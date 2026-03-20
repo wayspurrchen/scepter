@@ -1,0 +1,9 @@
+{
+  "noteTypes": {
+    "Task": { "shortcode": "T", "folder": "tasks" }
+  },
+  "project": {
+    "name": "Minimal Project",
+    "description": "A minimal SCEpter setup"
+  }
+}

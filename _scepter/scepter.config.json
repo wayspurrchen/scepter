@@ -1,0 +1,52 @@
+{
+  "noteTypes": {
+    "Architecture": {
+      "shortcode": "A",
+      "folder": "arch",
+      "description": "System architecture and high-level design"
+    },
+    "Requirement": {
+      "shortcode": "R",
+      "folder": "reqs",
+      "description": "Functional and non-functional requirements with acceptance criteria"
+    },
+    "Specification": {
+      "shortcode": "S",
+      "folder": "specs",
+      "description": "Subsystem specifications with claim-addressable sections"
+    },
+    "DetailedDesign": {
+      "shortcode": "DD",
+      "folder": "dd",
+      "description": "Implementation blueprints bridging specs to code"
+    },
+    "TestPlan": {
+      "shortcode": "TS",
+      "folder": "tests",
+      "description": "Test plans and verification strategies"
+    },
+    "Task": {
+      "shortcode": "T",
+      "folder": "tasks",
+      "description": "Actionable work items"
+    }
+  },
+  "paths": {
+    "notesRoot": "_scepter/notes",
+    "dataDir": "_scepter"
+  },
+  "project": {
+    "name": "SCEpter",
+    "description": "Software Composition Environment — CLI-first knowledge management for AI-assisted development"
+  },
+  "timestampPrecision": "datetime",
+  "claims": {
+    "projectionTypes": ["Requirement", "Specification", "DetailedDesign", "Source"]
+  },
+  "sourceCodeIntegration": {
+    "enabled": true,
+    "folders": ["core/src"],
+    "exclude": ["node_modules/**", "dist/**", "build/**", "**/*.test.ts"],
+    "extensions": [".ts", ".tsx", ".js", ".jsx"]
+  }
+}

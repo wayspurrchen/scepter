@@ -1,0 +1,30 @@
+.DS_Store
+/node_modules/
+node_modules/
+
+# Test directories
+.test-tmp/
+tmp/
+
+# Build output
+/dist
+
+# Local settings
+.claude/
+.mcp.json
+.cursor/
+
+# Debug and backup files
+__debug*
+.backups/
+*.backup*
+
+# AI tool artifacts
+.aider*
+.codecontext/cache/
+.codecontext/logs/
+
+# Lock files for non-npm package managers
+pnpm-lock.yaml
+pnpm-workspace.yaml
+bun.lock

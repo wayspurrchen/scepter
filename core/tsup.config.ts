@@ -1,0 +1,16 @@
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: ['src/cli/index.ts'],
+  format: ['cjs', 'esm'],
+  dts: true,
+  splitting: false,
+  sourcemap: true,
+  clean: true,
+  shims: true,
+  target: 'node18',
+  outDir: './dist',
+  esbuildOptions(options) {
+    options.platform = 'node';
+  },
+});

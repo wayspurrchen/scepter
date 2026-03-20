@@ -1,0 +1,59 @@
+{
+  "statusSets": {
+    "workflow": ["pending", "in-progress", "blocked", "completed"],
+    "approval": ["draft", "proposed", "approved", "rejected", "superseded"]
+  },
+  "noteTypes": {
+    "Requirement": {
+      "shortcode": "R",
+      "folder": "requirements",
+      "allowedStatuses": {
+        "sets": ["approval"],
+        "mode": "suggest"
+      }
+    },
+    "Decision": {
+      "shortcode": "D",
+      "folder": "decisions",
+      "allowedStatuses": {
+        "sets": ["approval"],
+        "mode": "suggest"
+      }
+    },
+    "Question": {
+      "shortcode": "Q",
+      "folder": "questions",
+      "allowedStatuses": ["open", "answered", "deferred"]
+    },
+    "Milestone": {
+      "shortcode": "M",
+      "folder": "milestones",
+      "allowedStatuses": {
+        "sets": ["workflow"],
+        "mode": "suggest"
+      }
+    }
+  },
+  "paths": {
+    "notesRoot": "_scepter",
+    "templatesRoot": "_scepter/_templates",
+    "dataDir": "_scepter"
+  },
+  "project": {
+    "name": "Example SCEpter Project",
+    "description": "An example SCEpter project with note types and status management"
+  },
+  "categories": {},
+  "sourceCodeIntegration": {
+    "enabled": true,
+    "folders": [
+      "src"
+    ],
+    "exclude": [
+      "node_modules/**"
+    ],
+    "extensions": [
+      ".ts"
+    ]
+  }
+}

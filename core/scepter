@@ -1,0 +1,11 @@
+#!/bin/sh
+# Resolve the actual script location (following symlinks)
+SCRIPT_PATH="$0"
+while [ -h "$SCRIPT_PATH" ]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  [[ $SCRIPT_PATH != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+exec tsx "$SCRIPT_DIR/src/cli/index.ts" "$@"

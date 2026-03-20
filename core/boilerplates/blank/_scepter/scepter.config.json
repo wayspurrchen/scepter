@@ -1,0 +1,19 @@
+{
+  "noteTypes": {},
+  "project": {
+    "name": "Blank Project",
+    "description": "A blank SCEpter setup -- add your own note types!"
+  },
+  "sourceCodeIntegration": {
+    "enabled": true,
+    "folders": [
+      "src"
+    ],
+    "exclude": [
+      "node_modules/**"
+    ],
+    "extensions": [
+      ".ts"
+    ]
+  }
+}

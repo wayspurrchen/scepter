@@ -1,0 +1,56 @@
+{
+  "noteTypes": {
+    "Requirement": {
+      "folder": "requirements",
+      "shortcode": "R",
+      "description": "Product and technical requirements that must be fulfilled"
+    },
+    "Decision": {
+      "folder": "decisions",
+      "shortcode": "D",
+      "description": "Architectural and technical decisions with documented rationale"
+    },
+    "Question": {
+      "folder": "questions",
+      "shortcode": "Q",
+      "description": "Open questions and uncertainties that need resolution"
+    },
+    "Component": {
+      "folder": "components",
+      "shortcode": "C",
+      "description": "System components and modules with their specifications"
+    },
+    "Milestone": {
+      "folder": "milestones",
+      "shortcode": "M",
+      "description": "Major project milestones and deliverables"
+    }
+  },
+  "paths": {
+    "notesRoot": "_scepter/notes",
+    "dataDir": "_scepter"
+  },
+  "project": {
+    "name": "Test SCEpter Project",
+    "description": "A comprehensive test fixture for SCEpter CLI testing",
+    "version": "0.1.0"
+  },
+  "sourceCodeIntegration": {
+    "enabled": true,
+    "folders": [
+      "src",
+      "lib",
+      "test"
+    ],
+    "exclude": [
+      "node_modules/**",
+      "**/*.test.js",
+      "**/*.spec.js"
+    ],
+    "extensions": [
+      ".js",
+      ".ts",
+      ".py"
+    ]
+  }
+}
