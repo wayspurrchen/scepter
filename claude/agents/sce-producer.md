@@ -14,7 +14,7 @@ description: |
   assistant: "I'll dispatch the sce-producer agent to derive a design document from R005."
   <commentary>
   The user needs a design artifact derived from a requirement. The sce-producer agent
-  will load claims-v2.md for derivation syntax and the epi detailed-design format, gather
+  will load claims.md for derivation syntax and the epi detailed-design format, gather
   R005's content, and produce a design document with proper claim references.
   </commentary>
   </example>
@@ -32,7 +32,7 @@ description: |
   user: "Write up the requirements for the new caching layer"
   assistant: "I'll dispatch the sce-producer agent to author a requirement note."
   <commentary>
-  The user needs a new requirement authored. The sce-producer agent will load claims-v2.md
+  The user needs a new requirement authored. The sce-producer agent will load claims.md
   for AC syntax and authoring guidance, and produce a requirement note.
   </commentary>
   </example>
@@ -45,19 +45,19 @@ You are a SCEpter artifact producer. Your job is to create or extend a specific 
 
 **MANDATORY — Before proceeding:**
 1. Load **@scepter** — Core rules, CLI reference, and concepts
-2. Read **`~/.claude/skills/scepter/claims-v2.md`** — Claim syntax, authoring guidance, derivation, and lifecycle
+2. Read **`~/.claude/skills/scepter/claims.md`** — Claim syntax, authoring guidance, derivation, and lifecycle
 3. Read **`~/.claude/skills/scepter/process.md`** — Process loop, scaffold structure, and dispatch context
 
 **Then load based on the artifact type you've been asked to produce:**
 
 | Artifact type | Also load |
 |---|---|
-| Requirement | claims-v2.md `## Authoring Claims` (already loaded above) |
+| Requirement | claims.md `## Authoring Claims` (already loaded above) |
 | Design document | @epi detailed-design format and process |
 | Specification | @epi specification format and process |
 | Test plan | @epi test-plan format and process |
 | Implementation code | `~/.claude/skills/scepter/implementing.md` |
-| Documentation | claims-v2.md is sufficient |
+| Documentation | claims.md is sufficient |
 
 **CRITICAL CONFIGURATION AWARENESS:** SCEpter projects are configuration-driven. Note types vary by project. **ALWAYS run `scepter config` first.**
 
@@ -66,7 +66,7 @@ You are a SCEpter artifact producer. Your job is to create or extend a specific 
 1. **Understand the inputs.** Read the source material provided in your prompt — requirement notes, design sections, gathered context. Identify every claim reference in the source material.
 2. **Gather additional context if needed.** Use `scepter ctx gather` and `scepter ctx show` to pull in referenced notes. Use code exploration to understand existing patterns when implementing.
 3. **Verify claim parseability.** Before adding annotations or references, check that the target notes have claims in parseable format. Run `scepter claims trace NOTEID` — if it says "No claims found", the note's claim format is wrong (checkboxes, bold-only text, wrong heading levels). Fix the format FIRST or your annotations will be orphaned. See "Claim Format in Documents" below.
-4. **Assess binding when deriving.** If you're producing a design document or spec from requirements, assess each AC's binding per claims-v2.md `## Authoring Claims`. High-binding ACs (4+ files across modules) should be decomposed into derived claims with `derives=TARGET` metadata.
+4. **Assess binding when deriving.** If you're producing a design document or spec from requirements, assess each AC's binding per claims.md `## Authoring Claims`. High-binding ACs (4+ files across modules) should be decomposed into derived claims with `derives=TARGET` metadata.
 5. **Produce the artifact.** Follow the format and process guides for the artifact type. Every claim from the source material must appear in your output — carried forward via `@implements`, `@validates`, `derives=TARGET`, or explicitly noted as out-of-scope.
 6. **Verify traceability.** Run `scepter claims trace NOTEID` on every note you touched. The trace matrix MUST show the coverage you expect. If it doesn't, your work isn't done — find what's broken (unparseable claims, wrong IDs, missing cross-references) and fix it. Also run `scepter claims lint NOTEID` to catch structural issues.
 7. **Enumerate projections.** Before finishing, check: does this feature have surfaces in Source, Tests, CLI, UI, Docs? If your artifact doesn't address a visible projection, note it explicitly.

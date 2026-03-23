@@ -234,8 +234,8 @@ The orchestrator does NOT implement or review. It coordinates.
 
 All swarm agents load `@scepter` (which includes rules, CLI reference, and core concepts). Then they read companion files based on their role:
 
-- **Producer**: Read `implementing.md` from this directory + `claims-v2.md`
-- **Reviewer**: Read `conformance.md` from this directory + `claims-v2.md`
+- **Producer**: Read `implementing.md` from this directory + `claims.md`
+- **Reviewer**: Read `conformance.md` from this directory + `claims.md`
 - **Linker**: Read `conformance.md` from this directory
 - **Researcher**: No additional companion files needed (reads `@scepter` only)
 
@@ -243,7 +243,7 @@ All agents also read **this file** (`swarm.md`) to understand the DM exchange pr
 
 ### Claims Awareness (ALL AGENTS)
 
-**Every agent in the swarm MUST read `claims-v2.md` from this skill directory** if the task context contains claim IDs (patterns like `§1.AC.01`, `R004.§3.AC.02`, `SEC.03`). Claims are SCEpter's sub-document traceability system — they are how individual acceptance criteria, constraints, and specifications are tracked across projections.
+**Every agent in the swarm MUST read `claims.md` from this skill directory** if the task context contains claim IDs (patterns like `§1.AC.01`, `R004.§3.AC.02`, `SEC.03`). Claims are SCEpter's sub-document traceability system — they are how individual acceptance criteria, constraints, and specifications are tracked across projections.
 
 - **Producers** must reference specific claims from upstream requirements, not just whole notes
 - **Producers** must add `@implements {NOTE.§N.PREFIX.NN}` annotations for each claim they satisfy

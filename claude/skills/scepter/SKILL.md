@@ -18,7 +18,7 @@ These rules prevent the most common agent failures. Violating any of them will b
 6. **CONNECT EVERYTHING** — Every note must reference related notes. Isolated notes are useless. Build the graph actively.
 7. **DATE EVERYTHING** — Run `date "+%Y-%m-%d"` before EVERY edit. Use the exact output. Never use "now", "today", or made-up dates.
 8. **REFERENCE IN CODE** — All code implementing SCEpter notes MUST include `@implements`, `@depends-on`, `@see`, or `@addresses` comments with note IDs.
-9. **USE CLAIM REFERENCES** — Use fully qualified claim paths: `{R012.§1.AC.15}` not bare `AC.15`. The dot between prefix and number is mandatory (`AC.01` not `AC01`). Hyphens are forbidden (`AC.01` not `AC-01`). **Read `claims-v2.md` from this skill directory for the full claim system.**
+9. **USE CLAIM REFERENCES** — Use fully qualified claim paths: `{R012.§1.AC.15}` not bare `AC.15`. The dot between prefix and number is mandatory (`AC.01` not `AC01`). Hyphens are forbidden (`AC.01` not `AC-01`). **Read `claims.md` from this skill directory for the full claim system.**
 
 ## Companion Files
 
@@ -39,15 +39,15 @@ WHAT OPERATION ARE YOU PERFORMING?
 │
 ├─ Multi-step feature work?  → Read process.md
 ├─ Working in a swarm?       → Read swarm.md
-├─ See claim IDs?            → Read claims-v2.md
+├─ See claim IDs?            → Read claims.md
 │
 ├─ AUTHORING claims (requirements, specs, DDs)?
-│   ├─ Read claims-v2.md (syntax, metadata, derives=)
+│   ├─ Read claims.md (syntax, metadata, derives=)
 │   └─ Producing a formal document? Load @epi format + process for that type
 │
 ├─ DERIVING (concretizing claims to a new projection)?
-│   ├─ To code → Read implementing.md + claims-v2.md
-│   ├─ To a DD/spec/other doc → Read claims-v2.md
+│   ├─ To code → Read implementing.md + claims.md
+│   ├─ To a DD/spec/other doc → Read claims.md
 │   └─ High-binding AC (maps to 4+ files)? Decompose with derives=TARGET
 │
 ├─ REVIEWING a claim stack?
@@ -64,7 +64,7 @@ WHAT OPERATION ARE YOU PERFORMING?
 │   └─ In notes → This file: `## Knowledge Graph`
 │
 ├─ VERIFYING / RETIRING / PROPAGATING claims?
-│   └─ Read claims-v2.md `### Lifecycle Tags` + `### CLI Tools`
+│   └─ Read claims.md `### Lifecycle Tags` + `### CLI Tools`
 │
 └─ Everything else?          → This file has what you need
 ```
@@ -83,7 +83,7 @@ SCEpter is a CLI-first knowledge management system that solves context loss and 
 
 **How it works:** Notes → References → Knowledge Graph → CLI queries → Context for AI agents
 
-**Key differentiator — Claim-level traceability:** SCEpter doesn't just link documents; it tracks individual claims (acceptance criteria, constraints, specifications) across projections. A requirement's `§2.AC.03` can be traced through the specification, into source code `@implements` annotations, and into test `@validates` markers. This is one of SCEpter's strongest value adds — agents are encouraged to use claim-level references (`{R004.§1.AC.03}`) over note-level references (`{R004}`) whenever the specific claim is known. See `claims-v2.md` in this skill directory for the full system.
+**Key differentiator — Claim-level traceability:** SCEpter doesn't just link documents; it tracks individual claims (acceptance criteria, constraints, specifications) across projections. A requirement's `§2.AC.03` can be traced through the specification, into source code `@implements` annotations, and into test `@validates` markers. This is one of SCEpter's strongest value adds — agents are encouraged to use claim-level references (`{R004.§1.AC.03}`) over note-level references (`{R004}`) whenever the specific claim is known. See `claims.md` in this skill directory for the full system.
 
 ## Core Architecture
 
@@ -144,7 +144,7 @@ class AuthService { ... }
 
 **Reference types:** `@implements`, `@depends-on`, `@addresses`, `@validates`, `@see`, plain `{ID}`.
 
-**Claim-level references** use dot notation: `{R012.§1.AC.15}`. Compact syntax for multiples: `{R012.§1.AC.11,.AC.29,.AC.30}`. Range syntax is supported: `{R012.§1.AC.01-30}`. The dot between prefix and number is mandatory — `AC01` and `AC-01` are both invalid. See `claims-v2.md` in this skill directory for the full syntax, rules, and examples.
+**Claim-level references** use dot notation: `{R012.§1.AC.15}`. Compact syntax for multiples: `{R012.§1.AC.11,.AC.29,.AC.30}`. Range syntax is supported: `{R012.§1.AC.01-30}`. The dot between prefix and number is mandatory — `AC01` and `AC-01` are both invalid. See `claims.md` in this skill directory for the full syntax, rules, and examples.
 
 **In tests:** `test('S002.§1.AC.01: eq matches identical values', () => { ... });`
 

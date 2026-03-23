@@ -50,6 +50,35 @@ scepter claims verify ARCH017.§11.AC.64 --actor "dev" --method "integration-tes
 
 These need separate derived claims because they're confirmed through different modes. The signal to watch for: if `@implements` would go on multiple files for different *reasons*, each reason is a separate claim. The failure mode when compound claims survive into implementation is the **standalone implementation trap**: an agent builds and annotates the capability half, the trace matrix shows coverage, and the integration or constraint half is never realized because the trace already looks green.
 
+**Never express a requirement as a consequence of a mechanism.** A common compound pattern that doesn't look compound:
+
+- **"X is achieved by Y"** — invariant + mechanism (different survival conditions)
+
+The requirement (what must hold) and the mechanism (how it currently holds) have different lifetimes. If the mechanism changes, the requirement must still be independently tracked. The diagnostic: **if the claim contains "because," "since," "automatically," or "through" followed by an implementation detail, the thing it serves should be its own claim.**
+
+Wrong — requirement hidden inside mechanism:
+```markdown
+§DC.42 SnapshotFieldDef MUST include shape, versioned, and companionFieldName
+properties. __SchemaSnapshot payloads capture all FieldDefinition properties —
+adding these fields preserves historical shapes automatically through the
+snapshot chain without additional storage mechanisms.
+```
+
+If someone later changes snapshots to selectively capture properties, the requirement ("historical shapes must be preserved") has no independent expression. The trace matrix shows DC.42 covered by the SnapshotFieldDef type definition, but the invariant it was meant to protect is invisible.
+
+Right — requirement and mechanism as separate claims:
+```markdown
+§DC.42 Schema snapshots MUST preserve blob shape metadata at every historical
+point. A snapshot from any point in history MUST be sufficient to reconstruct
+the shape contract that was active at that time.
+
+§DC.43 SnapshotFieldDef MUST include shape, versioned, and companionFieldName
+properties, read from FieldDefinition nodes during buildPayload(). This is the
+current mechanism for satisfying DC.42.
+```
+
+Now if the mechanism changes, DC.42 still exists as a requirement that must be satisfied by whatever replaces it.
+
 **Each step in a lifecycle or sequence diagram is a claim.** When a design document shows a numbered flow — "step 1: register schema, step 2: autoWire migrations, step 3: manual overrides" — each step asserts that something happens at that point in the sequence. If step 2 has no derived claim, no one tracks whether it was implemented.
 
 **Binding assessment includes projection boundaries.** The file-count heuristic (4+ files → decompose) is useful but secondary. The stronger signal is whether the claim crosses projection boundaries — architecture and implementation assertions in the same claim need decomposition even if the total file count is low.

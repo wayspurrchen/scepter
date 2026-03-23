@@ -2,7 +2,7 @@
 
 **Read this companion file when reviewing a claim stack for completeness or coherence.** This covers the analytical operations that happen BEFORE implementation (is the stack ready?) and AFTER changes (did anything break?).
 
-Ensure you have loaded `@scepter` (the main skill) first — it contains the non-negotiable rules, CLI reference, and core concepts. Also read `claims-v2.md` for claim syntax and derivation.
+Ensure you have loaded `@scepter` (the main skill) first — it contains the non-negotiable rules, CLI reference, and core concepts. Also read `claims.md` for claim syntax and derivation.
 
 **For deeper conceptual grounding** on claim properties (binding, inherence) and projections, optionally load `@epi vocabulary.md` §2 and §4.
 
@@ -88,7 +88,7 @@ For each AC, assess whether it needs decomposition into derived claims:
 
 **Low binding (pass through):** AC maps to 1-3 files in a single module. One `@implements` annotation covers it. Most ACs.
 
-**High binding (decompose):** AC maps to 4+ files across different modules or layers. A single `@implements` is too coarse — if one of those files has a bug, you can't tell which aspect of the AC failed. Create derived claims with `derives=TARGET` in the DD. See `claims-v2.md` §Derivation and Binding Assessment.
+**High binding (decompose):** AC maps to 4+ files across different modules or layers. A single `@implements` is too coarse — if one of those files has a bug, you can't tell which aspect of the AC failed. Create derived claims with `derives=TARGET` in the DD. See `claims.md` §Derivation and Binding Assessment.
 
 ## Coherence Review
 

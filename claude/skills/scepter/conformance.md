@@ -122,7 +122,7 @@ Actively verify any claims in the plan:
 
 ## Claim Verification
 
-Claims (e.g., `§1.AC.01`, `R004.§3.AC.02`) are SCEpter's mechanism for sub-document traceability. When validating implementations, you MUST verify that claims have been carried forward correctly. **Read `claims-v2.md` from this skill directory for the full claim syntax and rules.**
+Claims (e.g., `§1.AC.01`, `R004.§3.AC.02`) are SCEpter's mechanism for sub-document traceability. When validating implementations, you MUST verify that claims have been carried forward correctly. **Read `claims.md` from this skill directory for the full claim syntax and rules.**
 
 ### Start with the CLI
 

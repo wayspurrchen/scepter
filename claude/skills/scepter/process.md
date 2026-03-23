@@ -82,12 +82,12 @@ Produces artifacts. The prompt specifies what to create; the agent loads the app
 
 | Frontier item | Companion files | Inputs | Output |
 |---|---|---|---|
-| Author requirements | claims-v2.md | Problem description, existing notes | Requirement note with ACs |
-| Write design document from requirements | claims-v2.md, @epi detailed-design format | Requirement content, relevant code | Design doc with derived claims where needed |
-| Write test plan | claims-v2.md, @epi test-plan format | Requirement + design doc content | Test plan with @validates references |
+| Author requirements | claims.md | Problem description, existing notes | Requirement note with ACs |
+| Write design document from requirements | claims.md, @epi detailed-design format | Requirement content, relevant code | Design doc with derived claims where needed |
+| Write test plan | claims.md, @epi test-plan format | Requirement + design doc content | Test plan with @validates references |
 | Implement a design section | implementing.md | Design section, existing code | Code with @implements annotations |
-| Write specification | claims-v2.md, @epi spec format | Requirement + architecture notes | Spec with claim references |
-| Update documentation | claims-v2.md | Current file, feature context | Updated doc |
+| Write specification | claims.md, @epi spec format | Requirement + architecture notes | Spec with claim references |
+| Update documentation | claims.md | Current file, feature context | Updated doc |
 
 #### sce-reviewer
 

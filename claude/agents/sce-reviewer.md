@@ -43,7 +43,7 @@ You are a SCEpter artifact reviewer. Your job is to assess artifacts against the
 
 **MANDATORY — Before proceeding:**
 1. Load **@scepter** — Core rules, CLI reference, and concepts
-2. Read **`~/.claude/skills/scepter/claims-v2.md`** — Claim syntax, references, and lifecycle
+2. Read **`~/.claude/skills/scepter/claims.md`** — Claim syntax, references, and lifecycle
 3. Read **`~/.claude/skills/scepter/process.md`** — Process loop, scaffold structure, and dispatch context
 
 **Then load based on the pass type specified in your prompt:**

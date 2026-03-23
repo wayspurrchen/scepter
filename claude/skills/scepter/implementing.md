@@ -177,7 +177,7 @@ class AuthService {
 
 If your gathered context, task description, or reference documentation contains claim IDs (patterns like `§1.AC.01`, `R004.§3.AC.02`, `SEC.03`), you MUST:
 
-1. **Read `claims-v2.md`** from this skill directory for the full syntax, rules, and annotation patterns
+1. **Read `claims.md`** from this skill directory for the full syntax, rules, and annotation patterns
 2. **Carry forward every claim** from the reference material into your implementation via `@implements` annotations
 3. **Use fully qualified paths** in code: `{R004.§1.AC.01}` not bare `AC.01`
 
@@ -193,7 +193,7 @@ Quick reference — the annotation looks like this:
 
 **Do not drop claims silently.** If a claim from the reference material is out of scope for your current work, note it explicitly rather than ignoring it.
 
-For the full claim syntax, forbidden forms, compact notation, traceability matrix integration, and annotation workflow, read `claims-v2.md`.
+For the full claim syntax, forbidden forms, compact notation, traceability matrix integration, and annotation workflow, read `claims.md`.
 
 ## Updating Claim Threads (MANDATORY)
 
