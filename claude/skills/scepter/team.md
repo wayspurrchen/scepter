@@ -1,12 +1,12 @@
-# SCEpter Swarm: Paired-Agent Implementation Protocol
+# SCEpter Agent Teams: Paired-Agent Implementation Protocol
 
-**Read this companion file when operating as part of a swarm team.** This defines how producer-reviewer pairs coordinate via DM exchange, how the linker operates as a background tag-along, and protocols for blocking, escalation, and phase transitions.
+**Read this companion file when operating as part of an agent team.** This defines how producer-reviewer pairs coordinate via DM exchange, how the linker operates as a background tag-along, and protocols for blocking, escalation, and phase transitions.
 
-Ensure you have loaded `@scepter` (the main skill) first. Agents in a swarm should also read `implementing.md` or `conformance.md` from this directory depending on their role.
+Ensure you have loaded `@scepter` (the main skill) first. Agents on a team should also read `implementing.md` or `conformance.md` from this directory depending on their role.
 
 ## Core Concept
 
-The swarm replaces sequential agent handoffs with **live dialogue pairs**. Instead of "produce artifact → hand off → validate → loop if fail," two agents work the same phase simultaneously: one produces, one reviews, and they exchange feedback as work progresses.
+The agent team replaces sequential agent handoffs with **live dialogue pairs**. Instead of "produce artifact → hand off → validate → loop if fail," two agents work the same phase simultaneously: one produces, one reviews, and they exchange feedback as work progresses.
 
 There is exactly **one dialogue pair** and one **background tag-along**:
 
@@ -19,7 +19,7 @@ There is exactly **one dialogue pair** and one **background tag-along**:
 
 ## STRICT: Bash Command Discipline (ALL AGENTS)
 
-**Compound or complex Bash commands trigger a human approval prompt in Claude Code, which STALLS the entire swarm until a human intervenes.** This is catastrophic to throughput. Every agent MUST follow these rules without exception:
+**Compound or complex Bash commands trigger a human approval prompt in Claude Code, which STALLS the entire team until a human intervenes.** This is catastrophic to throughput. Every agent MUST follow these rules without exception:
 
 ### Prohibited Patterns
 
@@ -38,7 +38,7 @@ There is exactly **one dialogue pair** and one **background tag-along**:
 
 ### Why This Matters
 
-A single compound command requiring human approval can block an agent for the entire duration of the human's absence. In a swarm, this means the paired agent is also blocked waiting for messages. One bad Bash call can halt the entire team. **When in doubt, use a dedicated tool or split into multiple simple calls.**
+A single compound command requiring human approval can block an agent for the entire duration of the human's absence. In a team, this means the paired agent is also blocked waiting for messages. One bad Bash call can halt the entire team. **When in doubt, use a dedicated tool or split into multiple simple calls.**
 
 ## The Two Phases
 
@@ -232,18 +232,18 @@ The orchestrator does NOT implement or review. It coordinates.
 
 ## Agent Skill Loading
 
-All swarm agents load `@scepter` (which includes rules, CLI reference, and core concepts). Then they read companion files based on their role:
+All team agents load `@scepter` (which includes rules, CLI reference, and core concepts). Then they read companion files based on their role:
 
 - **Producer**: Read `implementing.md` from this directory + `claims.md`
 - **Reviewer**: Read `conformance.md` from this directory + `claims.md`
 - **Linker**: Read `conformance.md` from this directory
 - **Researcher**: No additional companion files needed (reads `@scepter` only)
 
-All agents also read **this file** (`swarm.md`) to understand the DM exchange protocol and their role.
+All agents also read **this file** (`team.md`) to understand the DM exchange protocol and their role.
 
 ### Claims Awareness (ALL AGENTS)
 
-**Every agent in the swarm MUST read `claims.md` from this skill directory** if the task context contains claim IDs (patterns like `§1.AC.01`, `R004.§3.AC.02`, `SEC.03`). Claims are SCEpter's sub-document traceability system — they are how individual acceptance criteria, constraints, and specifications are tracked across projections.
+**Every agent on the team MUST read `claims.md` from this skill directory** if the task context contains claim IDs (patterns like `§1.AC.01`, `R004.§3.AC.02`, `SEC.03`). Claims are SCEpter's sub-document traceability system — they are how individual acceptance criteria, constraints, and specifications are tracked across projections.
 
 - **Producers** must reference specific claims from upstream requirements, not just whole notes
 - **Producers** must add `@implements {NOTE.§N.PREFIX.NN}` annotations for each claim they satisfy

@@ -38,7 +38,7 @@ WHAT OPERATION ARE YOU PERFORMING?
 │      Read claude/agents/sce-reviewer.md and launch with Agent tool.
 │
 ├─ Multi-step feature work?  → Read process.md
-├─ Working in a swarm?       → Read swarm.md
+├─ Working in an agent team?  → Read team.md
 ├─ See claim IDs?            → Read claims.md
 │
 ├─ AUTHORING claims (requirements, specs, DDs)?
