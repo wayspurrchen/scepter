@@ -307,6 +307,17 @@ Check `scepter config` and `scepter types list` for project-specific allowed sta
 ❌ Creating note then writing `{D005}` assuming that's the ID
 ✅ `scepter create Decision "..."` → read ID from output (might be D003!) → then use `{D003}` in references
 
+### 7. Preserving Dead Provenance When Editing
+
+❌ `### Query-expressible methods (currently classified as "distinct-purpose" — revised 2026-03-28)`
+✅ `### Query-expressible methods`
+
+**Why:** When correcting, updating, or rewriting a document, do NOT preserve the old wrong state inline. A note saying "this was previously classified as X" has zero value when the reclassification happened in the same session or has no downstream consumers who relied on the old classification. It wastes tokens, confuses future readers, and creates noise that looks like it might be load-bearing history when it isn't.
+
+**The test:** Does the old state have a provenance chain that someone might need to trace? Did other documents, code, or decisions depend on the old classification? If yes, the history matters — capture it in a status update, a decision note, or a checkpoint. If no (the correction is within the same working session, or no one ever acted on the wrong version), just write the correct thing. The git history preserves what changed; the document should reflect what IS.
+
+**This applies to:** Section headers, claim text, architectural descriptions, any prose being corrected. It does NOT apply to lifecycle-tagged claims (`:removed`, `:superseded`) — those use the claim lifecycle system, not inline annotations.
+
 ## Note Creation Guidelines
 
 **Triggers:** Decision made → Decision note. Requirement discovered → Requirement note. Question arises → Question note. Work identified → Task.

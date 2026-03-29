@@ -61,10 +61,9 @@ scepter ctx list --types [YourType] --tags relevant
 
 - Follow the plan to the letter. No extra features.
 - Only implement what's explicitly required.
-- Deviations only if an issue blocks correctness/safety:
-  - Document the issue, proposed minimal change, rationale
-  - Prefer the smallest corrective change
-  - If larger changes needed, pause and request plan update
+- **Deviations require explicit escalation.** If the plan or spec can't be implemented as written — a missing API, a wrong type, a feature that doesn't exist — you MUST halt on that piece and report the divergence to the user or team lead. Do not improvise, invent workarounds, comment out requirements, or narrow scope silently. Implement everything else around the blocked piece and leave the gap visible.
+- The only deviation that does not require escalation is a purely internal implementation detail (variable names, loop structure, private helpers) that is invisible to all consumers and affects no claim, test, or external interface.
+- See team.md "Specification Fidelity and Divergence Protocol" for the full rule, including the BLOCKED message format.
 
 ### Iterative Layering
 
@@ -132,6 +131,30 @@ When adding claims to a codebase that predates the claims system (no `@implement
 ## Source Code References
 
 All code implementing SCEpter notes MUST include references. These are **mandatory**, not optional.
+
+### CRITICAL: `@implements` Means Actually Implemented
+
+**NEVER use `@implements` on code that does not actually implement the claim.** A stub, placeholder, or empty function that returns a hardcoded empty result or throws "not implemented" is NOT an implementation. Annotating a stub with `@implements` is **worse than no annotation at all** — it makes the trace matrix show Source coverage for a claim that has no real implementation, hiding the gap from every downstream consumer of `scepter claims trace` and `scepter claims gaps`.
+
+This failure mode is insidious. A phased implementation creates stubs for Phase 2 features, annotates them with `@implements`, and the trace matrix goes green. Nobody notices the features are missing because the mechanical system says they're covered. The gap is invisible until someone actually tries to use the feature.
+
+**Rules:**
+- **Stub / placeholder / no-op**: Use `@see` or a plain `{ID}` comment. NEVER `@implements`.
+- **Partial implementation** (some behavior works, some doesn't): Use `@implements` ONLY on the parts that work. Use `@see` on the parts that don't, with a comment explaining what's missing.
+- **Deferred claims**: Tag the claim itself with `:deferred` in the note. In code, use `@see` with a comment like "Phase 2 — not yet implemented".
+- **If you write a stub**, the corresponding claim in the DD/spec MUST carry `:deferred`. If it doesn't, add it. The claim lifecycle and the code must agree.
+
+**Wrong:**
+```typescript
+// @implements {S004.§3.AC.02} Widget extraction (Phase 2 stub)
+export const extractWidgets = (_input, _config) => [];  // RETURNS NOTHING
+```
+
+**Right:**
+```typescript
+// @see {S004.§3.AC.02} Widget extraction — Phase 2, not yet implemented
+export const extractWidgets = (_input, _config) => [];
+```
 
 ### Reference Types
 

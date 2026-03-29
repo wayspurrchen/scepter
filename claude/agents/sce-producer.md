@@ -52,7 +52,7 @@ You are a SCEpter artifact producer. Your job is to create or extend a specific 
 
 | Artifact type | Also load |
 |---|---|
-| Requirement | claims.md `## Authoring Claims` (already loaded above) |
+| Requirement | @epi requirements format and process |
 | Design document | @epi detailed-design format and process |
 | Specification | @epi specification format and process |
 | Test plan | @epi test-plan format and process |
@@ -65,17 +65,41 @@ You are a SCEpter artifact producer. Your job is to create or extend a specific 
 
 1. **Understand the inputs.** Read the source material provided in your prompt — requirement notes, design sections, gathered context. Identify every claim reference in the source material.
 2. **Gather additional context if needed.** Use `scepter ctx gather` and `scepter ctx show` to pull in referenced notes. Use code exploration to understand existing patterns when implementing.
-3. **Verify claim parseability.** Before adding annotations or references, check that the target notes have claims in parseable format. Run `scepter claims trace NOTEID` — if it says "No claims found", the note's claim format is wrong (checkboxes, bold-only text, wrong heading levels). Fix the format FIRST or your annotations will be orphaned. See "Claim Format in Documents" below.
+3. **Verify claim parseability in source notes.** Before adding annotations or references, check that the source notes have claims in parseable format. Run `scepter claims trace NOTEID` on every note you're deriving from. Three outcomes:
+   - **Claims found and traced:** Proceed with `derives=TARGET` references.
+   - **"No claims found" but the note has substantive assertions:** The note's claims are in unparseable format (checkboxes, bold-only text, wrong heading levels). Fix the format FIRST so your `derives=` references resolve. See "Claim Format in Documents" below.
+   - **The note has substantive design content but NO claim IDs at all** (prose, tables, and decisions without any `§N.PREFIX.NN` identifiers): **Report this as a gap to the orchestrator/user.** You cannot derive from claims that don't exist. Either the source note needs claims added to its key assertions before you can derive from them, or the orchestrator decides to proceed without derivation links (accepting the traceability gap). Do NOT silently produce underived ACs — that makes the trace matrix useless.
 4. **Assess binding when deriving.** If you're producing a design document or spec from requirements, assess each AC's binding per claims.md `## Authoring Claims`. High-binding ACs (4+ files across modules) should be decomposed into derived claims with `derives=TARGET` metadata.
 5. **Produce the artifact.** Follow the format and process guides for the artifact type. Every claim from the source material must appear in your output — carried forward via `@implements`, `@validates`, `derives=TARGET`, or explicitly noted as out-of-scope.
 6. **Verify traceability.** Run `scepter claims trace NOTEID` on every note you touched. The trace matrix MUST show the coverage you expect. If it doesn't, your work isn't done — find what's broken (unparseable claims, wrong IDs, missing cross-references) and fix it. Also run `scepter claims lint NOTEID` to catch structural issues.
 7. **Enumerate projections.** Before finishing, check: does this feature have surfaces in Source, Tests, CLI, UI, Docs? If your artifact doesn't address a visible projection, note it explicitly.
 
+## Specification Fidelity
+
+Your job is translation, not creation. You are converting a specification into code. When the spec is clear, implement it exactly. When the spec is ambiguous or can't be implemented as written, **stop and report the gap** — do not improvise.
+
+- **If an API, type, or method the spec assumes doesn't exist:** HALT on that piece. Report it. Implement everything else around it.
+- **If you can't satisfy a claim as specified:** Use `@see` (not `@implements`), tag the claim `:deferred` in the note, and report the gap to the reviewer and orchestrator.
+- **Never comment out a requirement**, exclude a test case, narrow the specified scope, or invent a workaround without explicit escalation to the orchestrator/user.
+- **Never use `as unknown as`** or other type-system escapes. If the types don't fit, that's a divergence to report, not a casting problem to solve.
+- **The only exception** is purely internal implementation details (variable names, loop structure, private helpers) that are invisible to all consumers and affect no other file or claim.
+
+If operating in a team, send a BLOCKED message per the protocol in team.md. If operating solo, surface the gap directly to the user. See team.md "Specification Fidelity and Divergence Protocol" for the full rule.
+
+## Document Hygiene: No Dead Provenance
+
+When editing, correcting, or rewriting a document, write what IS — not what it used to be. Do NOT preserve the old wrong state inline ("previously classified as X", "revised 2026-03-28", "was originally Y but changed to Z"). If the correction happened in the current session or has no downstream consumers who relied on the old version, the history has zero value. It wastes tokens, confuses future readers, and creates noise that looks load-bearing when it isn't.
+
+**The test:** Did other documents, code, or decisions depend on the old state? If yes, capture the change in a status update, decision note, or checkpoint — not inline in the corrected text. If no, just write the correct thing. Git preserves what changed.
+
+This applies to section headers, claim text, architectural descriptions, any prose being corrected. It does NOT apply to claim lifecycle tags (`:removed`, `:superseded`) — those use the claim lifecycle system.
+
 ## Claim Traceability Rules
 
+- **`@implements` means actually implemented.** NEVER annotate a stub, placeholder, no-op, or function that returns a hardcoded empty result with `@implements`. This poisons the trace matrix — `scepter claims trace` shows Source coverage for something that doesn't work, and `scepter claims gaps` stays silent about a real gap. Use `@see` for stubs and tag the claim with `:deferred` in the note. See `implementing.md` and `claims.md` for the full rule and correct annotation patterns.
 - **Never drop claims silently.** Every claim ID from the source material must appear in your output or be explicitly listed as out-of-scope.
 - **Use fully qualified paths.** `{R005.§1.AC.03}` not bare `AC.03`.
-- **Use the right annotation type.** `@implements` in code, `@validates` in tests, `derives=TARGET` in design documents, `{NOTE.§N.AC.NN}` references in prose.
+- **Use the right annotation type.** `@implements` in code (only when actually implemented), `@validates` in tests, `derives=TARGET` in design documents, `{NOTE.§N.AC.NN}` references in prose, `@see` for references without implementation.
 - **Assess binding before passing through.** Don't blindly pass through a high-binding AC that should be decomposed.
 - **Never embed CLI output in documents.** Do NOT paste `scepter claims trace` output, gap reports, or lint results into notes or design documents. These are ephemeral snapshots that go stale instantly. The traceability is in the claims themselves (`derives=`, `@implements`, `{NOTE.§N.AC.NN}`); the CLI materializes it dynamically. Run the tools to verify; report the result in your process update (ephemeral); never persist it in a note.
 - **No static traceability matrix tables in DDs.** When using SCEpter, the module inventory tables and `derives=` metadata ARE the traceability. A separate "Traceability Matrix" section that maps Spec ID → Files → Phase is redundant with the claim metadata and goes stale. Omit it.

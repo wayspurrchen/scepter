@@ -293,8 +293,18 @@ Lifecycle tags go in the metadata suffix. Mutually exclusive — at most one per
 |-----|---------|----------------|
 | `:closed` | Gap resolved | Excluded (use `--include-closed`) |
 | `:deferred` | Intentionally postponed | Excluded (use `--include-deferred`) |
-| `:removed` | Claim retired; ID not reused | Excluded; linter warns if still referenced |
+| `:removed` | Claim retired; ID not reused (see "Removing Claims" below) | Excluded; linter warns if still referenced |
 | `:superseded=TARGET` | Replaced by TARGET | Excluded; linter validates TARGET exists |
+
+### Removing Claims
+
+When a claim is retired via `:removed`, the original claim text MUST be replaced with `[Removed]` in the document. The claim ID line is retained (for parseability and to prevent ID reuse), but the substantive text is cleared so that invalid requirements are not mistaken for active ones.
+
+```markdown
+§5.AC.04:removed [Removed]
+```
+
+The ID stays (monotonic, never recycled). The text goes. A future reader sees that something was here, that it was removed, and doesn't waste time evaluating a dead claim. Any references to the removed claim in other notes or code should be updated or removed — the linter warns about these.
 
 ### Enumerating Projections
 
@@ -313,6 +323,15 @@ Missing a projection = gap. Add ACs or explicitly note as out-of-scope.
 ## Using Claims
 
 ### In Code
+
+**`@implements` MEANS ACTUALLY IMPLEMENTED.** This is a non-negotiable rule. If the code does not realize the claim's behavior — if it is a stub, a placeholder, a no-op, or returns a hardcoded empty result — it is NOT an implementation and MUST NOT carry `@implements`. Violations poison the trace matrix: `scepter claims trace` shows Source coverage for something that doesn't work, and `scepter claims gaps` stays silent about a real gap. This failure mode is insidious in phased implementations — stubs get annotated with `@implements`, the trace matrix goes green, and nobody notices the features are missing because the mechanical system says they're covered.
+
+| Code state | Correct annotation | Wrong annotation |
+|---|---|---|
+| **Full implementation** | `@implements {ID}` | — |
+| **Stub / no-op / returns `[]`** | `@see {ID}` + comment "not yet implemented" | `@implements {ID}` |
+| **Partial implementation** | `@implements {ID}` on working parts; `@see {ID}` on stubs | `@implements {ID}` on everything |
+| **Deferred to later phase** | `@see {ID}` + claim must carry `:deferred` in the note | `@implements {ID}` with "(stub)" in comment |
 
 ```typescript
 /**
@@ -342,21 +361,35 @@ When reference documentation contains claim IDs, you MUST:
 3. **Never drop claims silently** — note out-of-scope explicitly
 4. **Use the most specific reference** — `{R004.§1.AC.03}`, not `{R004}`
 
-### CLI Tools
+### CLI Tools (MANDATORY — Use These, Don't Guess)
+
+**You MUST use the claims CLI to verify traceability.** Do not rely on reading code comments, grep results, or your own memory to determine whether a claim is implemented, traced, or has gaps. The CLI is the single source of truth for claim state. If you haven't run `scepter claims trace` on a claim, you don't know its status.
 
 ```bash
+# TRACING — What projections cover this claim?
 scepter claims trace R004                    # Traceability matrix for a note
 scepter claims trace R004.§1.AC.01           # Trace a single claim
 scepter claims trace R004.§1.AC.01,R005.§2.AC.03  # Trace multiple claims (cross-note)
 scepter claims trace R004.§1.AC.01-06        # Trace a range
+
+# THREADING — Where does this claim derive from / lead to?
 scepter claims thread R004.§1.AC.01          # Derivation tree for a claim
 scepter claims thread R004 --depth 2         # All claim threads in a note
+
+# GAPS — What's missing?
 scepter claims gaps                          # Claims with partial projection coverage
 scepter claims gaps --include-zero           # Also show completely untraced claims
+scepter claims gaps --include-deferred       # Include deferred claims
 scepter claims gaps --projection Source      # Filter to specific projection types
+
+# VALIDATION
 scepter claims lint R004                     # Structural validation
 scepter claims index                         # Build/rebuild claim index
+
+# SEARCH
 scepter claims search "autoWire" --regex     # Search claims (use --regex for alternation |)
+
+# VERIFICATION & STALENESS
 scepter claims verify R004.§1.AC.03          # Record verification
 scepter claims verify R004.§1.AC.03 --actor "developer" --method "code review"
 scepter claims stale R004                    # Check for stale claims
@@ -365,7 +398,11 @@ scepter claims stale --importance 4          # Filter by importance
 
 `trace` shows a matrix with one row per claim and columns per projection type. `-` means no coverage. Use `--importance N` to filter.
 
-**Workflow**: Run `trace` before coding (find gaps) → add `@implements` while coding → run `trace` after (verify coverage).
+**Required workflow — no exceptions:**
+1. **Before coding**: Run `trace` on every claim you're about to implement. Know the current state.
+2. **While coding**: Add `@implements` annotations (only on code that actually implements the claim — see "In Code" above).
+3. **After coding**: Run `trace` again. Verify the Source column shows your files. Run `gaps` to check for holes.
+4. **When investigating claims**: Use `thread` to trace derivation chains and `search` to find related claims. Do not grep the notes directory — the CLI resolves cross-references that raw text search cannot.
 
 ### How Traceability Works Mechanically
 
@@ -401,11 +438,13 @@ The verification steps (1, 2, 5) are not optional — they're how you confirm th
 
 | Mistake | Correct form |
 |---------|--------------|
+| `@implements` on a stub/no-op | `@see` + `:deferred` on the claim. **This poisons the trace matrix.** |
 | `AC01` (missing dot) | `AC.01` |
 | `AC-01` (hyphen) | `AC.01` |
 | `{R012.15}` (bare number = section, not claim) | `{R012.§1.AC.15}` |
 | Bare `AC.01` in code (ambiguous) | `{R004.§1.AC.01}` |
 | Dropping claims from reference docs | Carry forward or note as out-of-scope |
+| Guessing claim status without CLI | Run `scepter claims trace` — the CLI is the source of truth |
 | Dates in documents | Use `scepter claims verify` (sidecar store) |
 | `:priority` or `:important` | Use bare digit `:4` |
 | `**DC.01** \`derives=...\`` (bold + code span) | `DC.01:derives=...` (colon-suffix) |

@@ -80,6 +80,91 @@ The producer writes code. The reviewer reads actual files and checks against the
 8. If not PASS: specific issues sent back, producer addresses them
 9. On PASS: both signal orchestrator, phase ends
 
+## Specification Fidelity and Divergence Protocol (ALL AGENTS INCLUDING ORCHESTRATOR)
+
+This section applies to every agent on the team — producer, reviewer, linker — AND to the orchestrator (the main Claude Code session). There are no exceptions.
+
+### The Rule
+
+Implementation is mechanical translation from specification to code. The spec is the contract. The agent's job is to realize the spec precisely, not to "get the task done." When those two goals conflict, fidelity to the spec wins. Always.
+
+### When the Spec Can't Be Implemented As Written
+
+If an agent encounters a divergence — a missing API, a type that doesn't exist, an interface that doesn't match what the spec assumes, a feature that would require changes outside the current scope — the agent MUST:
+
+1. **HALT on that specific piece.** Do not implement it. Do not approximate it. Do not comment it out. Do not stub it and mark it `@implements`.
+2. **Continue implementing everything else** that does not depend on the blocked piece. Maximize useful output around the gap.
+3. **Report the divergence explicitly.** In a team: send a BLOCKED message to the reviewer and orchestrator. Solo: surface the gap to the user immediately.
+4. **Leave the blocked piece visibly unimplemented.** No code, no stub, no workaround. The absence is the signal.
+
+**BLOCKED message format (teams):**
+```markdown
+## BLOCKED: {CLAIM_ID}
+
+### Spec says
+[Exact claim text from the spec/DD]
+
+### Reality
+[What actually exists in the codebase — the missing API, wrong type, etc.]
+
+### Why it can't be implemented as specified
+[The specific incompatibility]
+
+### What I did instead
+Nothing. This piece is untouched, waiting for resolution.
+
+### Impact on surrounding work
+[What other claims depend on this, if any]
+```
+
+**Solo agent (including orchestrator):** Surface the same information to the user directly. Do not attempt to resolve it yourself unless you have complete certainty that your resolution matches the spec's intent. "Complete certainty" means you can point to a specific claim, decision note, or settled architecture that resolves the ambiguity. If you're reasoning from general principles or guessing what the spec probably meant, that's not certainty — yield to the user.
+
+### The One Exception
+
+Purely internal implementation details — variable names, loop structure, local algorithm choice, private helper functions — that are invisible to every external consumer and have zero upstream or downstream effects may be decided by the agent. The test: if changing this decision would require updating any claim, any test assertion, any public API, or any other file, it is NOT a purely internal detail.
+
+### What Counts as Silent Divergence (Protocol Violation)
+
+All of the following are protocol violations equivalent in severity to data loss:
+
+- **Commenting out a requirement** ("can be added later") without escalating
+- **Excluding a test case or backend** that the spec lists, without escalating
+- **Stubbing a function and annotating it `@implements`** (see claims.md — use `@see` and `:deferred`)
+- **Narrowing scope** (e.g., "we'll skip Neo4j for now") without escalating
+- **Inventing an API or type** that doesn't exist in the codebase to make the spec work
+- **Using `as unknown as`** or other type-system escapes to force a round peg into a square hole
+- **Proceeding with incomplete context** when the agent isn't sure whether the spec can be satisfied
+
+### Escalation Path for BLOCKED Items
+
+When the orchestrator receives a BLOCKED message from a subagent:
+
+1. **Assess whether the orchestrator can resolve it directly.** A resolution is valid ONLY if it requires no spec interpretation — e.g., adding a missing getter method, fixing an import path, correcting a type name that was renamed. The fix must be mechanical and obvious.
+2. **If the orchestrator can resolve it:** make the fix, notify the producer, and log what was done. The producer resumes on that piece.
+3. **If the orchestrator cannot resolve it** — because the resolution requires a design choice, a scope decision, a spec clarification, or anything that involves judgment about what the system should do — **escalate to the user immediately.** Present the BLOCKED message contents and wait for the user's decision.
+4. **The orchestrator does NOT have authority to silently defer.** "We'll skip this for now" is not an orchestrator-level decision. Only the user can defer a spec claim.
+
+### Orchestrator Responsibilities (Fidelity)
+
+The orchestrator (main session agent) is not exempt from this protocol. When subagents or the orchestrator's own work encounters a spec divergence:
+
+1. **Surface it to the user.** Do not resolve ambiguities by reasoning about what the spec "probably" means.
+2. **Present the divergence clearly**: what the spec says, what reality is, why they don't match.
+3. **Wait for the user's decision** before proceeding on the blocked piece.
+4. **Do not relay subagent workarounds as completed work.** If a subagent reports "done" but worked around a spec requirement, the orchestrator must flag it, not pass it through.
+
+### Reviewer Enforcement
+
+The reviewer MUST specifically check for silent divergences during every review pass:
+
+- Scan for commented-out features or test cases that reference spec claims
+- Check whether all backends/scenarios listed in the spec are present in the implementation
+- Verify `@implements` annotations point to real implementations, not stubs (see claims.md)
+- Run `tsc --noEmit` (or the project's type checker) before issuing any verdict — a PASS on code that doesn't compile is void
+- Compare the scope of what was implemented against the scope of what was specified — are any claims quietly missing?
+
+A reviewer who passes silent divergence shares responsibility for the protocol violation.
+
 ## The Tag-Along: Linker
 
 The `sce-linker` runs as a **background task after each dialogue phase completes**. It does not participate in any pair. No agent needs to interact with it, wait for it, or send it messages.
@@ -225,10 +310,23 @@ The orchestrator (user's Claude Code session) manages:
 3. **Linker dispatch**: Fire linker in background after each phase
 4. **Linker collection**: Wait for linker output before user review
 5. **Researcher dispatch**: Available to any agent that requests context
-6. **Escalation handling**: Surface disagreements and failures to user
+6. **Escalation handling**: Surface disagreements, failures, and BLOCKED items to user
 7. **Shutdown**: Graceful `shutdown_request` to all agents when done
 
-The orchestrator does NOT implement or review. It coordinates.
+The orchestrator does NOT implement or review. It coordinates. But coordination includes verification — the orchestrator is not a relay.
+
+### Independent Verification (MANDATORY)
+
+**The orchestrator MUST NOT present agent verdicts to the user without independent verification.** An agent saying "PASS" or "216 tests passing" is a claim, not a fact. Before presenting results to the user:
+
+1. **Run `tsc --noEmit`** (or the project's type checker) yourself. If it fails, the agent's verdict is void regardless of what they reported.
+2. **Run the test suite** yourself. If it fails, same.
+3. **Spot-check scope alignment.** Compare what the spec said should be implemented against what the agent says it implemented. Are any claims missing from the agent's report? Are any backends, scenarios, or test dimensions from the spec absent?
+4. **Check for BLOCKED items that were silently resolved.** If the agent originally reported a divergence and later reported success, verify the resolution was correct — don't assume.
+
+If independent verification reveals problems, do NOT present the agent's verdict to the user. Present the actual state: "The agent reported PASS, but `tsc --noEmit` shows 5 errors" or "The agent excluded Neo4j from the test matrix despite the spec requiring it."
+
+The cost of this verification is minutes. The cost of relaying a false PASS is a user who trusts a broken implementation.
 
 ## Agent Skill Loading
 
