@@ -43,6 +43,8 @@ export interface TraceabilityRow {
   projections: Map<string, ProjectionPresence[]>;  // keyed by noteType
   unresolved?: boolean;         // true when target claim could not be resolved in the index
   noteType?: string;            // the note type this claim is defined in (for gap display)
+  isOutgoing?: boolean;         // true when this row is from the outgoing (referenced-by-this-note) section
+  relevantProjections?: Set<string>;  // projection types relevant to this row's source type (for gap display)
 }
 
 export interface TraceabilityMatrix {
@@ -123,9 +125,24 @@ export function buildTraceabilityMatrix(
 
   if (sourceClaims.length > 0 && hasOutgoing) {
     // Dual-role note: defines claims AND references external claims.
-    // Merge both directions into a single matrix.
+    // Merge both directions, with outgoing rows marked and derivation
+    // duplicates filtered out.
     const incoming = buildIncomingMatrix(noteId, sourceNoteType, sourceClaims, index);
     const outgoing = buildOutgoingMatrix(noteId, sourceNoteType, index);
+
+    // Collect all derivation sources from incoming claims — these already
+    // appear as projection column entries, so exclude them from outgoing rows.
+    const derivationSources = new Set<string>();
+    for (const claim of sourceClaims) {
+      for (const src of claim.derivedFrom) {
+        derivationSources.add(src);
+      }
+    }
+
+    // Mark outgoing rows and filter derivation-source duplicates
+    const filteredOutgoing = outgoing.rows
+      .filter(row => !derivationSources.has(row.claimId))
+      .map(row => ({ ...row, isOutgoing: true as const }));
 
     // Combine projection types from both
     const allTypes = new Set([...incoming.projectionTypes, ...outgoing.projectionTypes]);
@@ -133,7 +150,7 @@ export function buildTraceabilityMatrix(
     return {
       sourceNoteId: noteId,
       sourceNoteType,
-      rows: [...incoming.rows, ...outgoing.rows],
+      rows: [...incoming.rows, ...filteredOutgoing],
       projectionTypes: [...allTypes].sort(),
     };
   }
@@ -193,6 +210,27 @@ function buildIncomingMatrix(
       const existing = projections.get(fromType) ?? [];
       existing.push(presence);
       projections.set(fromType, existing);
+    }
+
+    // Derivation sources create projection coverage: if this claim derives
+    // from ARCH023.ARCH.14, the Architecture column should show ARCH023.
+    for (const derivSource of claim.derivedFrom) {
+      const sourceEntry = index.entries.get(derivSource);
+      if (sourceEntry) {
+        const sourceType = sourceEntry.noteType;
+        projectionTypesSet.add(sourceType);
+
+        const existing = projections.get(sourceType) ?? [];
+        // Avoid duplicate if already present from a cross-reference
+        if (!existing.some(p => p.noteId === sourceEntry.noteId && p.claimId === derivSource)) {
+          existing.push({
+            noteId: sourceEntry.noteId,
+            noteType: sourceType,
+            claimId: derivSource,
+          });
+          projections.set(sourceType, existing);
+        }
+      }
     }
 
     // @implements {R005.§1.AC.02} Copy importance from ClaimIndexEntry
@@ -538,40 +576,63 @@ export function findPartialCoverageGaps(
   const excludeClosed = options?.excludeClosed ?? true;
   const excludeDeferred = options?.excludeDeferred ?? true;
 
-  // Step 1: Discover all projection types from actual cross-references.
-  // A projection type is the note type of any note that references a claim
-  // (excluding the claim's own note type).
-  const globalProjectionTypes = new Set<string>();
-  for (const ref of index.crossRefs) {
-    const fromType = index.noteTypes.get(ref.fromNoteId);
-    if (fromType) {
-      globalProjectionTypes.add(fromType);
-    }
-  }
-
-  // Step 2: Determine the effective projection types to check against
-  let effectiveTypes: string[];
-  if (options?.projectionFilter && options.projectionFilter.length > 0) {
-    effectiveTypes = options.projectionFilter.filter(t => globalProjectionTypes.has(t));
-  } else {
-    effectiveTypes = [...globalProjectionTypes].sort();
-  }
-
-  // Step 3: For each claim entry, build a TraceabilityRow with projections
-  // from cross-references, then filter to partial coverage.
-  const gapRows: TraceabilityRow[] = [];
+  // Step 1: Build per-source-type projection maps.
+  // For each source note type, discover which projection types have coverage
+  // from at least one claim of that type. A gap is only meaningful when
+  // sibling claims (same source type) have coverage in a projection type.
+  const coverageBySourceType = new Map<string, Set<string>>();
 
   for (const entry of index.entries.values()) {
-    // Scope to a single note if requested
     if (options?.noteId && entry.noteId !== options.noteId) continue;
-
-    // Lifecycle filtering
     if (entry.lifecycle) {
       if (excludeClosed && entry.lifecycle.type === 'closed') continue;
       if (excludeDeferred && entry.lifecycle.type === 'deferred') continue;
       if (entry.lifecycle.type === 'removed') continue;
       if (entry.lifecycle.type === 'superseded') continue;
     }
+
+    const incomingRefs = index.crossRefs.filter(
+      (ref) => ref.toClaim === entry.fullyQualified,
+    );
+
+    for (const ref of incomingRefs) {
+      const fromType = index.noteTypes.get(ref.fromNoteId) ?? 'Unknown';
+      if (fromType === entry.noteType) continue; // skip self-type refs
+      let typeSet = coverageBySourceType.get(entry.noteType);
+      if (!typeSet) {
+        typeSet = new Set<string>();
+        coverageBySourceType.set(entry.noteType, typeSet);
+      }
+      typeSet.add(fromType);
+    }
+  }
+
+  // Step 2: Apply explicit projection filter if provided
+  if (options?.projectionFilter && options.projectionFilter.length > 0) {
+    const filterSet = new Set(options.projectionFilter);
+    for (const [sourceType, projTypes] of coverageBySourceType) {
+      const filtered = new Set([...projTypes].filter(t => filterSet.has(t)));
+      coverageBySourceType.set(sourceType, filtered);
+    }
+  }
+
+  // Step 3: For each claim entry, build a TraceabilityRow with projections
+  // from cross-references, then filter to partial coverage within that
+  // source type's relevant projection types.
+  const gapRows: TraceabilityRow[] = [];
+
+  for (const entry of index.entries.values()) {
+    if (options?.noteId && entry.noteId !== options.noteId) continue;
+    if (entry.lifecycle) {
+      if (excludeClosed && entry.lifecycle.type === 'closed') continue;
+      if (excludeDeferred && entry.lifecycle.type === 'deferred') continue;
+      if (entry.lifecycle.type === 'removed') continue;
+      if (entry.lifecycle.type === 'superseded') continue;
+    }
+
+    // Get the projection types relevant to this claim's source type
+    const relevantTypes = coverageBySourceType.get(entry.noteType);
+    if (!relevantTypes || relevantTypes.size === 0) continue;
 
     // Find all cross-references pointing TO this claim
     const incomingRefs = index.crossRefs.filter(
@@ -593,13 +654,11 @@ export function findPartialCoverageGaps(
       projections.set(fromType, existing);
     }
 
-    // Count how many effective projection types have coverage
+    // Count coverage against this source type's relevant projection types
     let filledCount = 0;
     let emptyCount = 0;
 
-    for (const pType of effectiveTypes) {
-      // Skip the claim's own note type — a claim is always "present" in its own type
-      if (pType === entry.noteType) continue;
+    for (const pType of relevantTypes) {
       const presences = projections.get(pType);
       if (presences && presences.length > 0) {
         filledCount++;
@@ -608,22 +667,14 @@ export function findPartialCoverageGaps(
       }
     }
 
-    if (effectiveTypes.length === 0) continue;
-
     // DC.16: full coverage — skip
     if (emptyCount === 0) continue;
 
     // DC.15: zero coverage — skip unless includeZeroCoverage
     if (filledCount === 0 && !options?.includeZeroCoverage) continue;
 
-    // DC.17: single-projection claims — only a gap if explicit filter
-    // When only one discovered type exists beyond the claim's own type,
-    // and no explicit filter is set, there's no second column to be empty.
-    const effectiveNonSelf = effectiveTypes.filter(t => t !== entry.noteType);
-    if (effectiveNonSelf.length <= 1 && !options?.projectionFilter) {
-      // At most one non-self projection type and no filter — can't have partial coverage
-      continue;
-    }
+    // DC.17: single-projection — only a gap if explicit filter
+    if (relevantTypes.size <= 1 && !options?.projectionFilter) continue;
 
     gapRows.push({
       claimId: entry.fullyQualified,
@@ -638,6 +689,7 @@ export function findPartialCoverageGaps(
       derivedFrom: entry.derivedFrom,
       projections,
       noteType: entry.noteType,
+      relevantProjections: relevantTypes,
     });
   }
 
@@ -650,13 +702,28 @@ export function findPartialCoverageGaps(
     return a.claimNumber - b.claimNumber;
   });
 
+  // Columns are the union of relevant projection types across displayed rows.
+  // Only include types that are in at least one row's relevantProjections set —
+  // this ensures irrelevant types (e.g., Exploration for Architecture claims)
+  // don't become columns even if they happen to have coverage on some row.
+  const activeTypes = new Set<string>();
+  for (const row of gapRows) {
+    if (row.relevantProjections) {
+      for (const t of row.relevantProjections) {
+        if (t !== row.noteType) {
+          activeTypes.add(t);
+        }
+      }
+    }
+  }
+
   return {
     sourceNoteId: options?.noteId ?? '(all)',
     sourceNoteType: options?.noteId
       ? (index.noteTypes.get(options.noteId) ?? '')
       : '',
     rows: gapRows,
-    projectionTypes: effectiveTypes,
+    projectionTypes: [...activeTypes].sort(),
   };
 }
 

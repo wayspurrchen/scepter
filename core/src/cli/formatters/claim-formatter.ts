@@ -77,11 +77,21 @@ export interface TraceDisplayOptions {
  * "§1.AC.01 Claim Grammar" -> "Claim Grammar").
  */
 function extractTitle(heading: string): string {
-  // Strip leading §-prefixed ID patterns: §1, §1.2, §1.AC.01, etc.
-  // Then strip any remaining leading whitespace.
-  let stripped = heading.replace(/^§?\d+(?:\.\d+)*(?:\.§?[A-Z]+\.\d{2,3}[a-z]?)?\s*/, '');
+  // Strip leading claim ID patterns. Handles both:
+  //   §1.AC.01 Title...  (section-prefixed)
+  //   §AC.01 Title...    (bare prefix, no section number)
+  //   AC.01 Title...     (no § prefix)
+  let stripped = heading.replace(
+    /^§?(?:\d+(?:\.\d+)*\.)?(?:§?[A-Z]+\.\d{2,3}[a-z]?)?\s*/,
+    '',
+  );
+  // Strip metadata suffix that leaks from raw claim headings.
+  // Format: colon-separated items like :5, :derives=TARGET, :closed, :deferred, etc.
+  stripped = stripped.replace(/^(?::(?:\d|derives=[^\s]+|closed|deferred|removed|superseded=[^\s]+))+\s*/, '');
   // Strip markdown bold markers (**text**) — these leak through from raw claim headings
   stripped = stripped.replace(/\*\*/g, '');
+  // Strip leading em-dash separator (common in heading-level claims: "DC.01 — title")
+  stripped = stripped.replace(/^[\u2014\u2013\u2015—–-]+\s*/, '');
   // If the heading was purely an ID with no descriptive text, return the original
   return stripped.length > 0 ? stripped : heading;
 }
@@ -154,10 +164,19 @@ export function formatTraceabilityMatrix(
     return displayOptions?.full ? raw : truncateString(raw, titleMaxWidth);
   });
 
-  // Build table header
+  // Build table header — include derivation indicator length in claim column width
   const claimColWidth = Math.max(
     10,
-    ...matrix.rows.map((r) => r.claimId.length),
+    ...matrix.rows.map((r) => {
+      let len = r.claimId.length;
+      if (r.derivedFrom && r.derivedFrom.length > 0) {
+        len += ` \u2190${r.derivedFrom[0]}`.length;
+        if (r.derivedFrom.length > 1) {
+          len += `+${r.derivedFrom.length - 1}`.length;
+        }
+      }
+      return len;
+    }),
   );
   const titleColWidth = Math.max(
     5,
@@ -177,9 +196,18 @@ export function formatTraceabilityMatrix(
   lines.push(chalk.gray('-'.repeat(headerParts.join(' | ').length)));
 
   // Build rows
+  let outgoingSeparatorShown = false;
   for (let i = 0; i < matrix.rows.length; i++) {
     const row = matrix.rows[i];
     const title = rowTitles[i];
+
+    // Insert separator before first outgoing row
+    if (row.isOutgoing && !outgoingSeparatorShown) {
+      outgoingSeparatorShown = true;
+      lines.push('');
+      lines.push(chalk.bold.gray('Referenced claims:'));
+      lines.push(chalk.gray('-'.repeat(headerParts.join(' | ').length)));
+    }
 
     // Unresolved rows get a [BROKEN] marker and descriptive message
     // instead of projection columns
@@ -228,7 +256,7 @@ export function formatTraceabilityMatrix(
       }
     }
 
-    const claimIdText = padRight(row.claimId + derivedIndicator, claimColWidth + derivedIndicator.length);
+    const claimIdText = padRight(row.claimId + derivedIndicator, claimColWidth);
     const claimLabel = isDimmed
       ? chalk.dim(claimIdText)
       : isHighImportance
@@ -257,8 +285,12 @@ export function formatTraceabilityMatrix(
         cells.push(isDimmed ? chalk.dim(cellText) : chalk.green(cellText));
       } else {
         // @implements {DD005.§DC.06} Gap mode: red marker for missing coverage
-        // But not for the claim's own note type — that's expected to be empty
-        if (displayOptions?.gapMode && row.noteType !== pType) {
+        // But not for the claim's own note type, and not for projection types
+        // irrelevant to this claim's source type.
+        const isRelevantGap = displayOptions?.gapMode
+          && row.noteType !== pType
+          && (!row.relevantProjections || row.relevantProjections.has(pType));
+        if (isRelevantGap) {
           cells.push(chalk.red(padRight('[gap]', typeColWidth)));
         } else {
           cells.push(chalk.gray(padRight('-', typeColWidth)));

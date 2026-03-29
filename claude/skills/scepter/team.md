@@ -40,6 +40,34 @@ There is exactly **one dialogue pair** and one **background tag-along**:
 
 A single compound command requiring human approval can block an agent for the entire duration of the human's absence. In a team, this means the paired agent is also blocked waiting for messages. One bad Bash call can halt the entire team. **When in doubt, use a dedicated tool or split into multiple simple calls.**
 
+## Pre-Dispatch: Execution Assessment
+
+Before dispatching the team, the orchestrator assesses whether the DD requires restructuring of existing code.
+
+### The Check
+
+Inspect the DD's Module Inventory. If the "Modified Files" section includes method removals, caller migrations, interface changes on files with existing consumers, or re-routing of existing call paths — the DD involves **behavior-preserving restructuring**, not just greenfield implementation.
+
+### When Restructuring Is Involved
+
+If a **refactoring skill** is available in the current environment (check the skill list), invoke it before team dispatch. The refactoring skill produces an execution plan that separates behavior-preserving moves (extract, redirect, remove) from feature additions (new implementations, new capabilities). This execution plan supplements the DD's integration sequence — the DD describes the end state; the refactoring plan describes the safe path from the current state to that end state.
+
+The execution plan informs how the producer sequences its work within each phase. Pass it to the producer alongside the DD in the team dispatch prompt.
+
+If no refactoring skill is available, the orchestrator should still assess the restructuring surface and flag it to the producer: "This DD modifies N existing files with M method removals and K caller migration sites. Sequence behavior-preserving changes before feature additions. Test after each caller migration." This is less rigorous than a formal refactoring plan but captures the key discipline: don't mix restructuring and feature work in the same step.
+
+### When It's Greenfield
+
+If the DD is entirely or predominantly new files — new engine implementations, new types, new modules with only minor wiring additions to existing entry points — the DD's integration sequence is the execution plan. Proceed directly to team dispatch.
+
+### Heuristic
+
+| DD Characteristic | Action |
+|---|---|
+| All new files, few modified | Skip — DD integration sequence is sufficient |
+| Mixed new and modified, modifications are additive (new methods, new fields) | Skip — additive changes are low-risk |
+| Substantial modifications: method removals, caller migrations, re-routing, interface changes | Load refactoring skill if available; flag restructuring concerns if not |
+
 ## The Two Phases
 
 The producer-reviewer pair works through two sequential phases. The same two agents handle both — they transition roles internally based on the phase.

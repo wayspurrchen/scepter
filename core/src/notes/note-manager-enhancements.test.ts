@@ -27,6 +27,8 @@ describe('NoteManager Enhancements', () => {
       Question: { shortcode: 'Q', folder: 'questions' },
       TODO: { shortcode: 'TD', folder: 'todos' },
     },
+    paths: { notesRoot: '_scepter/notes' },
+    folderNotesEnabled: false, // Tests assume single-file note format
   };
 
   beforeEach(async () => {

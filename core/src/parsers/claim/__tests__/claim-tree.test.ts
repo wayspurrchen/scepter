@@ -650,6 +650,10 @@ describe('Claim Tree', () => {
       r004Content = '';
     }
 
+    if (!r004Content) {
+      it.skip('R004 file not found — skipping integration tests', () => {});
+    }
+
     if (r004Content) {
       it('should parse R004 without throwing', () => {
         r004Tree = buildClaimTree(r004Content);

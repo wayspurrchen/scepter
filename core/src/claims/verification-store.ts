@@ -59,7 +59,18 @@ export async function loadVerificationStore(dataDir: string): Promise<Verificati
   const filePath = path.join(dataDir, STORE_FILENAME);
   try {
     const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as VerificationStore;
+    const raw = JSON.parse(content) as Record<string, Array<Record<string, unknown>>>;
+    // Normalize legacy "timestamp" field to "date"
+    const store: VerificationStore = {};
+    for (const [claimId, events] of Object.entries(raw)) {
+      store[claimId] = events.map(e => ({
+        claimId: (e.claimId as string) ?? claimId,
+        date: (e.date as string) ?? (e.timestamp as string) ?? '',
+        actor: (e.actor as string) ?? '',
+        ...(e.method ? { method: e.method as string } : {}),
+      }));
+    }
+    return store;
   } catch (err: unknown) {
     // File doesn't exist or is invalid — return empty store
     if (isNodeError(err) && err.code === 'ENOENT') {
