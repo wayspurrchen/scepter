@@ -28,6 +28,7 @@ There is exactly **one dialogue pair** and one **background tag-along**:
 3. **NEVER use heredocs** (`<< EOF`, `<< 'EOF'`), subshell substitutions (`$(cat ...)`), or `echo`/pipe constructions. Use the Write tool for file creation.
 4. **NEVER use `grep`, `rg`, `find`, `cat`, `head`, `tail`, `sed`, or `awk` via Bash** when dedicated tools exist. Use Grep for content search, Glob for file search, Read for file reading, Edit for file modification.
 5. **NEVER run `git add -A` or `git add .`** — always add specific files by name.
+6. **NEVER stage files you did not create or modify as part of your task.** The working tree contains research docs, config files, work logs, and artifacts from prior sessions. They are not yours to stage. If in doubt, do NOT stage it.
 
 ### Required Patterns
 

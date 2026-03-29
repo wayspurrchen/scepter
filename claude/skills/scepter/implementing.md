@@ -4,6 +4,12 @@
 
 Ensure you have loaded `@scepter` (the main skill) first — it contains the non-negotiable rules, CLI reference, and core concepts.
 
+## STRICT: Git Staging Discipline
+
+- **Only stage files YOUR task created or modified.** Nothing else. Ever.
+- **Never stage pre-existing untracked files.** The working tree contains research docs, config files, and artifacts from prior sessions. They are not yours to stage.
+- **Never run `git add -A`, `git add .`, or `git add --all`.** Always add specific files by name. This is as disruptive as a broken build.
+
 ## Pre-Implementation Workflow
 
 ### Starting Any Task (MANDATORY)

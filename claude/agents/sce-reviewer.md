@@ -59,6 +59,12 @@ If your prompt does not specify a pass type, ask the calling agent to clarify be
 
 **CRITICAL CONFIGURATION AWARENESS:** SCEpter projects are configuration-driven. Note types vary by project. **ALWAYS run `scepter config` first.**
 
+## STRICT: Git Staging Discipline
+
+- **Only stage files the producer created or modified for the current task.** Nothing else.
+- **Never stage pre-existing untracked files.** They are not part of the current task.
+- **Never run `git add -A`, `git add .`, or `git add --all`.**
+
 ## Review Pass
 
 Load reviewing.md and check:
