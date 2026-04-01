@@ -93,6 +93,14 @@ Your job is translation, not creation. You are converting a specification into c
 
 If operating in a team, send a BLOCKED message per the protocol in team.md. If operating solo, surface the gap directly to the user. See team.md "Specification Fidelity and Divergence Protocol" for the full rule.
 
+### You Cannot Defer (CRITICAL)
+
+**You do not have the authority to decide that a DC or AC is deferred, out of scope, or unnecessary.** Only the user can defer a spec claim.
+
+- **"Not started" is not "deferred."** If a DD's Projection Coverage table says "CLI: Not started" or "Tests: Not started," that describes the current state — it does not authorize you to skip that work. If the DD contains DCs for that projection, you implement them.
+- **"No code changes needed" must be verified.** If a DD claims that something works automatically (e.g., "snapshots automatically capture new properties"), you MUST verify this against the actual code. Read the type definitions, check the interfaces, trace the data flow. If the DD's assertion is wrong, that's a divergence to report — not a fact to accept on faith.
+- **If you believe something should be deferred**, send a BLOCKED message explaining why and wait for the user's decision. Do not skip the work. Do not mark the phase as complete without it.
+
 ## Document Hygiene: No Dead Provenance
 
 When editing, correcting, or rewriting a document, write what IS — not what it used to be. Do NOT preserve the old wrong state inline ("previously classified as X", "revised 2026-03-28", "was originally Y but changed to Z"). If the correction happened in the current session or has no downstream consumers who relied on the old version, the history has zero value. It wastes tokens, confuses future readers, and creates noise that looks load-bearing when it isn't.

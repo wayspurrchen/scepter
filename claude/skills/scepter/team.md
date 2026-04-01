@@ -152,6 +152,19 @@ Nothing. This piece is untouched, waiting for resolution.
 
 Purely internal implementation details — variable names, loop structure, local algorithm choice, private helper functions — that are invisible to every external consumer and have zero upstream or downstream effects may be decided by the agent. The test: if changing this decision would require updating any claim, any test assertion, any public API, or any other file, it is NOT a purely internal detail.
 
+### Deferral Authority (CRITICAL — No Agent May Self-Defer)
+
+**Only the user can defer a spec claim.** No agent — producer, reviewer, orchestrator — has the authority to decide that a DC or AC is "deferred," "out of scope," "not needed," or "can be added later."
+
+**"Not started" does not mean "deferred."** A DD's Projection Coverage table, status fields, or phase descriptions may say "Not started" or "Not implemented" for a projection. This is a **status description** of the current state, not a deferral directive. Unless the DD or requirement explicitly says "deferred" or "out of scope" with a rationale, every DC and AC is in scope and must be implemented.
+
+**If a producer believes something should be deferred**, they MUST send a BLOCKED message explaining why and wait for the user's decision. The producer does not skip the work. The reviewer does not accept "known gap" as a verdict category for claims that were never authorized as deferrals.
+
+**Violation examples:**
+- Reading a DD's "CLI: Not started" status and treating it as permission to skip CLI implementation
+- Accepting a DD's "no code changes needed" assertion without verifying it against the actual codebase
+- Classifying an unimplemented DC as an "acceptable gap" or "known deferral" in a review verdict
+
 ### What Counts as Silent Divergence (Protocol Violation)
 
 All of the following are protocol violations equivalent in severity to data loss:
@@ -160,6 +173,8 @@ All of the following are protocol violations equivalent in severity to data loss
 - **Excluding a test case or backend** that the spec lists, without escalating
 - **Stubbing a function and annotating it `@implements`** (see claims.md — use `@see` and `:deferred`)
 - **Narrowing scope** (e.g., "we'll skip Neo4j for now") without escalating
+- **Self-deferring a claim** (treating "not started" as "deferred," or deciding a DC doesn't need implementation)
+- **Accepting unverified DD assertions** (e.g., "no code changes needed" without checking the actual types/interfaces)
 - **Inventing an API or type** that doesn't exist in the codebase to make the spec work
 - **Using `as unknown as`** or other type-system escapes to force a round peg into a square hole
 - **Proceeding with incomplete context** when the agent isn't sure whether the spec can be satisfied
@@ -182,7 +197,9 @@ The orchestrator (main session agent) is not exempt from this protocol. When sub
 3. **Wait for the user's decision** before proceeding on the blocked piece.
 4. **Do not relay subagent workarounds as completed work.** If a subagent reports "done" but worked around a spec requirement, the orchestrator must flag it, not pass it through.
 
-### Reviewer Enforcement
+### Reviewer Enforcement — Adversarial Posture (CRITICAL)
+
+The reviewer's job is not just to review — it is to assume the producer will cut corners, skip work, misread the spec, and silently narrow scope. The reviewer must be **adversarial to the producer's claims of completeness.** When a producer says "all phases complete," the reviewer's default posture is skepticism, not trust.
 
 The reviewer MUST specifically check for silent divergences during every review pass:
 
@@ -191,8 +208,12 @@ The reviewer MUST specifically check for silent divergences during every review 
 - Verify `@implements` annotations point to real implementations, not stubs (see claims.md)
 - Run `tsc --noEmit` (or the project's type checker) before issuing any verdict — a PASS on code that doesn't compile is void
 - Compare the scope of what was implemented against the scope of what was specified — are any claims quietly missing?
+- **Check every DC in the DD against the actual files.** Do not accept the producer's summary of what was implemented. Read the files yourself.
+- **Verify "no code changes needed" assertions.** If a DD claims that something works automatically or requires no implementation, the reviewer MUST verify this by reading the actual code, types, and interfaces. An unverified assertion is not evidence.
+- **Do not rationalize gaps.** If a DC was not implemented, the verdict is FAIL or PARTIAL with the gap flagged as a protocol violation — not "acceptable gap," "known deferral," or "maintenance invariant." The reviewer does not have authority to accept deferrals that the user didn't authorize.
+- **Do not accept "Not started" as deferral.** If a DD's Projection Coverage or status table says "Not started" for a projection, and the DD contains DCs for that projection, those DCs are in scope. The status description is not a deferral directive.
 
-A reviewer who passes silent divergence shares responsibility for the protocol violation.
+A reviewer who passes silent divergence shares responsibility for the protocol violation. A reviewer who rationalizes gaps as "acceptable" or "known" without user authorization is committing the same violation as a producer who skips work.
 
 ## The Tag-Along: Linker
 

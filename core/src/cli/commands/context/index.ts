@@ -10,6 +10,7 @@ import { restoreCommand } from './restore';
 import { purgeCommand } from './purge';
 import { convertCommand } from './convert';
 import { xrefSourcesCommand } from './xref-sources';
+import { ingestCommand } from './ingest';
 
 /**
  * Main context command that groups all context-related subcommands
@@ -36,5 +37,8 @@ contextCommand.addCommand(convertCommand);
 
 // Cross-reference audit
 contextCommand.addCommand(xrefSourcesCommand);
+
+// Ingestion
+contextCommand.addCommand(ingestCommand);
 
 

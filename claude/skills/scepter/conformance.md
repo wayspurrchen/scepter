@@ -99,6 +99,21 @@ Actively verify any claims in the plan:
 **Signature:** `getUser(id: string): Promise<User>`
 ```
 
+### Verify "No Code Changes Needed" Assertions (CRITICAL)
+
+DDs and specs sometimes assert that a requirement is satisfied automatically — "existing mechanism handles this," "no code changes needed," "snapshots automatically capture new properties." **These assertions are claims, not facts. They require the same verification as any other claim.**
+
+**Why this matters:** A DD that says "SnapshotFieldDef automatically includes new properties because the snapshot mechanism reads all node properties" may be wrong. The TypeScript interface may not include the new fields. The serialization code may filter properties. The read-back code may not parse the new shape. The assertion is a hypothesis about existing code behavior — it must be tested against reality.
+
+**Verification process:**
+1. **Read the actual type/interface** the DD references. Does it include the claimed properties?
+2. **Trace the data flow.** If the DD says "X automatically captures Y," follow the code from X's write path through serialization, storage, and read-back. Is Y actually present at every stage?
+3. **Check for filtering or selective capture.** Many snapshot/serialization mechanisms don't capture "all properties" — they capture a defined set. New properties may need explicit inclusion.
+4. **If the assertion is correct**, document the evidence: specific file path, line number, and the code that proves it.
+5. **If the assertion is wrong**, flag it as a conformance failure. A DC that claims "no code changes needed" but is actually wrong is an implementation gap — it means the requirement is NOT satisfied and code IS needed.
+
+**This is a common failure mode.** Decomposition specifically exists to surface these cases — when a high-binding AC like "snapshots MUST preserve X" gets decomposed into a DC that says "no work needed," the decomposition should be validated, not accepted on faith. If it cannot be externally verified with a code citation, it has not been verified.
+
 ### Plan Validation Output
 
 ```markdown

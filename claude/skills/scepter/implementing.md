@@ -71,6 +71,21 @@ scepter ctx list --types [YourType] --tags relevant
 - The only deviation that does not require escalation is a purely internal implementation detail (variable names, loop structure, private helpers) that is invisible to all consumers and affects no claim, test, or external interface.
 - See team.md "Specification Fidelity and Divergence Protocol" for the full rule, including the BLOCKED message format.
 
+### "Not Started" Does Not Mean "Deferred" (CRITICAL)
+
+A DD's Projection Coverage table, status descriptions, or phase notes may say "Not started," "Not implemented," or "Not yet built" for a projection or feature. **This is a status description, not a deferral directive.** Unless the text explicitly says "deferred," "out of scope," or "excluded from this implementation" with a rationale, every DC and AC in the DD is in scope.
+
+You do not have the authority to decide that a DC is deferred. If you believe something should be deferred, escalate to the user with a BLOCKED message. Do not skip it.
+
+### Verify "No Code Changes Needed" Claims (CRITICAL)
+
+When a DD asserts that a requirement is satisfied automatically — "existing mechanism handles this," "no code changes needed," "works by consequence of X" — this is a hypothesis, not a verified fact. You MUST:
+
+1. **Read the actual code** the DD claims handles the requirement. Check types, interfaces, data flow.
+2. **Verify the assertion is true.** If the DD says "SnapshotFieldDef automatically captures new properties," read the `SnapshotFieldDef` interface and confirm it includes the new properties. If it doesn't, the DD is wrong and you need to implement the missing pieces.
+3. **If the assertion is correct**, add an `@implements` annotation with a comment citing the evidence (file path, line number).
+4. **If the assertion is wrong**, report the divergence. The DD's "no code changes needed" claim is a spec error — the requirement is NOT satisfied and code IS needed. Do not accept the DD's word over what the code actually says.
+
 ### Iterative Layering
 
 Build in small, testable layers:
