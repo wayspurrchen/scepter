@@ -238,6 +238,9 @@ const SCEpterConfigBaseSchema = z.object({
   sourceCodeIntegration: SourceCodeIntegrationConfigSchema.optional(),
   statusMappings: StatusMappingsRecordSchema.optional(),
   folderNotesEnabled: z.boolean().optional(),
+  // Discovery paths for note scanning
+  discoveryPaths: z.array(z.string().min(1, 'Discovery path cannot be empty')).optional(),
+  discoveryExclude: z.array(z.string().min(1, 'Exclude pattern cannot be empty')).optional(),
   // Timestamp precision for note metadata
   timestampPrecision: z.enum(['date', 'datetime']).optional().default('date'),
   // Status sets for reusable status value collections - @implements {F003}

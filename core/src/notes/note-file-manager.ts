@@ -230,51 +230,51 @@ export class NoteFileManager extends EventEmitter {
       }
     }
 
-    // 2. Fall back to recursive glob: _scepter/**/${noteId}*
-    const scepterRoot = path.join(this.projectPath, '_scepter');
-    if (!await fs.pathExists(scepterRoot)) {
-      return null;
-    }
-
-    // Glob for both files and directories matching the note ID
-    const globPattern = path.join(scepterRoot, '**', `${noteId}*`);
-    const matches = await glob(globPattern, { dot: false });
+    // 2. Fall back to recursive glob across all discovery paths
+    const discoveryRoots = this.getDiscoveryRoots();
 
     // Build ID match regex: noteId followed by space, .md, or end of string
     const idRegex = new RegExp(`^${noteId}(\\s|\\.|$)`);
 
-    for (const matchPath of matches) {
-      const basename = path.basename(matchPath);
+    for (const root of discoveryRoots) {
+      if (!await fs.pathExists(root)) continue;
 
-      // Verify basename actually starts with the noteId (not a partial match)
-      if (!idRegex.test(basename)) continue;
+      const globPattern = path.join(root, '**', `${noteId}*`);
+      const matches = await glob(globPattern, { dot: false });
 
-      // Exclude _templates/ and _prompts/
-      const relToScepter = path.relative(scepterRoot, matchPath);
-      const parts = relToScepter.split(path.sep);
-      if (parts.some(p => p === '_templates' || p === '_prompts')) continue;
+      for (const matchPath of matches) {
+        const basename = path.basename(matchPath);
 
-      // Conditionally exclude _archive/ and _deleted/
-      const inArchive = parts.some(p => p === '_archive');
-      const inDeleted = parts.some(p => p === '_deleted');
-      if (inArchive && !options?.includeArchived) continue;
-      if (inDeleted && !options?.includeDeleted) continue;
+        // Verify basename actually starts with the noteId (not a partial match)
+        if (!idRegex.test(basename)) continue;
 
-      try {
-        const stats = await stat(matchPath);
+        // Exclude _templates/ and _prompts/
+        const relToRoot = path.relative(root, matchPath);
+        const parts = relToRoot.split(path.sep);
+        if (parts.some(p => p === '_templates' || p === '_prompts')) continue;
 
-        if (stats.isDirectory()) {
-          // Check if this is a folder-based note
-          const detection = await detectFolderNote(matchPath);
-          if (detection.isFolder && detection.mainFile) {
-            return detection.mainFile;
+        // Conditionally exclude _archive/ and _deleted/
+        const inArchive = parts.some(p => p === '_archive');
+        const inDeleted = parts.some(p => p === '_deleted');
+        if (inArchive && !options?.includeArchived) continue;
+        if (inDeleted && !options?.includeDeleted) continue;
+
+        try {
+          const stats = await stat(matchPath);
+
+          if (stats.isDirectory()) {
+            // Check if this is a folder-based note
+            const detection = await detectFolderNote(matchPath);
+            if (detection.isFolder && detection.mainFile) {
+              return detection.mainFile;
+            }
+          } else if (stats.isFile() && matchPath.endsWith('.md')) {
+            return matchPath;
           }
-        } else if (stats.isFile() && matchPath.endsWith('.md')) {
-          return matchPath;
+        } catch {
+          // Skip inaccessible paths
+          continue;
         }
-      } catch {
-        // Skip inaccessible paths
-        continue;
       }
     }
 
@@ -589,7 +589,7 @@ export class NoteFileManager extends EventEmitter {
 
   /**
    * Start watching for file changes
-   * Notes Anywhere: watches _scepter/ recursively instead of per-type-folder paths
+   * Notes Anywhere: watches all discovery paths recursively
    */
   async startWatching(): Promise<void> {
     // Ensure index is built (idempotent — skips work if already populated)
@@ -600,17 +600,25 @@ export class NoteFileManager extends EventEmitter {
       this.emit('file:created', { noteId, filePath });
     }
 
-    // Watch the entire _scepter/ directory recursively
-    const scepterRoot = path.join(this.projectPath, '_scepter');
-    await fs.ensureDir(scepterRoot);
+    // Watch all discovery paths
+    const watchRoots = this.getDiscoveryRoots();
+    for (const root of watchRoots) {
+      await fs.ensureDir(root);
+    }
 
-    this.watcher = chokidar.watch(scepterRoot, {
+    const config = this.configManager.getConfig();
+    const userExcludes = config.discoveryExclude || [];
+    const defaultExcludes = ['node_modules', '.git', 'dist', 'build', 'coverage', '.next', '.nuxt', '.turbo', '.cache'];
+    const allExcludes = [...defaultExcludes, ...userExcludes];
+
+    this.watcher = chokidar.watch(watchRoots, {
       persistent: true,
       ignoreInitial: true,
       ignored: [
         /(^|[/\\])\../, // dotfiles
         /_templates/,
         /_prompts/,
+        ...allExcludes.map((ex) => new RegExp(`(^|[/\\\\])${ex}([/\\\\]|$)`)),
       ],
       awaitWriteFinish: {
         stabilityThreshold: 100,
@@ -680,6 +688,26 @@ export class NoteFileManager extends EventEmitter {
   }
 
   /**
+   * Get the resolved discovery root directories.
+   */
+  private getDiscoveryRoots(): string[] {
+    const config = this.configManager.getConfig();
+    const discoveryPaths = config.discoveryPaths || ['_scepter'];
+    return discoveryPaths.map((dp) => path.resolve(this.projectPath, dp));
+  }
+
+  /**
+   * Check if a path is in an excluded directory.
+   */
+  private isExcludedDir(parts: string[]): boolean {
+    const config = this.configManager.getConfig();
+    const userExcludes = config.discoveryExclude || [];
+    const defaultExcludes = ['node_modules', '.git', 'dist', 'build', 'coverage', '.next', '.nuxt', '.turbo', '.cache'];
+    const allExcludes = new Set([...defaultExcludes, ...userExcludes, '_templates', '_prompts']);
+    return parts.some((p) => allExcludes.has(p));
+  }
+
+  /**
    * Build the noteId→filePath index from disk.
    *
    * This is the single choke-point for populating the in-memory index that
@@ -687,60 +715,59 @@ export class NoteFileManager extends EventEmitter {
    * Must be called during ProjectManager.initialize() so the index is
    * available regardless of whether file watchers are started.
    *
-   * Notes Anywhere: uses recursive glob of _scepter/ instead of type-folder iteration.
+   * Notes Anywhere: scans all configured discoveryPaths.
    */
   async buildIndex(): Promise<void> {
-    const scepterRoot = path.join(this.projectPath, '_scepter');
-    if (!await fs.pathExists(scepterRoot)) {
-      return;
-    }
+    const roots = this.getDiscoveryRoots();
 
-    // Scan for .md files recursively
-    const mdPattern = path.join(scepterRoot, '**', '*.md');
-    const mdFiles = await glob(mdPattern, { dot: false });
+    for (const root of roots) {
+      if (!await fs.pathExists(root)) continue;
 
-    for (const filePath of mdFiles) {
-      // Exclude _templates/ and _prompts/
-      const relToScepter = path.relative(scepterRoot, filePath);
-      const parts = relToScepter.split(path.sep);
-      if (parts.some(p => p === '_templates' || p === '_prompts')) continue;
+      // Scan for .md files recursively
+      const mdPattern = path.join(root, '**', '*.md');
+      const mdFiles = await glob(mdPattern, { dot: false });
 
-      const filename = path.basename(filePath);
-      const noteId = this.extractNoteIdFromFilename(filename);
-      if (noteId) {
-        this.noteIndex.set(noteId, filePath);
-        this.fileToNoteId.set(filePath, noteId);
-      }
-    }
+      for (const filePath of mdFiles) {
+        const relToRoot = path.relative(root, filePath);
+        const parts = relToRoot.split(path.sep);
+        if (this.isExcludedDir(parts)) continue;
 
-    // Scan for folder-based note directories matching ID pattern
-    const dirPattern = path.join(scepterRoot, '**');
-    const allPaths = await glob(dirPattern, { dot: false });
-
-    for (const p of allPaths) {
-      // Exclude _templates/ and _prompts/
-      const relToScepter = path.relative(scepterRoot, p);
-      const parts = relToScepter.split(path.sep);
-      if (parts.some(part => part === '_templates' || part === '_prompts')) continue;
-
-      const basename = path.basename(p);
-      const noteId = this.extractNoteIdFromFilename(basename);
-      if (!noteId) continue;
-
-      // Only check directories we haven't already indexed via the .md scan
-      if (this.noteIndex.has(noteId)) continue;
-
-      try {
-        const stats = await stat(p);
-        if (stats.isDirectory()) {
-          const detection = await detectFolderNote(p);
-          if (detection.isFolder && detection.mainFile) {
-            this.noteIndex.set(noteId, detection.mainFile);
-            this.fileToNoteId.set(detection.mainFile, noteId);
-          }
+        const filename = path.basename(filePath);
+        const noteId = this.extractNoteIdFromFilename(filename);
+        if (noteId && !this.noteIndex.has(noteId)) {
+          this.noteIndex.set(noteId, filePath);
+          this.fileToNoteId.set(filePath, noteId);
         }
-      } catch {
-        // Skip inaccessible paths
+      }
+
+      // Scan for folder-based note directories matching ID pattern
+      const dirPattern = path.join(root, '**');
+      const allPaths = await glob(dirPattern, { dot: false });
+
+      for (const p of allPaths) {
+        const relToRoot = path.relative(root, p);
+        const parts = relToRoot.split(path.sep);
+        if (this.isExcludedDir(parts)) continue;
+
+        const basename = path.basename(p);
+        const noteId = this.extractNoteIdFromFilename(basename);
+        if (!noteId) continue;
+
+        // Only check directories we haven't already indexed via the .md scan
+        if (this.noteIndex.has(noteId)) continue;
+
+        try {
+          const stats = await stat(p);
+          if (stats.isDirectory()) {
+            const detection = await detectFolderNote(p);
+            if (detection.isFolder && detection.mainFile) {
+              this.noteIndex.set(noteId, detection.mainFile);
+              this.fileToNoteId.set(detection.mainFile, noteId);
+            }
+          }
+        } catch {
+          // Skip inaccessible paths
+        }
       }
     }
   }

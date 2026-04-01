@@ -323,7 +323,7 @@ describe('UnifiedDiscovery', () => {
       await discovery.watch();
 
       expect(chokidar.watch).toHaveBeenCalledWith(
-        path.join(testProjectPath, '_scepter'),
+        [path.join(testProjectPath, '_scepter')],
         expect.objectContaining({
           persistent: true,
           ignoreInitial: true,

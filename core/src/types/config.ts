@@ -143,6 +143,21 @@ export interface SCEpterConfig {
   folderNotesEnabled?: boolean; // Global enable/disable for folder-based notes (defaults to true)
 
   /**
+   * Directories to scan for notes. Each entry is relative to the project root.
+   * Defaults to ["_scepter"] for backward compatibility.
+   * Use ["."] to scan the entire project, or specific directories like
+   * ["product", "technical", "business"].
+   */
+  discoveryPaths?: string[];
+
+  /**
+   * Glob patterns to exclude from note discovery.
+   * Defaults to sensible ignores (node_modules, .git, dist, etc.).
+   * Merged with built-in excludes — user patterns are additive.
+   */
+  discoveryExclude?: string[];
+
+  /**
    * Controls the precision of timestamps written to note metadata.
    * - 'date': YYYY-MM-DD (default)
    * - 'datetime': Full ISO 8601 (e.g. 2025-07-20T16:45:22.099Z)

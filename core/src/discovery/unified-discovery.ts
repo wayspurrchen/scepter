@@ -1,7 +1,7 @@
 /**
- * Notes Anywhere: Single recursive glob, ID-based type resolution.
- * Notes can live in arbitrary folders under _scepter/ and are discovered
- * by their ID prefix (shortcode), not by folder location.
+ * Notes Anywhere: Discovers notes by ID prefix across configurable directories.
+ * Notes can live in arbitrary folders and are discovered by their ID prefix
+ * (shortcode), not by folder location.
  */
 import { EventEmitter } from 'events';
 import { readFile, stat } from 'fs/promises';
@@ -24,8 +24,23 @@ export interface DiscoverySource {
 /** Regex to extract a note ID from a filename: e.g. "D001 Title.md" → "D001" */
 const NOTE_ID_REGEX = /^([A-Z]{1,5}\d{3,5})(?:\s|\.md|$)/;
 
-/** Directories under _scepter/ that are NOT note storage */
-const EXCLUDED_DIRS = ['_templates', '_prompts'];
+/** Directories that are never note storage */
+const EXCLUDED_DIRS = new Set(['_templates', '_prompts']);
+
+/** Default glob excludes applied when scanning outside _scepter/ */
+const DEFAULT_EXCLUDES = [
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  '.vscode',
+  '.idea',
+];
 
 export class UnifiedDiscovery extends EventEmitter {
   private sources: DiscoverySource[] = [];
@@ -44,7 +59,7 @@ export class UnifiedDiscovery extends EventEmitter {
   async initialize(): Promise<void> {
     this.sources = [];
     this.buildShortcodeMap();
-    this.registerDefaultSource();
+    this.registerDefaultSources();
   }
 
   /**
@@ -84,51 +99,80 @@ export class UnifiedDiscovery extends EventEmitter {
   }
 
   /**
-   * Check whether a file path is in an excluded directory.
+   * Get the resolved discovery paths from config, defaulting to ["_scepter"].
    */
-  private isExcludedPath(filePath: string): boolean {
-    const relativePath = path.relative(
-      path.join(this.projectPath, '_scepter'),
-      filePath,
-    );
-    const parts = relativePath.split(path.sep);
-    return parts.some((part) => EXCLUDED_DIRS.includes(part));
+  private getDiscoveryPaths(): string[] {
+    const config = this.configManager.getConfig();
+    return config.discoveryPaths || ['_scepter'];
   }
 
   /**
-   * Register a single recursive source that discovers all notes under _scepter/.
+   * Get the combined exclude patterns (built-in defaults + user config).
    */
-  private registerDefaultSource(): void {
-    const source: DiscoverySource = {
-      type: 'note',
-      pattern: path.join(this.projectPath, '_scepter/**/*.md'),
-      extractId: (filename: string) => {
-        const match = filename.match(NOTE_ID_REGEX);
-        return match ? match[1] : null;
-      },
-      enrichNote: (note: Note, filePath: string) => {
-        // Determine type from ID prefix
-        const typeName = this.resolveTypeFromId(note.id);
+  private getExcludePatterns(): string[] {
+    const config = this.configManager.getConfig();
+    const userExcludes = config.discoveryExclude || [];
+    return [...DEFAULT_EXCLUDES, ...userExcludes];
+  }
 
-        // Detect archive/deleted from path
-        const tags = [...note.tags];
-        if (filePath.includes('/_archive/') || filePath.includes('\\_archive\\')) {
-          if (!tags.includes('archived')) tags.push('archived');
-        }
-        if (filePath.includes('/_deleted/') || filePath.includes('\\_deleted\\')) {
-          if (!tags.includes('deleted')) tags.push('deleted');
-        }
+  /**
+   * Check whether a file path is in an excluded directory.
+   */
+  private isExcludedPath(filePath: string): boolean {
+    const relativePath = path.relative(this.projectPath, filePath);
+    const parts = relativePath.split(path.sep);
 
-        return {
-          ...note,
-          type: typeName || note.type,
-          tags,
-          filePath,
-        };
-      },
-    };
+    // Check structural excludes (_templates, _prompts)
+    if (parts.some((part) => EXCLUDED_DIRS.has(part))) return true;
 
-    this.sources.push(source);
+    // Check configurable excludes
+    const excludes = this.getExcludePatterns();
+    if (parts.some((part) => excludes.includes(part))) return true;
+
+    return false;
+  }
+
+  /**
+   * Register discovery sources for each configured discovery path.
+   */
+  private registerDefaultSources(): void {
+    const discoveryPaths = this.getDiscoveryPaths();
+
+    for (const dp of discoveryPaths) {
+      const absoluteBase = path.resolve(this.projectPath, dp);
+      const pattern = path.join(absoluteBase, '**/*.md');
+
+      const source: DiscoverySource = {
+        type: 'note',
+        pattern,
+        extractId: (filename: string) => {
+          const match = filename.match(NOTE_ID_REGEX);
+          return match ? match[1] : null;
+        },
+        enrichNote: (note: Note, filePath: string) => {
+          // Determine type from ID prefix
+          const typeName = this.resolveTypeFromId(note.id);
+
+          // Detect archive/deleted from path
+          const tags = [...note.tags];
+          if (filePath.includes('/_archive/') || filePath.includes('\\_archive\\')) {
+            if (!tags.includes('archived')) tags.push('archived');
+          }
+          if (filePath.includes('/_deleted/') || filePath.includes('\\_deleted\\')) {
+            if (!tags.includes('deleted')) tags.push('deleted');
+          }
+
+          return {
+            ...note,
+            type: typeName || note.type,
+            tags,
+            filePath,
+          };
+        },
+      };
+
+      this.sources.push(source);
+    }
   }
 
   registerSource(source: DiscoverySource): void {
@@ -143,10 +187,10 @@ export class UnifiedDiscovery extends EventEmitter {
   }
 
   /**
-   * @deprecated No-op. Archive and delete notes are now always discovered by the single recursive glob.
+   * @deprecated No-op. Archive and delete notes are now always discovered by the recursive glob.
    */
   registerArchiveDeleteSources(): void {
-    // No-op: archive/deleted notes are discovered by the default _scepter/**/*.md pattern
+    // No-op: archive/deleted notes are discovered by the default patterns
   }
 
   getSources(): DiscoverySource[] {
@@ -155,6 +199,7 @@ export class UnifiedDiscovery extends EventEmitter {
 
   async discoverAll(): Promise<Note[]> {
     const allNotes: Note[] = [];
+    const seenIds = new Set<string>();
 
     for (const source of this.sources) {
       try {
@@ -165,7 +210,8 @@ export class UnifiedDiscovery extends EventEmitter {
           if (this.isExcludedPath(filePath)) continue;
 
           const note = await this.processFile(filePath, source);
-          if (note) {
+          if (note && !seenIds.has(note.id)) {
+            seenIds.add(note.id);
             allNotes.push(note);
             this.noteIndex.set(note.id, filePath);
             this.emit('note:discovered', note);
@@ -196,7 +242,8 @@ export class UnifiedDiscovery extends EventEmitter {
               isFolder: true,
               folderPath: folderPath,
             });
-            if (note) {
+            if (note && !seenIds.has(note.id)) {
+              seenIds.add(note.id);
               note.isFolder = true;
               note.folderPath = folderPath;
 
@@ -313,14 +360,20 @@ export class UnifiedDiscovery extends EventEmitter {
   }
 
   async watch(): Promise<void> {
-    const scepterPath = path.join(this.projectPath, '_scepter');
+    const discoveryPaths = this.getDiscoveryPaths();
+    const excludes = this.getExcludePatterns();
 
-    this.watcher = chokidar.watch(scepterPath, {
-      ignored: [
-        /(^|[\/\\])\../, // dotfiles
-        /_templates/,
-        /_prompts/,
-      ],
+    const watchPaths = discoveryPaths.map((dp) => path.resolve(this.projectPath, dp));
+
+    const ignoredPatterns: Array<RegExp | string | ((path: string) => boolean)> = [
+      /(^|[\/\\])\../, // dotfiles
+      /_templates/,
+      /_prompts/,
+      ...excludes.map((ex) => new RegExp(`(^|[/\\\\])${ex}([/\\\\]|$)`)),
+    ];
+
+    this.watcher = chokidar.watch(watchPaths, {
+      ignored: ignoredPatterns,
       persistent: true,
       ignoreInitial: true,
     });
