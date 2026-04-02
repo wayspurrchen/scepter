@@ -46,6 +46,8 @@ export {
   saveVerificationStore,
   addVerificationEvent,
   getLatestVerification,
+  removeLatestVerification,
+  removeAllVerifications,
 } from './verification-store.js';
 
 export type {

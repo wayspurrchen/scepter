@@ -1,3 +1,11 @@
+/**
+ * @implements {DD008.§1.DC.03} Claim address detection before note lookup
+ * @implements {DD008.§1.DC.04} Single claim display via formatClaimTrace
+ * @implements {DD008.§1.DC.05} Ambiguous claim disambiguation listing
+ * @implements {DD008.§1.DC.06} Zero-match fuzzy suggestions
+ * @implements {DD008.§1.DC.07} Bare note ID zero-padding fallback
+ */
+
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import * as path from 'path';
@@ -5,6 +13,12 @@ import { minimatch } from 'minimatch';
 import { ProjectManager } from '../../../project/project-manager';
 import { formatNote, formatNotes, formatNotesAsJson } from '../../formatters/note-formatter';
 import { SourceCodeScanner } from '../../../scanners/source-code-scanner';
+import { ensureIndex } from '../claims/ensure-index';
+import { parseClaimAddress } from '../../../parsers/claim/claim-parser';
+import { formatClaimTrace } from '../../formatters/claim-formatter';
+import { loadVerificationStore } from '../../../claims/index';
+import { resolveClaimInput } from '../shared/resolve-claim-id';
+import type { ClaimIndexData, ClaimIndexEntry, VerificationStore } from '../../../claims/index';
 import type { Note } from '../../../types/note';
 import type { SourceReference } from '../../../types/reference';
 import type { CommandContext } from '../base-command';
@@ -43,6 +57,205 @@ export async function showNotes(
 
   if (!noteManager) {
     throw new Error('Note manager not initialized');
+  }
+
+  // @implements {DD008.§1.DC.03} Detect claim addresses before note lookup.
+  // A claim address contains '.' and has a claim prefix pattern (e.g., DD007.1.DC.01).
+  // Separate claim IDs from regular note IDs for different processing paths.
+  const claimIds: string[] = [];
+  const noteIds: string[] = [];
+  for (const id of ids) {
+    if (looksLikeClaimAddress(id)) {
+      claimIds.push(id);
+    } else {
+      noteIds.push(id);
+    }
+  }
+
+  // Process claim IDs through the claim resolution path
+  if (claimIds.length > 0) {
+    const claimOutput = await resolveAndDisplayClaims(claimIds, options, context);
+    if (claimOutput !== null) {
+      // If we had ONLY claim IDs, return the claim output directly
+      if (noteIds.length === 0) {
+        return { notes: [], notFound: [], output: claimOutput };
+      }
+      // Mixed: prepend claim output, continue with note IDs below
+      const noteResult = await showNotesCore(noteIds, options, context);
+      const combinedOutput = claimOutput + '\n\n' + noteResult.output;
+      return { notes: noteResult.notes, notFound: noteResult.notFound, output: combinedOutput };
+    }
+  }
+
+  // Fall through: process note IDs (or all IDs if none were claims)
+  const idsToProcess = claimIds.length > 0 ? noteIds : ids;
+  return showNotesCore(idsToProcess, options, context);
+}
+
+/**
+ * Detect whether an input string looks like a claim address.
+ * A claim address contains dots and includes a claim prefix pattern
+ * (uppercase letters followed by a dot and digits).
+ *
+ * Also handles compressed-zero inputs like DD7.1.DC.1 by zero-padding
+ * before attempting parse.
+ *
+ * @implements {DD008.§1.DC.03}
+ */
+function looksLikeClaimAddress(id: string): boolean {
+  if (!id.includes('.')) return false;
+  // Normalize $ to § for detection
+  let normalized = id.replace(/\$/g, '§');
+
+  // Try parsing as-is first
+  let addr = parseClaimAddress(normalized);
+  if (addr !== null && addr.claimPrefix !== undefined) return true;
+
+  // If parse fails, try zero-padding the note ID and claim number segments.
+  // This handles cases like DD7.1.DC.1 where parseClaimAddress rejects DD7
+  // because it expects 3-5 digit note IDs.
+  normalized = preNormalizeForDetection(normalized);
+  addr = parseClaimAddress(normalized);
+  if (addr !== null && addr.claimPrefix !== undefined) return true;
+
+  // Also match section references: NOTEID.SECTION (e.g., DD007.1, DD007.3.1)
+  // These have a dot but no claim prefix — just note ID + numeric section path
+  const stripped = id.replace(/\$/g, '§').replace(/§/g, '');
+  const parts = stripped.split('.');
+  if (parts.length >= 2 && /^[A-Z]{1,5}\d+$/.test(parts[0]) && parts.slice(1).every(p => /^\d+$/.test(p))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Pre-normalize a dotted string by zero-padding segments that look like
+ * compressed note IDs or claim numbers, so that parseClaimAddress can
+ * recognize them.
+ */
+function preNormalizeForDetection(input: string): string {
+  const parts = input.replace(/§/g, '').split('.');
+  if (parts.length === 0) return input;
+
+  // Normalize first segment: note ID digits to exactly 3 (strip excess or pad short)
+  const noteMatch = parts[0].match(/^([A-Z]{1,5})(\d+)$/);
+  if (noteMatch) {
+    const num = String(parseInt(noteMatch[2], 10));
+    parts[0] = noteMatch[1] + num.padStart(3, '0');
+  }
+
+  // Normalize last segment: claim number to exactly 2 digits (strip excess or pad short)
+  if (parts.length >= 2) {
+    const lastIdx = parts.length - 1;
+    const claimNumMatch = parts[lastIdx].match(/^(\d+)([a-z])?$/);
+    if (claimNumMatch && /^[A-Z]+$/.test(parts[lastIdx - 1])) {
+      const num = String(parseInt(claimNumMatch[1], 10));
+      parts[lastIdx] = num.padStart(2, '0') + (claimNumMatch[2] || '');
+    }
+  }
+
+  // Strip leading zeros from section path segments (between note ID and claim prefix)
+  // Do NOT strip claim numbers (digits preceded by an uppercase prefix)
+  for (let i = 1; i < parts.length; i++) {
+    if (/^\d+$/.test(parts[i]) && parts[i].length > 1) {
+      const prev = parts[i - 1];
+      // If previous part is an uppercase prefix, this is a claim number — don't strip
+      if (/^[A-Z]+$/.test(prev)) continue;
+      parts[i] = String(parseInt(parts[i], 10));
+    }
+  }
+
+  return parts.join('.');
+}
+
+/**
+ * Resolve claim IDs and format output for display.
+ * Returns formatted output string, or null if resolution should be skipped.
+ *
+ * @implements {DD008.§1.DC.04} Single match -> formatClaimTrace display
+ * @implements {DD008.§1.DC.05} Multiple matches -> disambiguation list
+ * @implements {DD008.§1.DC.06} Zero matches -> "Claim not found" with fuzzy suggestions
+ */
+async function resolveAndDisplayClaims(
+  claimIds: string[],
+  options: ShowOptions,
+  context: CommandContext,
+): Promise<string | null> {
+  const { projectManager } = context;
+  const data = await ensureIndex(projectManager);
+
+  // Load verification store for claim trace display
+  const config = projectManager.configManager.getConfig();
+  const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
+  const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+
+  const outputs: string[] = [];
+
+  for (const id of claimIds) {
+    const result = resolveClaimInput(id, data);
+
+    if (result.matches.length === 1) {
+      // @implements {DD008.§1.DC.04} Single match: display with formatClaimTrace
+      const entry = result.matches[0];
+      const incoming = data.crossRefs.filter(ref => ref.toClaim === entry.fullyQualified);
+      const traceOutput = await formatClaimTrace(entry, incoming, data.noteTypes, {}, verificationStore);
+      outputs.push(traceOutput);
+
+    } else if (result.matches.length > 1) {
+      // @implements {DD008.§1.DC.05} Multiple matches: list for disambiguation
+      outputs.push(chalk.yellow(`Ambiguous claim address "${id}" matches ${result.matches.length} claims:`));
+      outputs.push('');
+      for (const entry of result.matches) {
+        const heading = entry.heading.replace(/\*\*/g, '').trim();
+        outputs.push(`  ${chalk.cyan(entry.fullyQualified)}  ${heading}  ${chalk.gray(`L${entry.line}`)}`);
+      }
+      outputs.push('');
+      outputs.push(chalk.gray('Specify the section number to disambiguate (e.g., ' +
+        result.matches[0].fullyQualified + ')'));
+
+    } else {
+      // @implements {DD008.§1.DC.06} Zero matches: show not found with fuzzy suggestions
+      outputs.push(chalk.red(`Claim not found: ${id}`));
+
+      // Try fuzzy matching: extract the claim suffix and search for entries ending with it
+      const normalized = id.replace(/\$/g, '§').replace(/§/g, '');
+      const dotParts = normalized.split('.');
+      if (dotParts.length >= 2) {
+        const suffix = '.' + dotParts.slice(1).join('.');
+        const candidates = [...data.entries.keys()].filter(k => k.endsWith(suffix));
+        if (candidates.length > 0) {
+          outputs.push('');
+          outputs.push('Did you mean:');
+          for (const c of candidates.slice(0, 5)) {
+            outputs.push(`  ${c}`);
+          }
+        }
+      }
+    }
+  }
+
+  return outputs.length > 0 ? outputs.join('\n') : null;
+}
+
+/**
+ * Core note display logic, extracted from showNotes to allow claim IDs to be
+ * processed separately.
+ */
+async function showNotesCore(
+  ids: string[],
+  options: ShowOptions,
+  context: CommandContext,
+): Promise<ShowResult> {
+  const { projectManager } = context;
+  const noteManager = projectManager.noteManager;
+
+  if (!noteManager) {
+    throw new Error('Note manager not initialized');
+  }
+
+  if (ids.length === 0) {
+    return { notes: [], notFound: [], output: '' };
   }
 
   // Get the requested notes
@@ -102,6 +315,32 @@ export async function showNotes(
         notFound.push(id);
       }
     });
+  }
+
+  // @implements {DD008.§1.DC.07} Zero-padding fallback for bare note IDs.
+  // When a bare note ID like "DD7" is not found, try zero-padding to "DD007".
+  if (notFound.length > 0) {
+    const stillNotFound: string[] = [];
+    for (const id of notFound) {
+      const padded = zeroPadNoteId(id);
+      if (padded && padded !== id) {
+        const retryResult = await noteManager.getNotes({
+          ids: [padded],
+          includeArchived: options.includeArchived,
+          includeDeleted: options.includeDeleted,
+        });
+        if (retryResult.notes.length > 0 && !processedIds.has(padded)) {
+          notes.push(retryResult.notes[0]);
+          processedIds.add(padded);
+        } else {
+          stillNotFound.push(id);
+        }
+      } else {
+        stillNotFound.push(id);
+      }
+    }
+    notFound.length = 0;
+    notFound.push(...stillNotFound);
   }
 
   // Get referenced notes if requested with tree structure
@@ -490,4 +729,23 @@ export async function writeOutput(output: string, filePath?: string): Promise<vo
   } else {
     console.log(output);
   }
+}
+
+/**
+ * Try to zero-pad a bare note ID (e.g., "DD7" -> "DD007").
+ * Returns the padded ID if it looks like a shortcode+digits pattern,
+ * or null if the input doesn't match.
+ *
+ * @implements {DD008.§1.DC.07}
+ */
+function zeroPadNoteId(id: string): string | null {
+  const match = id.match(/^([A-Z]{1,5})(\d+)$/);
+  if (!match) return null;
+
+  const shortcode = match[1];
+  const digits = match[2];
+
+  // Pad to at least 3 digits (the standard width for note IDs)
+  if (digits.length >= 3) return null; // Already sufficient width
+  return shortcode + digits.padStart(3, '0');
 }

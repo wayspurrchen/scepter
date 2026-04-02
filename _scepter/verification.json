@@ -1,0 +1,66 @@
+{
+  "DD006.3.DC.10": [
+    {
+      "claimId": "DD006.3.DC.10",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.11": [
+    {
+      "claimId": "DD006.3.DC.11",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.24": [
+    {
+      "claimId": "DD006.3.DC.24",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.25": [
+    {
+      "claimId": "DD006.3.DC.25",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.26": [
+    {
+      "claimId": "DD006.3.DC.26",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.27": [
+    {
+      "claimId": "DD006.3.DC.27",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.28": [
+    {
+      "claimId": "DD006.3.DC.28",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ],
+  "DD006.3.DC.29": [
+    {
+      "claimId": "DD006.3.DC.29",
+      "date": "2026-04-02",
+      "actor": "orchestrator",
+      "method": "file-deletion"
+    }
+  ]
+}

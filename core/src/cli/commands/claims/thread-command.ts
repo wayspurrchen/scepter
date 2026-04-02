@@ -39,8 +39,9 @@ export const threadCommand = new Command('thread')
   .description('Show a tree view of all relationships for a claim or note')
   .argument('<id>', 'Claim ID (e.g., R004.§1.AC.01) or note ID (e.g., R004)')
   .option('--depth <n>', 'Maximum depth to traverse (default: 1)', parseInt)
+  .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
-  .action(async (id: string, options: { depth?: number; json?: boolean; projectDir?: string }) => {
+  .action(async (id: string, options: { depth?: number; reindex?: boolean; json?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -49,7 +50,7 @@ export const threadCommand = new Command('thread')
           startWatching: true,
         },
         async (context) => {
-          const data = await ensureIndex(context.projectManager);
+          const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Load verification store for verified events
           const config = context.projectManager.configManager.getConfig();

@@ -20,6 +20,8 @@ import {
   loadVerificationStore,
   saveVerificationStore,
   addVerificationEvent,
+  removeLatestVerification,
+  removeAllVerifications,
 } from '../../../claims/index.js';
 import type { VerificationEvent } from '../../../claims/index.js';
 
@@ -51,7 +53,10 @@ export const verifyCommand = new Command('verify')
   .argument('<id>', 'Claim ID (e.g., R004.§1.AC.03) or note ID (e.g., R004)')
   .option('--actor <name>', 'Name of the verifying actor')
   .option('--method <method>', 'Verification method (e.g., code-review, test)')
-  .action(async (id: string, options: { actor?: string; method?: string; projectDir?: string }) => {
+  .option('--remove', 'Remove verification events instead of adding')
+  .option('--all', 'With --remove: clear all verification history (requires claim ID, not note ID)')
+  .option('--reindex', 'Force rebuild of claim index')
+  .action(async (id: string, options: { actor?: string; method?: string; remove?: boolean; all?: boolean; reindex?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -66,7 +71,7 @@ export const verifyCommand = new Command('verify')
           const date = new Date().toISOString().split('T')[0];
 
           // Build index to validate claim IDs and get claim entries
-          const data = await ensureIndex(context.projectManager);
+          const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Load existing verification store
           const store = await loadVerificationStore(dataDir);
@@ -129,6 +134,46 @@ export const verifyCommand = new Command('verify')
 
           if (claimsToVerify.length === 0) {
             console.log(chalk.yellow('No claims to verify.'));
+            return;
+          }
+
+          // @implements {DD007.§1.DC.03} --remove flag: remove instead of add
+          // @implements {DD007.§1.DC.04} --remove without --all: pop latest event
+          // @implements {DD007.§1.DC.05} --remove --all: clear full history
+          // @implements {DD007.§1.DC.06} --remove --all with note ID is rejected
+          if (options.remove) {
+            if (options.all && !isClaimLevelId(id)) {
+              console.log(chalk.red('--remove --all requires a specific claim ID, not a note ID.'));
+              console.log(chalk.gray('Use --remove without --all to remove the latest event from each claim.'));
+              return;
+            }
+
+            if (options.all) {
+              // Clear full history for each claim
+              for (const claimId of claimsToVerify) {
+                const count = removeAllVerifications(store, claimId);
+                if (count > 0) {
+                  console.log(`${chalk.cyan(claimId)}: removed ${chalk.yellow(String(count))} verification event(s)`);
+                } else {
+                  console.log(`${chalk.cyan(claimId)}: no verification history`);
+                }
+              }
+            } else {
+              // Remove latest event for each claim
+              for (const claimId of claimsToVerify) {
+                const removed = removeLatestVerification(store, claimId);
+                if (removed) {
+                  const parts = [removed.date];
+                  if (removed.actor) parts.push(`by ${removed.actor}`);
+                  if (removed.method) parts.push(`(${removed.method})`);
+                  console.log(`${chalk.cyan(claimId)}: removed ${chalk.yellow(parts.join(' '))}`);
+                } else {
+                  console.log(`${chalk.cyan(claimId)}: no verification history`);
+                }
+              }
+            }
+
+            await saveVerificationStore(dataDir, store);
             return;
           }
 

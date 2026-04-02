@@ -39,6 +39,7 @@ export const gapsCommand = new Command('gaps')
   .option('--include-zero', 'Include claims with zero coverage (no references at all)')
   // @implements {R006.§3.AC.03} --show-derived flag
   .option('--show-derived', 'Expand derivation tree for each gap')
+  .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
   .option('--width <chars>', 'Max characters for claim title column (default: 70)', parseInt)
   .option('--full', 'Show full claim titles without truncation')
@@ -51,6 +52,7 @@ export const gapsCommand = new Command('gaps')
     projection?: string;
     includeZero?: boolean;
     showDerived?: boolean;
+    reindex?: boolean;
     json?: boolean;
     width?: number;
     full?: boolean;
@@ -64,7 +66,7 @@ export const gapsCommand = new Command('gaps')
           startWatching: true,
         },
         async (context) => {
-          const data = await ensureIndex(context.projectManager);
+          const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
           const config = context.projectManager.configManager.getConfig();
           const claimIndex = context.projectManager.claimIndex;
 

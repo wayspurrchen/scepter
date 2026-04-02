@@ -129,6 +129,48 @@ export function getLatestVerification(
   return events[events.length - 1];
 }
 
+/**
+ * Remove the most recent verification event for a claim.
+ * Returns the removed event, or null if no events exist.
+ * Deletes the key from the store if the array becomes empty.
+ *
+ * @implements {DD007.§1.DC.01}
+ */
+export function removeLatestVerification(
+  store: VerificationStore,
+  claimId: string,
+): VerificationEvent | null {
+  const events = store[claimId];
+  if (!events || events.length === 0) {
+    return null;
+  }
+  const removed = events.pop()!;
+  if (events.length === 0) {
+    delete store[claimId];
+  }
+  return removed;
+}
+
+/**
+ * Remove all verification events for a claim.
+ * Deletes the key from the store entirely.
+ * Returns the count of events removed.
+ *
+ * @implements {DD007.§1.DC.02}
+ */
+export function removeAllVerifications(
+  store: VerificationStore,
+  claimId: string,
+): number {
+  const events = store[claimId];
+  if (!events || events.length === 0) {
+    return 0;
+  }
+  const count = events.length;
+  delete store[claimId];
+  return count;
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

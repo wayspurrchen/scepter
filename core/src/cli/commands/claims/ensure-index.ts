@@ -1,9 +1,15 @@
 /**
  * Shared helper for claim commands that need a built index.
+ *
+ * @implements {DD006.§3.DC.12} Lazy initialization via cached ensureIndex()
+ * @implements {DD006.§3.DC.13} Module-level caching with --reindex bypass
  */
 
 import type { ProjectManager } from '../../../project/project-manager.js';
 import type { ClaimIndexData, NoteWithContent } from '../../../claims/index.js';
+
+/** Module-level cache for the claim index within a single CLI invocation. */
+let cachedData: ClaimIndexData | null = null;
 
 /**
  * Build the claim index from all notes and source code references.
@@ -12,8 +18,19 @@ import type { ClaimIndexData, NoteWithContent } from '../../../claims/index.js';
  * then incorporates source code references (if source scanning is enabled)
  * so that source files appear as a "Source" projection type in the
  * traceability matrix.
+ *
+ * Results are cached for the lifetime of the process. Pass `reindex: true`
+ * to force a fresh build (bypasses cache).
  */
-export async function ensureIndex(projectManager: ProjectManager): Promise<ClaimIndexData> {
+export async function ensureIndex(
+  projectManager: ProjectManager,
+  options?: { reindex?: boolean },
+): Promise<ClaimIndexData> {
+  // Return cached result if available and reindex not requested
+  if (cachedData && !options?.reindex) {
+    return cachedData;
+  }
+
   const noteManager = projectManager.noteManager;
   if (!noteManager) {
     throw new Error('Note manager not initialized');
@@ -42,6 +59,9 @@ export async function ensureIndex(projectManager: ProjectManager): Promise<Claim
     const allRefs = scanner.getIndex().getAllReferences();
     projectManager.claimIndex.addSourceReferences(allRefs);
   }
+
+  // Cache the result
+  cachedData = data;
 
   return data;
 }

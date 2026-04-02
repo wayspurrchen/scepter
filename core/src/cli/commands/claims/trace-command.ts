@@ -13,6 +13,7 @@
 
 import * as path from 'path';
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import { buildTraceabilityMatrix, loadVerificationStore, getLatestVerification } from '../../../claims/index.js';
@@ -20,6 +21,7 @@ import type { ClaimIndexData, ClaimIndexEntry, VerificationStore, TraceabilityMa
 import { parseClaimAddress, parseRangeSuffix, expandClaimRange } from '../../../parsers/claim/index.js';
 import { formatTraceabilityMatrix, formatClaimTrace } from '../../formatters/claim-formatter.js';
 import type { TraceDisplayOptions, ClaimTraceOptions } from '../../formatters/claim-formatter.js';
+import type { SourceReference } from '../../../types/reference.js';
 
 /**
  * Detect whether the argument is a claim-level ID (contains dots with a claim prefix)
@@ -181,8 +183,11 @@ export const traceCommand = new Command('trace')
   .option('--no-excerpts', 'Hide line excerpts in single-claim trace')
   // @implements {R006.§4.AC.02} --show-derived flag
   .option('--show-derived', 'Expand derivative sub-rows under source claims')
+  .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
-  .action(async (id: string, options: { importance?: number; sort?: string; width?: number; full?: boolean; excerpts?: boolean; showDerived?: boolean; json?: boolean; projectDir?: string }) => {
+  // @implements {DD006.§3.DC.21} Verbose flag controls note-level source ref detail
+  .option('--verbose', 'Show full detail for note-level source references')
+  .action(async (id: string, options: { importance?: number; sort?: string; width?: number; full?: boolean; excerpts?: boolean; showDerived?: boolean; reindex?: boolean; json?: boolean; verbose?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -191,7 +196,7 @@ export const traceCommand = new Command('trace')
           startWatching: true,
         },
         async (context) => {
-          const data = await ensureIndex(context.projectManager);
+          const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // @implements {R005.§3.AC.07} Load verification store for date display
           const config = context.projectManager.configManager.getConfig();
@@ -342,8 +347,13 @@ export const traceCommand = new Command('trace')
             });
           }
 
+          // @implements {DD006.§3.DC.19} Query bare note-level source references
+          // @implements {DD006.§3.DC.22} Include sourceReferences in JSON output
+          const bareRefs = getBareNoteRefs(id, context);
+
           if (options.json) {
             // @implements {R005.§5.AC.03} JSON includes importance, lifecycle, verification
+            // @implements {DD006.§3.DC.22} JSON includes sourceReferences field
             const serializable = {
               ...matrix,
               rows: matrix.rows.map((row) => {
@@ -354,6 +364,12 @@ export const traceCommand = new Command('trace')
                   verification: latestVerification ?? undefined,
                 };
               }),
+              sourceReferences: bareRefs.map((ref) => ({
+                filePath: path.relative(context.projectPath, ref.filePath),
+                line: ref.line ?? 0,
+                referenceType: ref.referenceType,
+                context: ref.context,
+              })),
             };
             console.log(JSON.stringify(serializable, null, 2));
             return;
@@ -370,9 +386,93 @@ export const traceCommand = new Command('trace')
           if (options.width !== undefined) displayOpts.titleWidth = options.width;
           if (options.full) displayOpts.full = true;
           console.log(formatTraceabilityMatrix(matrix, displayOpts, verificationStore));
+
+          // @implements {DD006.§3.DC.19} Bare note-level source references section
+          // @implements {DD006.§3.DC.20} Format as "Source References (note-level)"
+          // @implements {DD006.§3.DC.21} Verbose/summary threshold
+          // @implements {DD006.§3.DC.23} Not shown in single-claim trace (we're in note-level branch)
+          if (bareRefs.length > 0) {
+            console.log(formatNoteSourceReferences(bareRefs, context.projectPath, !!options.verbose));
+          }
         },
       );
     } catch (error) {
       BaseCommand.handleError(error);
     }
   });
+
+/**
+ * Query the SourceCodeScanner for bare note-level references (claimPath undefined).
+ *
+ * @implements {DD006.§3.DC.19} Filter to refs where claimPath is undefined/empty
+ */
+function getBareNoteRefs(
+  noteId: string,
+  context: { projectManager: any; projectPath: string },
+): SourceReference[] {
+  const scanner = context.projectManager.sourceScanner;
+  if (!scanner?.isReady()) return [];
+
+  const allRefs: SourceReference[] = scanner.getReferencesToNote(noteId);
+  return allRefs.filter((ref: SourceReference) => !ref.claimPath);
+}
+
+/**
+ * Format bare note-level source references for console output.
+ *
+ * @implements {DD006.§3.DC.20} "Source References (note-level)" section
+ * @implements {DD006.§3.DC.21} Verbose/summary threshold (>10 = summary unless verbose)
+ */
+function formatNoteSourceReferences(
+  bareRefs: SourceReference[],
+  projectPath: string,
+  verbose: boolean,
+): string {
+  const lines: string[] = [];
+
+  // Count unique files
+  const uniqueFiles = new Set(bareRefs.map((ref) => ref.filePath));
+
+  lines.push('');
+  lines.push(chalk.bold(`Source References (note-level): ${bareRefs.length} reference${bareRefs.length !== 1 ? 's' : ''} across ${uniqueFiles.size} file${uniqueFiles.size !== 1 ? 's' : ''}`));
+
+  const SUMMARY_THRESHOLD = 10;
+  const showDetail = bareRefs.length <= SUMMARY_THRESHOLD || verbose;
+
+  if (showDetail) {
+    // Full detail: file path, line, reference type
+    // Sort by file path then line number
+    const sorted = [...bareRefs].sort((a, b) => {
+      const pathCmp = a.filePath.localeCompare(b.filePath);
+      if (pathCmp !== 0) return pathCmp;
+      return (a.line ?? 0) - (b.line ?? 0);
+    });
+
+    for (const ref of sorted) {
+      const relPath = path.relative(projectPath, ref.filePath);
+      const lineStr = ref.line ? `:${ref.line}` : '';
+      const typeStr = ref.referenceType === 'mentions' ? 'mentions' : `@${ref.referenceType}`;
+      lines.push(`  ${chalk.dim(relPath + lineStr)}  ${typeStr}`);
+      if (ref.context) {
+        lines.push(`    ${chalk.dim(ref.context.trim())}`);
+      }
+    }
+  } else {
+    // Summary: file list with counts
+    lines.push(chalk.dim('  (use --verbose to see full detail)'));
+    lines.push('');
+
+    // Count refs per file
+    const fileCounts = new Map<string, number>();
+    for (const ref of bareRefs) {
+      const relPath = path.relative(projectPath, ref.filePath);
+      fileCounts.set(relPath, (fileCounts.get(relPath) ?? 0) + 1);
+    }
+
+    const fileEntries = [...fileCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const fileList = fileEntries.map(([f, c]) => `${f} (${c})`).join(', ');
+    lines.push(`  Files: ${fileList}`);
+  }
+
+  return lines.join('\n');
+}

@@ -22,8 +22,9 @@ import { formatLintResults, formatClaimTree as formatClaimTreeDisplay } from '..
 export const lintCommand = new Command('lint')
   .description('Validate claim structure in a note')
   .argument('<noteId>', 'Note ID to lint (e.g., R004)')
+  .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
-  .action(async (noteId: string, options: { json?: boolean; projectDir?: string }) => {
+  .action(async (noteId: string, options: { reindex?: boolean; json?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -48,7 +49,7 @@ export const lintCommand = new Command('lint')
           const treeErrors = validateClaimTree(treeResult);
 
           // Also build the full index to check for cross-reference errors
-          const indexData = await ensureIndex(context.projectManager);
+          const indexData = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Collect index-level errors that pertain to this note
           const indexErrors = indexData.errors.filter((e) => {

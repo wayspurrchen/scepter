@@ -158,197 +158,254 @@ export function formatTraceabilityMatrix(
     ? Infinity
     : (displayOptions?.titleWidth ?? 70);
 
-  // Compute titles and their display widths
-  const rowTitles = matrix.rows.map((r) => {
-    const raw = extractTitle(r.heading);
-    return displayOptions?.full ? raw : truncateString(raw, titleMaxWidth);
-  });
-
-  // Build table header — include derivation indicator length in claim column width
-  const claimColWidth = Math.max(
-    10,
-    ...matrix.rows.map((r) => {
-      let len = r.claimId.length;
-      if (r.derivedFrom && r.derivedFrom.length > 0) {
-        len += ` \u2190${r.derivedFrom[0]}`.length;
-        if (r.derivedFrom.length > 1) {
-          len += `+${r.derivedFrom.length - 1}`.length;
-        }
-      }
-      return len;
-    }),
-  );
-  const titleColWidth = Math.max(
-    5,
-    ...rowTitles.map((t) => t.length),
-  );
-  const typeColWidth = 14;
-
-  const headerParts = [
-    padRight('Claim', claimColWidth),
-    padRight('Title', titleColWidth),
-  ];
-  for (const pType of matrix.projectionTypes) {
-    headerParts.push(padRight(pType, typeColWidth));
+  // Split rows into own claims and referenced (outgoing) claims
+  const ownRows: typeof matrix.rows = [];
+  const referencedRows: typeof matrix.rows = [];
+  for (const row of matrix.rows) {
+    if (row.isOutgoing) {
+      referencedRows.push(row);
+    } else {
+      ownRows.push(row);
+    }
   }
 
-  lines.push(chalk.bold(headerParts.join(' | ')));
-  lines.push(chalk.gray('-'.repeat(headerParts.join(' | ').length)));
-
-  // Build rows
-  let outgoingSeparatorShown = false;
-  for (let i = 0; i < matrix.rows.length; i++) {
-    const row = matrix.rows[i];
-    const title = rowTitles[i];
-
-    // Insert separator before first outgoing row
-    if (row.isOutgoing && !outgoingSeparatorShown) {
-      outgoingSeparatorShown = true;
-      lines.push('');
-      lines.push(chalk.bold.gray('Referenced claims:'));
-      lines.push(chalk.gray('-'.repeat(headerParts.join(' | ').length)));
-    }
-
-    // Unresolved rows get a [BROKEN] marker and descriptive message
-    // instead of projection columns
-    if (row.unresolved) {
-      const claimIdText = padRight(row.claimId, claimColWidth);
-      const claimLabel = chalk.red(claimIdText);
-      const brokenMsg = padRight('[BROKEN] target claim not found in index', titleColWidth);
-      const cells = [claimLabel, chalk.red(brokenMsg)];
-      // Fill projection columns with a red dash
-      for (const _pType of matrix.projectionTypes) {
-        cells.push(chalk.red(padRight('?', typeColWidth)));
-      }
-      lines.push(cells.join(' | '));
-      continue;
-    }
-
-    // @implements {R005.§1.AC.03} importance >= 4 gets red/bold highlighting
-    const isHighImportance = row.importance !== undefined && row.importance >= 4;
-
-    // @implements {R005.§2.AC.08} Lifecycle state visual markers
-    let lifecycleMarker = '';
-    let isDimmed = false;
-    if (row.lifecycle) {
-      switch (row.lifecycle.type) {
-        case 'closed':
-          isDimmed = true;
-          break;
-        case 'removed':
-          lifecycleMarker = ' [removed]';
-          break;
-        case 'superseded':
-          lifecycleMarker = ` [superseded\u2192${row.lifecycle.target ?? '?'}]`;
-          break;
-        case 'deferred':
-          lifecycleMarker = ' [deferred]';
-          break;
-      }
-    }
-
-    // @implements {R006.§4.AC.03} Append <-SOURCE indicator for derived claims
-    let derivedIndicator = '';
-    if (row.derivedFrom && row.derivedFrom.length > 0) {
-      derivedIndicator = ` \u2190${row.derivedFrom[0]}`;
-      if (row.derivedFrom.length > 1) {
-        derivedIndicator += `+${row.derivedFrom.length - 1}`;
-      }
-    }
-
-    const claimIdText = padRight(row.claimId + derivedIndicator, claimColWidth);
-    const claimLabel = isDimmed
-      ? chalk.dim(claimIdText)
-      : isHighImportance
-        ? chalk.red.bold(claimIdText)
-        : chalk.cyan(claimIdText);
-
-    const titleText = padRight(title + lifecycleMarker, titleColWidth);
-    const titleLabel = isDimmed ? chalk.dim(titleText) : chalk.white(titleText);
-
-    const cells = [claimLabel, titleLabel];
-
-    for (const pType of matrix.projectionTypes) {
-      const presences = row.projections.get(pType);
-      if (presences && presences.length > 0) {
-        // Deduplicate note IDs and show count if multiple refs from same note
-        const countByNote = new Map<string, number>();
-        for (const p of presences) {
-          countByNote.set(p.noteId, (countByNote.get(p.noteId) || 0) + 1);
-        }
-        const noteLabels = [...countByNote.entries()].map(([id, count]) => {
-          // Strip "source:" prefix for display — redundant in the Source column
-          const displayId = id.startsWith('source:') ? id.slice(7) : id;
-          return count > 1 ? `${displayId}(x${count})` : displayId;
-        });
-        const cellText = padRight(noteLabels.join(','), typeColWidth);
-        cells.push(isDimmed ? chalk.dim(cellText) : chalk.green(cellText));
-      } else {
-        // @implements {DD005.§DC.06} Gap mode: red marker for missing coverage
-        // But not for the claim's own note type, and not for projection types
-        // irrelevant to this claim's source type.
-        const isRelevantGap = displayOptions?.gapMode
-          && row.noteType !== pType
-          && (!row.relevantProjections || row.relevantProjections.has(pType));
-        if (isRelevantGap) {
-          cells.push(chalk.red(padRight('[gap]', typeColWidth)));
-        } else {
-          cells.push(chalk.gray(padRight('-', typeColWidth)));
+  // Compute active projection types per section (only types with data)
+  function getActiveProjections(rows: typeof matrix.rows): string[] {
+    const active = new Set<string>();
+    for (const row of rows) {
+      for (const pType of matrix.projectionTypes) {
+        const presences = row.projections.get(pType);
+        if (presences && presences.length > 0) {
+          active.add(pType);
         }
       }
     }
+    // Preserve original ordering
+    return matrix.projectionTypes.filter(t => active.has(t));
+  }
 
-    // @implements {R005.§3.AC.07} Show verification date when store provided
-    if (verificationStore) {
-      const latestVerif = getLatestVerification(verificationStore, row.claimId);
-      if (latestVerif) {
-        cells.push(chalk.gray(latestVerif.date));
-      }
-    }
+  // Check if any row in a section has verification data
+  const hasVerification = verificationStore && matrix.rows.some(row => {
+    const v = getLatestVerification(verificationStore, row.claimId);
+    return v !== undefined;
+  });
 
-    // @implements {R006.§4.AC.02} --show-derived: add derivation status marker and sub-rows
-    if (displayOptions?.showDerived && displayOptions.getDerivatives) {
-      const derivatives = displayOptions.getDerivatives(row.claimId);
-      if (derivatives.length > 0) {
-        // Check Source coverage on each derivative
-        let covered = 0;
-        for (const dFqid of derivatives) {
-          if (displayOptions.hasSourceCoverage?.(dFqid)) {
-            covered++;
+  const typeColWidth = 14;
+  const verifiedColWidth = 12;
+
+  // Render a section of rows with its own header
+  function renderSection(
+    rows: typeof matrix.rows,
+    sectionLabel: string | null,
+    projectionTypes: string[],
+  ): void {
+    if (rows.length === 0) return;
+
+    // Compute titles
+    const titles = rows.map((r) => {
+      const raw = extractTitle(r.heading);
+      return displayOptions?.full ? raw : truncateString(raw, titleMaxWidth);
+    });
+
+    // Column widths for this section
+    const claimColWidth = Math.max(
+      10,
+      ...rows.map((r) => {
+        let len = r.claimId.length;
+        if (r.derivedFrom && r.derivedFrom.length > 0) {
+          len += ` \u2190${r.derivedFrom[0]}`.length;
+          if (r.derivedFrom.length > 1) {
+            len += `+${r.derivedFrom.length - 1}`.length;
           }
         }
-        const marker = covered === derivatives.length
-          ? chalk.green(' [derived:OK]')
-          : chalk.yellow(` [derived:partial ${covered}/${derivatives.length}]`);
-        cells.push(marker);
-      }
+        return len;
+      }),
+    );
+    const titleColWidth = Math.max(
+      5,
+      ...titles.map((t) => t.length),
+    );
+
+    // Section separator
+    if (sectionLabel) {
+      lines.push('');
+      lines.push(chalk.bold.gray(`${sectionLabel}:`));
     }
 
-    lines.push(cells.join(' | '));
+    // Header
+    const headerParts = [
+      padRight('Claim', claimColWidth),
+      padRight('Title', titleColWidth),
+    ];
+    for (const pType of projectionTypes) {
+      headerParts.push(padRight(pType, typeColWidth));
+    }
+    if (hasVerification) {
+      headerParts.push(padRight('Verified', verifiedColWidth));
+    }
 
-    // @implements {R006.§4.AC.02} --show-derived: insert indented sub-rows for each derivative
-    if (displayOptions?.showDerived && displayOptions.getDerivatives) {
-      const derivatives = displayOptions.getDerivatives(row.claimId);
-      for (const derivFqid of derivatives) {
-        const derivEntry = displayOptions.getClaimEntry?.(derivFqid);
-        const derivTitle = derivEntry ? extractTitle(derivEntry.heading) : '';
-        const truncTitle = displayOptions?.full ? derivTitle : truncateString(derivTitle, titleMaxWidth);
+    lines.push(chalk.bold(headerParts.join(' | ')));
+    lines.push(chalk.gray('-'.repeat(headerParts.join(' | ').length)));
 
-        const hasSrc = displayOptions.hasSourceCoverage?.(derivFqid) ?? false;
-        const srcMarker = hasSrc ? chalk.green('\u2713') : chalk.red('\u2717');
+    // Rows
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const title = titles[i];
 
-        const subCells = [
-          chalk.gray(padRight(`  \u2514\u2500 ${derivFqid}`, claimColWidth + 5)),
-          chalk.gray(padRight(truncTitle, titleColWidth)),
-        ];
-        // Fill projection columns with the source coverage marker in the last column
-        for (const _pType of matrix.projectionTypes) {
-          subCells.push(chalk.gray(padRight('', typeColWidth)));
+      // Unresolved rows get a [BROKEN] marker
+      if (row.unresolved) {
+        const claimIdText = padRight(row.claimId, claimColWidth);
+        const claimLabel = chalk.red(claimIdText);
+        const brokenMsg = padRight('[BROKEN] target claim not found in index', titleColWidth);
+        const cells = [claimLabel, chalk.red(brokenMsg)];
+        for (const _pType of projectionTypes) {
+          cells.push(chalk.red(padRight('?', typeColWidth)));
         }
-        subCells.push(srcMarker);
-        lines.push(subCells.join(' | '));
+        if (hasVerification) {
+          cells.push(padRight('', verifiedColWidth));
+        }
+        lines.push(cells.join(' | '));
+        continue;
+      }
+
+      // @implements {R005.§1.AC.03} importance >= 4 gets red/bold highlighting
+      const isHighImportance = row.importance !== undefined && row.importance >= 4;
+
+      // @implements {R005.§2.AC.08} Lifecycle state visual markers
+      let lifecycleMarker = '';
+      let isDimmed = false;
+      if (row.lifecycle) {
+        switch (row.lifecycle.type) {
+          case 'closed':
+            isDimmed = true;
+            break;
+          case 'removed':
+            lifecycleMarker = ' [removed]';
+            break;
+          case 'superseded':
+            lifecycleMarker = ` [superseded\u2192${row.lifecycle.target ?? '?'}]`;
+            break;
+          case 'deferred':
+            lifecycleMarker = ' [deferred]';
+            break;
+        }
+      }
+
+      // @implements {R006.§4.AC.03} Append <-SOURCE indicator for derived claims
+      let derivedIndicator = '';
+      if (row.derivedFrom && row.derivedFrom.length > 0) {
+        derivedIndicator = ` \u2190${row.derivedFrom[0]}`;
+        if (row.derivedFrom.length > 1) {
+          derivedIndicator += `+${row.derivedFrom.length - 1}`;
+        }
+      }
+
+      const claimIdText = padRight(row.claimId + derivedIndicator, claimColWidth);
+      const claimLabel = isDimmed
+        ? chalk.dim(claimIdText)
+        : isHighImportance
+          ? chalk.red.bold(claimIdText)
+          : chalk.cyan(claimIdText);
+
+      const titleText = padRight(title + lifecycleMarker, titleColWidth);
+      const titleLabel = isDimmed ? chalk.dim(titleText) : chalk.white(titleText);
+
+      const cells = [claimLabel, titleLabel];
+
+      for (const pType of projectionTypes) {
+        const presences = row.projections.get(pType);
+        if (presences && presences.length > 0) {
+          const countByNote = new Map<string, number>();
+          for (const p of presences) {
+            countByNote.set(p.noteId, (countByNote.get(p.noteId) || 0) + 1);
+          }
+          const noteLabels = [...countByNote.entries()].map(([id, count]) => {
+            const displayId = id.startsWith('source:') ? id.slice(7) : id;
+            return count > 1 ? `${displayId}(x${count})` : displayId;
+          });
+          const cellText = padRight(noteLabels.join(','), typeColWidth);
+          cells.push(isDimmed ? chalk.dim(cellText) : chalk.green(cellText));
+        } else {
+          // @implements {DD005.§DC.06} Gap mode: red marker for missing coverage
+          const isRelevantGap = displayOptions?.gapMode
+            && row.noteType !== pType
+            && (!row.relevantProjections || row.relevantProjections.has(pType));
+          if (isRelevantGap) {
+            cells.push(chalk.red(padRight('[gap]', typeColWidth)));
+          } else {
+            cells.push(chalk.gray(padRight('-', typeColWidth)));
+          }
+        }
+      }
+
+      // @implements {R005.§3.AC.07} Show verification date when store provided
+      if (hasVerification && verificationStore) {
+        const latestVerif = getLatestVerification(verificationStore, row.claimId);
+        if (latestVerif) {
+          cells.push(chalk.green(padRight(latestVerif.date, verifiedColWidth)));
+        } else {
+          cells.push(padRight('', verifiedColWidth));
+        }
+      }
+
+      // @implements {R006.§4.AC.02} --show-derived: add derivation status marker
+      if (displayOptions?.showDerived && displayOptions.getDerivatives) {
+        const derivatives = displayOptions.getDerivatives(row.claimId);
+        if (derivatives.length > 0) {
+          let covered = 0;
+          for (const dFqid of derivatives) {
+            if (displayOptions.hasSourceCoverage?.(dFqid)) {
+              covered++;
+            }
+          }
+          const marker = covered === derivatives.length
+            ? chalk.green(' [derived:OK]')
+            : chalk.yellow(` [derived:partial ${covered}/${derivatives.length}]`);
+          cells.push(marker);
+        }
+      }
+
+      lines.push(cells.join(' | '));
+
+      // @implements {R006.§4.AC.02} --show-derived: insert derivative sub-rows
+      if (displayOptions?.showDerived && displayOptions.getDerivatives) {
+        const derivatives = displayOptions.getDerivatives(row.claimId);
+        for (const derivFqid of derivatives) {
+          const derivEntry = displayOptions.getClaimEntry?.(derivFqid);
+          const derivTitle = derivEntry ? extractTitle(derivEntry.heading) : '';
+          const truncTitle = displayOptions?.full ? derivTitle : truncateString(derivTitle, titleMaxWidth);
+
+          const hasSrc = displayOptions.hasSourceCoverage?.(derivFqid) ?? false;
+          const srcMarker = hasSrc ? chalk.green('\u2713') : chalk.red('\u2717');
+
+          const subCells = [
+            chalk.gray(padRight(`  \u2514\u2500 ${derivFqid}`, claimColWidth + 5)),
+            chalk.gray(padRight(truncTitle, titleColWidth)),
+          ];
+          for (const _pType of projectionTypes) {
+            subCells.push(chalk.gray(padRight('', typeColWidth)));
+          }
+          subCells.push(srcMarker);
+          lines.push(subCells.join(' | '));
+        }
       }
     }
+  }
+
+  // Render own claims section (no label for the first section)
+  const ownProjections = getActiveProjections(ownRows);
+  renderSection(ownRows, null, ownProjections);
+
+  // Hint about verified claims
+  if (hasVerification) {
+    lines.push('');
+    lines.push(chalk.gray('This note has verified claims. View verification history with `scepter trace <claimId>`.'));
+  }
+
+  // Render referenced claims section with separate header
+  if (referencedRows.length > 0) {
+    const refProjections = getActiveProjections(referencedRows);
+    renderSection(referencedRows, 'Referenced claims', refProjections);
   }
 
   return lines.join('\n');
@@ -456,11 +513,18 @@ export async function formatClaimTrace(
     lines.push(`  ${chalk.gray('Derived from:')} ${entry.derivedFrom.join(', ')}`);
   }
 
-  // @implements {R005.§3.AC.07} Show verification info
+  // @implements {R005.§3.AC.07} Show full verification history in single-claim trace
   if (verificationStore) {
-    const latestVerif = getLatestVerification(verificationStore, entry.fullyQualified);
-    if (latestVerif) {
-      lines.push(`  ${chalk.gray('Last verified:')} ${latestVerif.date} by ${latestVerif.actor}${latestVerif.method ? ` (${latestVerif.method})` : ''}`);
+    const events = verificationStore[entry.fullyQualified];
+    if (events && events.length > 0) {
+      lines.push(`  ${chalk.gray('Verification history:')}`);
+      // Show most recent first
+      for (const event of [...events].reverse()) {
+        const parts = [event.date];
+        if (event.actor) parts.push(`by ${event.actor}`);
+        if (event.method) parts.push(`(${event.method})`);
+        lines.push(`    ${chalk.green(parts.join(' '))}`);
+      }
     }
   }
 

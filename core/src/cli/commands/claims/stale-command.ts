@@ -24,8 +24,9 @@ export const staleCommand = new Command('stale')
   .description('Report stale and unverified claims based on source file changes')
   .option('--importance <level>', 'Filter by minimum importance level (1-5)', parseInt)
   .option('--note <noteId>', 'Scope to claims from a specific note')
+  .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
-  .action(async (options: { importance?: number; note?: string; json?: boolean; projectDir?: string }) => {
+  .action(async (options: { importance?: number; note?: string; reindex?: boolean; json?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -35,7 +36,7 @@ export const staleCommand = new Command('stale')
         },
         async (context) => {
           // Build the claim index
-          const data = await ensureIndex(context.projectManager);
+          const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Load the verification store
           const config = context.projectManager.configManager.getConfig();

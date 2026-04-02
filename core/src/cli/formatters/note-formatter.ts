@@ -92,13 +92,68 @@ export function formatNote(note: Note, options: NoteFormatOptions = {}): string 
   // References - removed from here as they're shown in the reference tree
 
   // Content
+  // @implements {DD008.§2.DC.08} Syntax highlighting for note/claim references and annotations
+  // @implements {DD008.§2.DC.09} Highlighting disabled when colorize is false (--no-format, JSON)
   if (showContent && note.content) {
     lines.push(c.gray('Content:'));
     lines.push('');
-    lines.push(note.content);
+    if (colorize) {
+      lines.push(highlightContent(note.content));
+    } else {
+      lines.push(note.content);
+    }
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Apply syntax highlighting to note content.
+ *
+ * Highlights:
+ * - {NOTEID} references (e.g., {R005}, {DD007}) -> cyan
+ * - {NOTEID.section.PREFIX.NN} claim references -> cyan
+ * - Bare NOTEID.section.PREFIX.NN without braces -> cyan
+ * - @implements, @depends-on, @validates, @see, @addresses, @blocked-by -> green
+ *
+ * Uses a single regex pass per line for efficiency.
+ *
+ * @implements {DD008.§2.DC.08}
+ * @implements {DD008.§2.DC.10} Single regex pass per line
+ */
+function highlightContent(content: string): string {
+  // Combined pattern matching all highlight targets in a single pass:
+  //   1. Braced note/claim references: {R005}, {DD007.§1.DC.03}
+  //   2. Fully-qualified bare claims: R005.§1.AC.03, DD007.1.DC.01
+  //   3. Bare §-prefixed claims/sections: §DC.01, §1.DC.01, §1, §3.1
+  //   4. @keyword annotations
+  const highlightPattern = new RegExp(
+    // Group 1: Braced references {R005}, {DD007.§1.DC.03}, {A001.§2.AC.01,.AC.02}
+    '(\\{[A-Z]{1,5}\\d{1,5}(?:\\.[^}]*)?\\})' +
+    // Group 2: Fully-qualified bare claims: R005.§1.AC.03, DD007.1.DC.01
+    '|(?<![A-Za-z0-9{])([A-Z]{1,5}\\d{3,5}\\.§?\\d+(?:\\.\\d+)*\\.§?[A-Z]+\\.\\d{2,3}[a-z]?)(?![A-Za-z0-9}])' +
+    // Group 3: Bare §-prefixed: §DC.01, §1.DC.01, §1, §3.1
+    '|(?<![A-Za-z0-9])(§\\d+(?:\\.\\d+)*(?:\\.[A-Z]+\\.\\d{2,3}[a-z]?)?|§[A-Z]+\\.\\d{2,3}[a-z]?)(?![A-Za-z0-9])' +
+    // Group 4: Bare note IDs: DD007, R005, A001 (1-5 uppercase + 3-5 digits, not in braces)
+    '|(?<![A-Za-z0-9{])([A-Z]{1,5}\\d{3,5})(?![A-Za-z0-9.}])' +
+    // Group 5: @keyword annotations
+    '|(@(?:implements|depends-on|validates|see|addresses|blocked-by))\\b',
+    'g',
+  );
+
+  const lines = content.split('\n');
+  const highlighted = lines.map(line => {
+    return line.replace(highlightPattern, (match, braced, bare, section, noteId, keyword) => {
+      if (braced) return chalk.cyan(braced);
+      if (bare) return chalk.cyan(bare);
+      if (section) return chalk.cyan(section);
+      if (noteId) return chalk.cyan(noteId);
+      if (keyword) return chalk.green(keyword);
+      return match;
+    });
+  });
+
+  return highlighted.join('\n');
 }
 
 /**

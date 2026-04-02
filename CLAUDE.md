@@ -1,6 +1,6 @@
 ## Claude.MD
 
-Read @docs/prompts/working-intelligently.md and follow its instructions, then read @docs/architecture/ARCHITECTURE_OVERVIEW.md immediately, and ask the user what they want to accomplish.
+Read @docs/architecture/ARCHITECTURE_OVERVIEW.md immediately, then ask the user what they want to accomplish.
 
 ## Working Context Management
 
