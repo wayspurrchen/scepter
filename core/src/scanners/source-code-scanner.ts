@@ -260,6 +260,7 @@ export class SourceCodeScanner extends EventEmitter {
         cwd: this.projectPath,
         ignore: this.config.exclude,
         nodir: true,
+        dot: true,
       });
 
       const sourceFiles = matches.filter((file) => this.config!.extensions.some((ext) => file.endsWith(ext)));
