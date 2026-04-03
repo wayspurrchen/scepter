@@ -115,7 +115,12 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
       : path.join(this.index.projectDir, element.filePath);
     const args: any[] = [vscode.Uri.file(absPath)];
     if (element.line != null) {
-      args.push({ selection: new vscode.Range(element.line - 1, 0, element.line - 1, 0) });
+      args.push({
+        selection: new vscode.Range(element.line - 1, 0, element.line - 1, 0),
+        preserveFocus: true,
+      });
+    } else {
+      args.push({ preserveFocus: true });
     }
     item.command = {
       command: 'vscode.open',

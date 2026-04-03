@@ -32,6 +32,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
   outputChannel.appendLine('SCEpter Claims extension activating...');
 
   // @implements {DD012.§DC.05} Replace findScepterProject with findProjectRoot
+  // Try upward walk first (workspace root IS a SCEpter project or is inside one),
+  // then fall back to downward glob (monorepo with nested SCEpter projects).
   const workspaceFolders = vscode.workspace.workspaceFolders;
   let projectDir: string | null = null;
   if (workspaceFolders) {
@@ -41,9 +43,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     }
   }
 
+  // Downward search: find nested _scepter/scepter.config.json in workspace
+  if (!projectDir) {
+    outputChannel.appendLine('Upward walk found nothing, searching workspace for nested SCEpter projects...');
+    const configFiles = await vscode.workspace.findFiles(
+      '**/scepter.config.json',
+      '{**/node_modules/**,**/dist/**,**/build/**}',
+      5,
+    );
+    for (const uri of configFiles) {
+      // Config could be at <project>/scepter.config.json or <project>/_scepter/scepter.config.json
+      const configDir = uri.fsPath.replace(/[/\\]scepter\.config\.json$/, '');
+      const candidate = configDir.endsWith('_scepter')
+        ? configDir.replace(/[/\\]_scepter$/, '')
+        : configDir;
+      projectDir = await findProjectRoot(candidate);
+      if (projectDir) {
+        outputChannel.appendLine(`Found nested SCEpter project: ${projectDir}`);
+        break;
+      }
+    }
+  }
+
   if (!projectDir) {
     outputChannel.appendLine(
-      'No SCEpter project found (no scepter.config.json in workspace folders)'
+      'No SCEpter project found (no scepter.config.json in workspace folders or subdirectories)'
     );
     return {};
   }

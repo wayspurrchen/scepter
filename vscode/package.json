@@ -204,18 +204,22 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run package",
+    "build": "node esbuild.mjs",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "watch": "node esbuild.mjs --watch",
+    "package": "node esbuild.mjs --production",
+    "vsix": "npx @vscode/vsce package --no-dependencies",
     "lint": "eslint src"
   },
   "dependencies": {
-    "scepter": "file:..",
-    "markdown-it": "^14.0.0"
+    "markdown-it": "^14.0.0",
+    "scepter": "file:.."
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.8.3"
   }
 }

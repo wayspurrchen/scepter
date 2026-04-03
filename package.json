@@ -33,6 +33,8 @@
   },
   "scripts": {
     "build": "cd core && tsup",
+    "build:vscode": "pnpm run build && cd vscode && npm run build",
+    "vsix": "pnpm run build && cd vscode && npm run vsix",
     "cli": "tsx core/src/cli/index.ts",
     "typecheck": "tsc",
     "test": "cd core && vitest",
