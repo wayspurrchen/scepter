@@ -103,7 +103,7 @@ Notes follow Zettelkasten principles — as small as possible to capture a core 
 
 Storage: `_scepter/notes/[type_folder]/[ID] [Title].md`
 
-**Tasks** are a special virtual note type: always shortcode `T`, sequential IDs (T001, T002...), stored in `_scepter/tasks/`. Tasks bridge knowledge (decisions, requirements) and work (implementation).
+**Tasks** use shortcode `T`, sequential IDs (T001, T002...), stored in `_scepter/tasks/`. Tasks bridge knowledge (decisions, requirements) and work (implementation). Task should be defined in the project's `scepter.config.json` like any other type — check with `scepter config` first.
 
 ### Configuration-Driven Everything
 
@@ -280,7 +280,7 @@ Check `scepter config` and `scepter types list` for project-specific allowed sta
 ❌ `Read: _scepter/notes/decisions/D001.md` / `Glob: _scepter/**/*.md`
 ✅ `scepter ctx show D001` / `scepter ctx list`
 
-**Why:** CLI tracks references, handles virtual types, provides context. Direct access breaks all of this.
+**Why:** CLI tracks references, resolves types, provides context. Direct access breaks all of this.
 
 ### 2. Creating Without Searching First
 

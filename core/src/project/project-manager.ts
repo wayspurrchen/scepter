@@ -12,9 +12,15 @@ import { StatusValidator } from '../statuses/status-validator.js';
 import { ClaimIndex } from '../claims/claim-index.js';
 import type { SCEpterConfig } from '../types/config';
 import type { SimpleLLMFunction } from '../llm/types';
-import * as fs from 'fs/promises';
-import * as fsExtra from 'fs-extra';
+import type {
+  NoteStorage,
+  ConfigStorage,
+  TemplateStorage,
+  VerificationStorage,
+  IdCounterStorage,
+} from '../storage';
 import * as path from 'path';
+import * as fsProjectUtils from '../storage/filesystem/filesystem-project-utils';
 import type {
   TypeInfo,
   RenameResult,
@@ -34,26 +40,18 @@ export interface ProjectManagerDependencies {
   taskDispatcher?: TaskDispatcher;
   sourceScanner?: SourceCodeScanner;
   llmFunction?: SimpleLLMFunction;
+  // Storage interfaces (new — injected by createFilesystemProject)
+  noteStorage?: NoteStorage;
+  configStorage?: ConfigStorage;
+  templateStorage?: TemplateStorage;
+  verificationStorage?: VerificationStorage;
+  idCounterStorage?: IdCounterStorage;
 }
 
-export interface ValidationError {
-  type: 'missing_directory' | 'not_a_directory' | 'permission_error';
-  path: string;
-  message: string;
-}
-
-export interface ValidationReport {
-  isValid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationError[];
-  checkedPaths: string[];
-}
-
-export interface CleanupSuggestion {
-  path: string;
-  reason: string;
-  hasContent: boolean;
-}
+// Import filesystem-specific types used in public methods below,
+// and re-export for backwards compatibility.
+import type { ValidationError, ValidationReport, CleanupSuggestion } from '../storage/filesystem/filesystem-project-utils';
+export type { ValidationError, ValidationReport, CleanupSuggestion };
 
 export interface ProjectStatistics {
   totalNotes: number;
@@ -62,16 +60,6 @@ export interface ProjectStatistics {
   lastModified: Date | null;
   projectSize: number; // in bytes
 }
-
-export interface ProjectMetadata {
-  version: string;
-  createdAt: string;
-  scepterVersion: string;
-  lastUpdated?: string;
-}
-
-const SCEPTER_VERSION = '1.0.0';
-const PROJECT_VERSION = '1.0.0';
 
 /**
  * @implements {T011} Phase 3 - CLI Integration
@@ -89,6 +77,13 @@ export class ProjectManager extends EventEmitter {
   public statusValidator!: StatusValidator;
   public readonly claimIndex: ClaimIndex;
 
+  // Storage interfaces (injected by factory, undefined in legacy construction path)
+  public readonly noteStorage?: NoteStorage;
+  public readonly configStorage?: ConfigStorage;
+  public readonly templateStorage?: TemplateStorage;
+  public readonly verificationStorage?: VerificationStorage;
+  public readonly idCounterStorage?: IdCounterStorage;
+
   private validationErrors: ValidationError[] = [];
   private llmFunction?: SimpleLLMFunction;
 
@@ -100,6 +95,13 @@ export class ProjectManager extends EventEmitter {
 
     // Store LLM function for TaskDispatcher creation
     this.llmFunction = deps.llmFunction;
+
+    // Store storage interfaces if provided (injected by createFilesystemProject)
+    this.noteStorage = deps.noteStorage;
+    this.configStorage = deps.configStorage;
+    this.templateStorage = deps.templateStorage;
+    this.verificationStorage = deps.verificationStorage;
+    this.idCounterStorage = deps.idCounterStorage;
 
     // Create all dependencies with defaults if not provided
     this.configManager = deps.configManager || new ConfigManager(projectPath);
@@ -139,165 +141,84 @@ export class ProjectManager extends EventEmitter {
     this.claimIndex = new ClaimIndex();
   }
 
+  /**
+   * Initialize the project. Directory bootstrapping and config loading are
+   * handled by the factory (createFilesystemProject / bootstrapFilesystemDirs)
+   * before this method is called. initialize() sets up in-memory subsystems only.
+   *
+   * @implements {DD010.§DC.18} ProjectManager.initialize() contains no direct filesystem operations
+   */
   async initialize(options?: { includeArchived?: boolean; includeDeleted?: boolean; startWatchers?: boolean }): Promise<void> {
+    // Load config if not already loaded by the factory
+    let config: SCEpterConfig;
     try {
-      // First check if we can access the project path at all
-      try {
-        await fs.access(this.projectPath, fs.constants.W_OK);
-      } catch (error: any) {
-        if (error.code === 'ENOENT') {
-          // Try to create the project path
-          try {
-            await fs.mkdir(this.projectPath, { recursive: true });
-          } catch (mkdirError: any) {
-            if (mkdirError.code === 'EACCES' || mkdirError.code === 'EPERM') {
-              throw new Error(`Permission denied: cannot create project directory`);
-            }
-            throw new Error(`Invalid project path: ${this.projectPath}`);
-          }
-        } else if (error.code === 'EACCES' || error.code === 'EPERM') {
-          throw new Error(`Permission denied: cannot access project directory`);
-        }
-      }
-
-      // Check for any existing directories with permission issues
-      try {
-        const entries = await fs.readdir(this.projectPath, { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.isDirectory()) {
-            const dirPath = path.join(this.projectPath, entry.name);
-            try {
-              await fs.access(dirPath, fs.constants.R_OK);
-            } catch (error: any) {
-              if (error.code === 'EACCES' || error.code === 'EPERM') {
-                throw new Error(`Permission denied: cannot access directory ${entry.name}`);
-              }
-            }
-          }
-        }
-      } catch (error: any) {
-        if (error.message && error.message.includes('Permission denied')) {
-          throw error;
-        }
-        // Ignore other errors
-      }
-
-      // Load config from filesystem if not already loaded
-      // This makes initialize() more robust and prevents "No configuration loaded" errors
-      let config: SCEpterConfig;
-      try {
-        config = this.configManager.getConfig();
-      } catch (error) {
-        // Config not loaded yet, try to load it
-        const loaded = await this.configManager.loadConfigFromFilesystem();
-        if (!loaded) {
-          throw new Error('No configuration file found. Please run `scepter init` first.');
-        }
-        config = loaded;
-      }
-
-      // @implements {T011} Initialize status validator after config is loaded
-      this.statusValidator = new StatusValidator(config);
-
-      // Initialize note type resolver after config is loaded
-      this.noteTypeResolver.initialize();
-
-      // Initialize template manager
-      await this.noteTypeTemplateManager.initialize();
-
-      // Initialize note manager to discover tasks
-      await this.noteManager.initialize(options);
-
-      // Build the NoteFileManager index so getFileContents()/getFilePath() work
-      // regardless of whether file watchers are started. This is the single
-      // choke-point — every consumer (CLI, web, tests) goes through initialize().
-      await this.noteFileManager.buildIndex();
-
-      // Create base directories
-      await this.createBaseDirectories(config);
-
-      // Create note type directories
-      await this.createNoteTypeDirectories(config);
-
-      // Create project metadata - now handled by scepter.config.json
-      // await this.createProjectMetadata(config);
-
-      // Initialize TaskDispatcher with work modes from config
-      this.taskDispatcher = await this.createTaskDispatcher();
-
-      // Initialize source code scanner if enabled
-      if (config.sourceCodeIntegration?.enabled) {
-        this.sourceScanner = new SourceCodeScanner(this.projectPath, this.configManager);
-        try {
-          await this.sourceScanner.initialize();
-          // Set up bidirectional integration with ReferenceManager
-          this.referenceManager.setSourceIndex(this.sourceScanner.getIndex());
-          // Start watching for changes only if requested (e.g., for daemon/watch mode)
-          // Default is false to avoid hanging CLI commands
-          if (options?.startWatchers) {
-            await this.sourceScanner.startWatching();
-          }
-        } catch (error) {
-          console.warn('Failed to initialize source code scanner:', error);
-          this.sourceScanner = undefined;
-        }
-      }
-
-      // Emit event
-      this.emit('structure:changed');
+      config = this.configManager.getConfig();
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('Permission denied')) {
-          throw error;
-        }
-        if (error.message.includes('EACCES') || error.message.includes('EPERM')) {
-          throw new Error(`Permission denied while initializing project: ${error.message}`);
-        }
-        // Only treat ENOENT as invalid path if it's about the project path itself
-        if (error.message.includes('ENOENT') && error.message.includes('/invalid/')) {
-          throw new Error(`Invalid project path: ${this.projectPath}`);
-        }
+      const loaded = await this.configManager.loadConfigFromFilesystem();
+      if (!loaded) {
+        throw new Error('No configuration file found. Please run `scepter init` first.');
       }
-      throw error;
+      config = loaded;
     }
+
+    // @implements {T011} Initialize status validator after config is loaded
+    this.statusValidator = new StatusValidator(config);
+
+    // Initialize note type resolver after config is loaded
+    this.noteTypeResolver.initialize();
+
+    // Initialize template manager
+    await this.noteTypeTemplateManager.initialize();
+
+    // Initialize note manager to discover tasks
+    await this.noteManager.initialize(options);
+
+    // Build the NoteFileManager index so getFileContents()/getFilePath() work
+    // regardless of whether file watchers are started. This is the single
+    // choke-point — every consumer (CLI, web, tests) goes through initialize().
+    await this.noteFileManager.buildIndex();
+
+    // Initialize TaskDispatcher with work modes from config
+    this.taskDispatcher = await this.createTaskDispatcher();
+
+    // Initialize source code scanner if enabled
+    if (config.sourceCodeIntegration?.enabled) {
+      this.sourceScanner = new SourceCodeScanner(this.projectPath, this.configManager);
+      try {
+        await this.sourceScanner.initialize();
+        // Set up bidirectional integration with ReferenceManager
+        this.referenceManager.setSourceIndex(this.sourceScanner.getIndex());
+        // Start watching for changes only if requested (e.g., for daemon/watch mode)
+        // Default is false to avoid hanging CLI commands
+        if (options?.startWatchers) {
+          await this.sourceScanner.startWatching();
+        }
+      } catch (error) {
+        console.warn('Failed to initialize source code scanner:', error);
+        this.sourceScanner = undefined;
+      }
+    }
+
+    // Emit event
+    this.emit('structure:changed');
   }
 
+  /**
+   * Validate the project's filesystem structure.
+   * Delegates to filesystem-project-utils (inherently filesystem-bound).
+   */
   async validateStructure(): Promise<boolean> {
-    this.validationErrors = [];
-    const checkedPaths: string[] = [];
-
     try {
-      const config = await this.configManager.getConfig();
-
-      // Check base directories
-      const dataDir = path.join(this.projectPath, config.paths?.dataDir || '_scepter');
-      const notesRoot = path.join(this.projectPath, config.paths?.notesRoot || '_scepter');
-
-      await this.checkDirectory(dataDir, checkedPaths);
-      await this.checkDirectory(notesRoot, checkedPaths);
-
-      // Check optional directories only if they exist (don't flag missing ones as errors)
-      await this.checkOptionalDirectory(path.join(this.projectPath, '_scepter/_templates'), checkedPaths);
-      await this.checkOptionalDirectory(path.join(this.projectPath, '_scepter/_prompts'), checkedPaths);
-      await this.checkOptionalDirectory(path.join(notesRoot, '_templates'), checkedPaths);
-
-      // Check note type directories (only for types with a folder defined)
-      for (const [key, noteType] of Object.entries(config.noteTypes)) {
-        if (noteType.folder) {
-          const noteTypePath = path.join(notesRoot, noteType.folder);
-          await this.checkDirectory(noteTypePath, checkedPaths);
-        }
-      }
-
-    } catch (error) {
-      // Config loading error
-      this.validationErrors.push({
+      const config = this.configManager.getConfig();
+      const errors = await fsProjectUtils.validateStructure(this.projectPath, config);
+      this.validationErrors = errors;
+    } catch {
+      this.validationErrors = [{
         type: 'missing_directory',
         path: this.projectPath,
         message: 'Failed to load configuration',
-      });
+      }];
     }
-
     return this.validationErrors.length === 0;
   }
 
@@ -306,394 +227,54 @@ export class ProjectManager extends EventEmitter {
   }
 
   async getValidationReport(): Promise<ValidationReport> {
-    await this.validateStructure();
-
-    const warnings: ValidationError[] = [];
-    const checkedPaths: string[] = [];
-
-    // Re-run validation to collect all checked paths
-    try {
-      const config = await this.configManager.getConfig();
-      const paths = [
-        path.join(this.projectPath, config.paths?.dataDir || '_scepter'),
-        path.join(this.projectPath, config.paths?.notesRoot || '_scepter'),
-      ];
-
-      for (const p of paths) {
-        checkedPaths.push(p);
-      }
-
-      const notesRoot = path.join(this.projectPath, config.paths?.notesRoot || '_scepter');
-
-      for (const noteType of Object.values(config.noteTypes)) {
-        if (noteType.folder) {
-          checkedPaths.push(path.join(notesRoot, noteType.folder));
-        }
-      }
-    } catch { }
-
-    return {
-      isValid: this.validationErrors.length === 0,
-      errors: [...this.validationErrors],
-      warnings,
-      checkedPaths,
-    };
+    const config = this.configManager.getConfig();
+    return fsProjectUtils.getValidationReport(this.projectPath, config);
   }
 
   async updateStructure(): Promise<void> {
-    const config = await this.configManager.getConfig();
-
-    // Create any missing directories
-    await this.createNoteTypeDirectories(config);
-
+    // Directory creation is handled by the factory/bootstrap — just emit event
     this.emit('structure:updated');
   }
 
   async getCleanupSuggestions(): Promise<CleanupSuggestion[]> {
-    const suggestions: CleanupSuggestion[] = [];
-    const config = await this.configManager.getConfig();
-
-    const notesRoot = path.join(this.projectPath, config.paths?.notesRoot || '_scepter');
-
-    // Check for orphaned note type folders (only consider types that have folders)
-    const expectedNoteFolders = new Set(
-      Object.values(config.noteTypes)
-        .map((nt) => nt.folder)
-        .filter((f): f is string => !!f)
-    );
-    await this.checkOrphanedFolders(notesRoot, expectedNoteFolders, 'note type', suggestions);
-
-    return suggestions;
+    const config = this.configManager.getConfig();
+    return fsProjectUtils.getCleanupSuggestions(this.projectPath, config);
   }
 
+  /**
+   * Get project statistics. Delegates filesystem-bound operations
+   * (lastModified, projectSize) to noteStorage.getStatistics().
+   *
+   * @implements {DD010.§DC.27} getStatistics delegates to noteStorage
+   */
   async getStatistics(): Promise<ProjectStatistics> {
-    const config = await this.configManager.getConfig();
-    const notesRoot = path.join(this.projectPath, config.paths?.notesRoot || '_scepter');
+    const noteManagerStats = await this.noteManager.getStatistics();
 
-    let totalNotes = 0;
-    const notesByType: Record<string, number> = {};
-    const notesByMode: Record<string, number> = {};
+    // Delegate storage-level stats (lastModified, totalSize) to noteStorage if available
     let lastModified: Date | null = null;
     let projectSize = 0;
-
-    // Use NoteManager for accurate statistics
-    const stats = await this.noteManager.getStatistics();
-    totalNotes = stats.totalNotes;
-    Object.assign(notesByType, stats.notesByType);
-
-    // Still need to calculate lastModified and projectSize from filesystem
-    for (const [key, noteType] of Object.entries(config.noteTypes)) {
-      if (!noteType.folder) continue;
-
-      const noteTypePath = path.join(notesRoot, noteType.folder);
-
-      // Update last modified
-      const dirMtime = await this.getLastModifiedInDirectory(noteTypePath);
-      if (dirMtime && (!lastModified || dirMtime > lastModified)) {
-        lastModified = dirMtime;
-      }
-
-      // Add to project size
-      projectSize += await this.getDirectorySize(noteTypePath);
+    if (this.noteStorage) {
+      const storageStats = await this.noteStorage.getStatistics();
+      lastModified = storageStats.lastModified || null;
+      projectSize = storageStats.totalSize || 0;
     }
 
     return {
-      totalNotes,
-      notesByType,
-      notesByMode,
+      totalNotes: noteManagerStats.totalNotes,
+      notesByType: { ...noteManagerStats.notesByType },
+      notesByMode: {},
       lastModified,
       projectSize,
     };
   }
 
-  static async findProjectRoot(startPath: string): Promise<string | null> {
-    let currentPath = path.resolve(startPath);
-
-    while (currentPath !== path.dirname(currentPath)) {
-      // Check for SCEpter markers - specifically the project metadata file
-      try {
-        const hasConfigJs = await fs
-          .access(path.join(currentPath, 'scepter.config.js'))
-          .then(() => true)
-          .catch(() => false);
-
-        const hasScepterConfigJson = await fs
-          .access(path.join(currentPath, '_scepter', 'scepter.config.json'))
-          .then(() => true)
-          .catch(() => false);
-
-        const hasLegacyConfigJson = await fs
-          .access(path.join(currentPath, '_scepter', 'config.json'))
-          .then(() => true)
-          .catch(() => false);
-
-        if (hasConfigJs || hasScepterConfigJson || hasLegacyConfigJson) {
-          return currentPath;
-        }
-      } catch { }
-
-      currentPath = path.dirname(currentPath);
-    }
-
-    return null;
-  }
-
-  // Private helper methods
-
-  private async createBaseDirectories(config: SCEpterConfig): Promise<void> {
-    const notesRoot = config.paths?.notesRoot || '_scepter';
-    const dirs = [
-      path.join(this.projectPath, config.paths?.dataDir || '_scepter'),
-      path.join(this.projectPath, notesRoot),
-      // Only include _templates/_prompts if they already exist on disk
-    ];
-
-    // Conditionally include optional directories only if they already exist
-    const optionalDirs = [
-      path.join(this.projectPath, '_scepter/_templates'),
-      path.join(this.projectPath, '_scepter/_prompts'),
-      path.join(this.projectPath, notesRoot, '_templates'),
-    ];
-    for (const optDir of optionalDirs) {
-      try {
-        const stats = await fs.stat(optDir);
-        if (stats.isDirectory()) {
-          dirs.push(optDir);
-        }
-      } catch {
-        // Directory doesn't exist — don't create it
-      }
-    }
-
-    for (const dir of dirs) {
-      try {
-        // Check parent directory for permission issues
-        const parentDir = path.dirname(dir);
-        if (parentDir !== this.projectPath) {
-          try {
-            await fs.access(parentDir, fs.constants.W_OK);
-          } catch (error: any) {
-            if (error.code === 'EACCES' || error.code === 'EPERM') {
-              throw new Error(`Permission denied: cannot access ${parentDir}`);
-            }
-          }
-        }
-
-        await fs.mkdir(dir, { recursive: true });
-      } catch (error: any) {
-        if (error.code === 'EACCES' || error.code === 'EPERM') {
-          throw new Error(`Permission denied: ${error.message}`);
-        }
-        throw error;
-      }
-    }
-  }
-
-  private async createNoteTypeDirectories(config: SCEpterConfig): Promise<void> {
-    const notesRoot = path.join(this.projectPath, config.paths?.notesRoot || '_scepter');
-
-    for (const [key, noteType] of Object.entries(config.noteTypes)) {
-      // Only create directories for types that have a folder defined
-      if (!noteType.folder) continue;
-
-      const noteTypePath = path.join(notesRoot, noteType.folder);
-      try {
-        await fs.mkdir(noteTypePath, { recursive: true });
-      } catch (error: any) {
-        if (error.code === 'EACCES' || error.code === 'EPERM') {
-          throw new Error(`Permission denied: ${error.message}`);
-        }
-        throw error;
-      }
-
-      // Create .gitkeep if directory is empty
-      await this.ensureGitkeep(noteTypePath);
-    }
-  }
-
-  private async createProjectMetadata(config: SCEpterConfig): Promise<void> {
-    const metadataPath = path.join(this.projectPath, config.paths?.dataDir || '_scepter', 'project.json');
-
-    const metadata: ProjectMetadata = {
-      version: PROJECT_VERSION,
-      createdAt: new Date().toISOString(),
-      scepterVersion: SCEPTER_VERSION,
-    };
-
-    // Don't overwrite existing metadata
-    try {
-      await fs.access(metadataPath);
-    } catch {
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
-    }
-  }
-
-  private async ensureGitkeep(dirPath: string): Promise<void> {
-    const gitkeepPath = path.join(dirPath, '.gitkeep');
-
-    try {
-      const files = await fs.readdir(dirPath);
-      // Only create .gitkeep if directory is empty or only has .gitkeep
-      if (files.length === 0 || (files.length === 1 && files[0] === '.gitkeep')) {
-        // IMPORTANT: do not rewrite .gitkeep if it already exists; this can cause
-        // dev servers (Vite/HMR) to hot-reload on every request if initialization
-        // runs often (e.g., per web request).
-        try {
-          await fs.writeFile(gitkeepPath, '', { flag: 'wx' });
-        } catch {
-          // ignore if already exists or cannot be created
-        }
-      }
-    } catch {
-      // Directory doesn't exist or other error
-    }
-  }
-
-  private async checkDirectory(dirPath: string, checkedPaths: string[]): Promise<void> {
-    checkedPaths.push(dirPath);
-
-    try {
-      const stats = await fs.stat(dirPath);
-      if (!stats.isDirectory()) {
-        this.validationErrors.push({
-          type: 'not_a_directory',
-          path: dirPath,
-          message: `Path exists but is not a directory: ${dirPath}`,
-        });
-      }
-    } catch (error) {
-      this.validationErrors.push({
-        type: 'missing_directory',
-        path: dirPath,
-        message: `Required directory is missing: ${dirPath}`,
-      });
-    }
-  }
-
   /**
-   * Check an optional directory — only flag errors if it exists but is not a directory.
-   * Missing directories are silently ignored.
+   * @deprecated Use findProjectRoot() from create-filesystem-project.ts instead.
+   * Kept as a static forwarding method for backwards compatibility.
    */
-  private async checkOptionalDirectory(dirPath: string, checkedPaths: string[]): Promise<void> {
-    try {
-      const stats = await fs.stat(dirPath);
-      checkedPaths.push(dirPath);
-      if (!stats.isDirectory()) {
-        this.validationErrors.push({
-          type: 'not_a_directory',
-          path: dirPath,
-          message: `Path exists but is not a directory: ${dirPath}`,
-        });
-      }
-    } catch {
-      // Directory doesn't exist — that's fine for optional directories
-    }
-  }
-
-  private async checkOrphanedFolders(
-    rootPath: string,
-    expectedFolders: Set<string>,
-    folderType: string,
-    suggestions: CleanupSuggestion[],
-  ): Promise<void> {
-    try {
-      const entries = await fs.readdir(rootPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (entry.isDirectory() && !expectedFolders.has(entry.name)) {
-          const folderPath = path.join(rootPath, entry.name);
-          const hasContent = await this.directoryHasContent(folderPath);
-
-          suggestions.push({
-            path: folderPath,
-            reason: `Orphaned ${folderType} folder not in configuration`,
-            hasContent,
-          });
-        }
-      }
-    } catch {
-      // Directory doesn't exist
-    }
-  }
-
-  private async directoryHasContent(dirPath: string): Promise<boolean> {
-    try {
-      const files = await fs.readdir(dirPath);
-      return files.some((f) => f !== '.gitkeep');
-    } catch {
-      return false;
-    }
-  }
-
-  private async countFilesInDirectory(dirPath: string, extension: string): Promise<number> {
-    let count = 0;
-
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith(extension)) {
-          count++;
-        } else if (entry.isDirectory()) {
-          count += await this.countFilesInDirectory(path.join(dirPath, entry.name), extension);
-        }
-      }
-    } catch {
-      // Directory doesn't exist
-    }
-
-    return count;
-  }
-
-  private async getLastModifiedInDirectory(dirPath: string): Promise<Date | null> {
-    let lastModified: Date | null = null;
-
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const entryPath = path.join(dirPath, entry.name);
-        const stats = await fs.stat(entryPath);
-
-        if (!lastModified || stats.mtime > lastModified) {
-          lastModified = stats.mtime;
-        }
-
-        if (entry.isDirectory()) {
-          const subDirMtime = await this.getLastModifiedInDirectory(entryPath);
-          if (subDirMtime && (!lastModified || subDirMtime > lastModified)) {
-            lastModified = subDirMtime;
-          }
-        }
-      }
-    } catch {
-      // Directory doesn't exist
-    }
-
-    return lastModified;
-  }
-
-  private async getDirectorySize(dirPath: string): Promise<number> {
-    let size = 0;
-
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const entryPath = path.join(dirPath, entry.name);
-        const stats = await fs.stat(entryPath);
-
-        if (entry.isFile()) {
-          size += stats.size;
-        } else if (entry.isDirectory()) {
-          size += await this.getDirectorySize(entryPath);
-        }
-      }
-    } catch {
-      // Directory doesn't exist
-    }
-
-    return size;
+  static async findProjectRoot(startPath: string): Promise<string | null> {
+    const { findProjectRoot } = await import('../storage/filesystem/create-filesystem-project');
+    return findProjectRoot(startPath);
   }
 
   // Config change watching
@@ -745,12 +326,10 @@ export class ProjectManager extends EventEmitter {
     const typeInfos: TypeInfo[] = [];
 
     for (const [typeName, typeConfig] of Object.entries(config.noteTypes)) {
-      const templatePath = path.join(
-        this.projectPath,
-        config.templates?.paths?.types || '_scepter/templates/types',
-        `${typeName}.md`
-      );
-      const hasTemplate = await fsExtra.pathExists(templatePath);
+      // Check template existence via storage interface
+      const hasTemplate = this.templateStorage
+        ? (await this.templateStorage.getTemplate(typeName)) !== null
+        : false;
 
       // @implements {T011.3.3} Populate allowedStatuses info for type listing
       let allowedStatusesInfo: TypeInfo['allowedStatuses'];
@@ -827,12 +406,7 @@ export class ProjectManager extends EventEmitter {
 
     // Create folder only if one was specified
     if (folder) {
-      const folderPath = path.join(
-        this.projectPath,
-        config.paths?.notesRoot || '_scepter',
-        folder
-      );
-      await fsExtra.ensureDir(folderPath);
+      await fsProjectUtils.ensureNoteTypeDirectory(this.projectPath, config, folder);
     }
 
     // Reinitialize note manager to pick up new type
@@ -999,17 +573,12 @@ export class ProjectManager extends EventEmitter {
       });
     }
 
-    // Check for template
-    const templatePath = path.join(
-      this.projectPath,
-      config.templates?.paths?.types || '_scepter/templates/types',
-      `${oldName}.md`
-    );
-    try {
-      await fs.access(templatePath);
-      result.changes.templateRenames = 1;
-    } catch {
-      // No template exists
+    // Check for template via storage interface
+    if (this.templateStorage) {
+      const template = await this.templateStorage.getTemplate(oldName);
+      if (template !== null) {
+        result.changes.templateRenames = 1;
+      }
     }
 
     // If dry run, return here
@@ -1043,48 +612,48 @@ export class ProjectManager extends EventEmitter {
         await updateReferencesForTypeRename(this.projectPath, oldShortcode, newShortcode);
       }
 
-      // Update note files
-      for (const noteFile of result.details!.noteFiles) {
-        const oldFullPath = path.join(this.projectPath, noteFile.oldPath);
-        const newFullPath = path.join(this.projectPath, noteFile.newPath);
-
-        if (oldFullPath !== newFullPath) {
-          await fs.rename(oldFullPath, newFullPath);
-        }
-      }
-
-      // Update config
+      // Update config BEFORE renaming notes — the adapter's createNoteFile()
+      // calls findTypeConfig(newName), which must find the new type entry
+      // (including its folder) so files are created in the correct location.
+      // @implements {DD010.§DC.27} renameNoteType delegates to noteStorage.renameNotesOfType
       if (oldName !== newName) {
-        // Remove old type
+        const newFolder = result.details!.newFolder || oldTypeConfig.folder;
         await this.configManager.removeNoteType(oldName);
-
-        // Add new type
         await this.configManager.addNoteType(newName, {
           ...oldTypeConfig,
           shortcode: newShortcode,
+          ...(newFolder && { folder: newFolder }),
           ...(options?.newDescription && { description: options.newDescription })
         });
       } else {
-        // Just update the existing type
         await this.configManager.updateNoteType(oldName, {
           shortcode: newShortcode,
           ...(options?.newDescription && { description: options.newDescription })
         });
       }
 
-      // Update template if exists
+      // Ensure the new type's folder exists before moving files into it
+      if (result.changes.folderRenames > 0 && result.details!.newFolder) {
+        await fsProjectUtils.ensureNoteTypeDirectory(
+          this.projectPath,
+          this.configManager.getConfig(),
+          result.details!.newFolder,
+        );
+      }
+
+      // Now rename note files via storage interface — config is updated,
+      // so createNoteFile() will find the new type and its folder.
+      // NOTE: This works because UnifiedDiscovery.shortcodeToType is cached
+      // from initialization and NOT refreshed by programmatic config changes,
+      // so the adapter still resolves old-prefix notes correctly. If auto-refresh
+      // of the shortcode map on config change is ever added, this will break.
+      if (this.noteStorage && (newShortcode !== oldShortcode || oldName !== newName)) {
+        await this.noteStorage.renameNotesOfType(oldName, newName, newShortcode);
+      }
+
+      // Rename template via filesystem utilities
       if (result.changes.templateRenames > 0) {
-        const oldTemplatePath = path.join(
-          this.projectPath,
-          config.templates?.paths?.types || '_scepter/templates/types',
-          `${oldName}.md`
-        );
-        const newTemplatePath = path.join(
-          this.projectPath,
-          config.templates?.paths?.types || '_scepter/templates/types',
-          `${newName}.md`
-        );
-        await fs.rename(oldTemplatePath, newTemplatePath);
+        await fsProjectUtils.renameTemplate(this.projectPath, config, oldName, newName);
       }
 
       // Reinitialize to pick up changes
@@ -1245,23 +814,13 @@ export class ProjectManager extends EventEmitter {
     const backupPath = await this.configManager.createBackup();
 
     try {
-      // Execute the strategy
+      // Execute the strategy via storage interfaces
+      // @implements {DD010.§DC.27} deleteNoteType delegates to noteStorage
       if (strategy === 'archive') {
-        // Archive notes by moving them to an archive folder
-        const archiveDir = path.join(
-          this.projectPath,
-          config.paths?.notesRoot || '_scepter',
-          '.archive',
-          typeName
-        );
-        await fsExtra.ensureDir(archiveDir);
-
-        for (const note of affectedNotes) {
-          const archivePath = path.join(archiveDir, path.basename(note.filePath || ''));
-          await fs.rename(note.filePath || '', archivePath);
+        if (this.noteStorage) {
+          await this.noteStorage.archiveNotesOfType(typeName);
         }
       } else if (strategy === 'move-to-uncategorized') {
-        // Ensure target type exists or create Uncategorized
         const targetType = options?.targetType || 'Uncategorized';
         if (!config.noteTypes[targetType] && targetType === 'Uncategorized') {
           await this.configManager.addNoteType('Uncategorized', {
@@ -1271,47 +830,26 @@ export class ProjectManager extends EventEmitter {
           });
         }
 
-        // Move notes to target type
-        for (const noteDetail of result.details!.affectedNotes) {
-          if (noteDetail.action === 'moved' && noteDetail.newPath) {
-            const oldFullPath = path.join(this.projectPath, noteDetail.path);
-            const newFullPath = path.join(this.projectPath, noteDetail.newPath);
+        const targetTypeConfig = config.noteTypes[targetType] ||
+          { shortcode: 'U', folder: 'uncategorized' };
+        const targetShortcode = targetTypeConfig.shortcode || 'U';
 
-            // Ensure target directory exists
-            await fsExtra.ensureDir(path.dirname(newFullPath));
-
-            // Move the file
-            await fs.rename(oldFullPath, newFullPath);
-
-            // Update note content to reflect new type
-            const content = await fs.readFile(newFullPath, 'utf-8');
-            const updatedContent = content.replace(
-              /^type:\s*\w+$/m,
-              `type: ${targetType}`
-            );
-            await fs.writeFile(newFullPath, updatedContent);
-          }
+        if (this.noteStorage) {
+          await this.noteStorage.renameNotesOfType(typeName, targetType, targetShortcode);
         }
       }
 
       // Remove the type from config
       await this.configManager.removeNoteType(typeName);
 
-      // Remove empty folder (only if type has a folder defined)
+      // Remove empty folder via filesystem utilities (only if type has a folder)
       if (typeConfig.folder) {
         const typeFolder = path.join(
           this.projectPath,
           config.paths?.notesRoot || '_scepter',
           typeConfig.folder
         );
-        try {
-          const remaining = await fs.readdir(typeFolder);
-          if (remaining.length === 0) {
-            await fs.rmdir(typeFolder);
-          }
-        } catch {
-          // Folder might not exist or already be deleted
-        }
+        await fsProjectUtils.removeEmptyDirectory(typeFolder);
       }
 
       // Reinitialize to pick up changes

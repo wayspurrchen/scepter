@@ -19,11 +19,10 @@
  * @implements {R006.§3.AC.03} --show-derived flag
  */
 
-import * as path from 'path';
 import { Command } from 'commander';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
-import { findPartialCoverageGaps, loadVerificationStore, getLatestVerification } from '../../../claims/index.js';
+import { findPartialCoverageGaps, getLatestVerification } from '../../../claims/index.js';
 import type { PartialCoverageOptions, VerificationStore } from '../../../claims/index.js';
 import { formatTraceabilityMatrix } from '../../formatters/claim-formatter.js';
 import type { TraceDisplayOptions } from '../../formatters/claim-formatter.js';
@@ -107,8 +106,7 @@ export const gapsCommand = new Command('gaps')
 
           // @implements {DD005.§DC.12} JSON output with trace-matrix-style data
           if (options.json) {
-            const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-            const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+            const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
             const serializable = {
               ...matrix,
               rows: matrix.rows.map((row) => {
@@ -137,8 +135,7 @@ export const gapsCommand = new Command('gaps')
           if (options.width !== undefined) displayOpts.titleWidth = options.width;
           if (options.full) displayOpts.full = true;
 
-          const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-          const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
           console.log(formatTraceabilityMatrix(matrix, displayOpts, verificationStore));
         },
       );

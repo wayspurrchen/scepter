@@ -11,12 +11,11 @@
  * @implements {DD005.§DC.20} Cross-note claim traces merge projection columns
  */
 
-import * as path from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
-import { buildTraceabilityMatrix, loadVerificationStore, getLatestVerification } from '../../../claims/index.js';
+import { buildTraceabilityMatrix, getLatestVerification } from '../../../claims/index.js';
 import type { ClaimIndexData, ClaimIndexEntry, VerificationStore, TraceabilityMatrix, TraceabilityRow, ProjectionPresence } from '../../../claims/index.js';
 import { parseClaimAddress, parseRangeSuffix, expandClaimRange } from '../../../parsers/claim/index.js';
 import { formatTraceabilityMatrix, formatClaimTrace } from '../../formatters/claim-formatter.js';
@@ -199,9 +198,7 @@ export const traceCommand = new Command('trace')
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // @implements {R005.§3.AC.07} Load verification store for date display
-          const config = context.projectManager.configManager.getConfig();
-          const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-          const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
 
           // @implements {R006.§4.AC.02} Get derivatives lookup from claim index
           const claimIndex = context.projectManager.claimIndex;

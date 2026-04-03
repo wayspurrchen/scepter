@@ -12,12 +12,10 @@
  * @implements {DD005.§DC.25} Accept bare note ID for all claims in that note
  */
 
-import * as path from 'path';
 import { Command } from 'commander';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import { buildClaimThread, buildClaimThreadsForNote } from '../../../claims/claim-thread.js';
-import { loadVerificationStore } from '../../../claims/index.js';
 import type { VerificationStore } from '../../../claims/index.js';
 import { parseClaimAddress } from '../../../parsers/claim/index.js';
 import { formatClaimThread, formatClaimThreadJson } from '../../formatters/claim-formatter.js';
@@ -53,9 +51,7 @@ export const threadCommand = new Command('thread')
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Load verification store for verified events
-          const config = context.projectManager.configManager.getConfig();
-          const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-          const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
 
           // Get derivatives lookup from claim index
           const claimIndex = context.projectManager.claimIndex;

@@ -8,7 +8,6 @@ import chalk from 'chalk';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { CommandContext } from '../base-command';
-import { scanFolderContents } from '../../../notes/folder-utils';
 
 export interface GatherCommandOptions {
   // Gathering control
@@ -298,7 +297,7 @@ export async function gatherContext(
   }
 
   // Analyze folder contents if origin is folder-based
-  const folderInfo = await analyzeFolderContents(origin, !!options.includeFolderContents, projectPath);
+  const folderInfo = await analyzeFolderContents(origin, !!options.includeFolderContents, projectManager);
 
   // Format output
   const formatOptions: GatherFormatOptions = {
@@ -436,19 +435,24 @@ async function calculateDepth(targetId: string, originId: string, projectManager
 async function analyzeFolderContents(
   note: Note,
   includeFolderContents: boolean,
-  projectPath: string
+  projectManager: ProjectManager,
 ): Promise<FolderContentInfo | undefined> {
   // Check if note is folder-based
   if (!note.isFolder || !note.folderPath) {
     return undefined;
   }
 
-  try {
-    // Scan folder for additional files
-    const additionalFiles = await scanFolderContents(note.folderPath);
+  const noteStorage = projectManager.noteStorage;
+  if (!noteStorage) {
+    return undefined;
+  }
 
-    if (additionalFiles.length === 0) {
-      return undefined; // No additional files
+  try {
+    // Use NoteStorage.getAttachments() instead of direct fs calls
+    const attachments = await noteStorage.getAttachments(note.id);
+
+    if (attachments.length === 0) {
+      return undefined;
     }
 
     const fileInfo: FolderContentInfo['files'] = [];
@@ -457,52 +461,47 @@ async function analyzeFolderContents(
     const maxFileSize = 100 * 1024; // 100KB limit per file
     const maxTotalSize = 500 * 1024; // 500KB total limit
 
-    for (const relPath of additionalFiles) {
-      const fullPath = path.join(note.folderPath, relPath);
+    const TEXT_EXTENSIONS = ['.md', '.txt', '.json', '.yaml', '.yml', '.xml', '.csv', '.log'];
+    const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
 
-      try {
-        const stats = await fs.stat(fullPath);
-        const fileExt = path.extname(relPath).toLowerCase();
+    for (const attachment of attachments) {
+      const fileExt = path.extname(attachment.name).toLowerCase();
 
-        // Determine file type
-        let fileType = 'data';
-        if (['.md', '.txt', '.json', '.yaml', '.yml', '.xml', '.csv', '.log'].includes(fileExt)) {
-          fileType = 'text';
-        } else if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].includes(fileExt)) {
-          fileType = 'image';
-        } else if (stats.size > 1024 * 1024) { // Files > 1MB considered binary
-          fileType = 'binary';
+      // Determine file type
+      let fileType = 'data';
+      if (TEXT_EXTENSIONS.includes(fileExt)) {
+        fileType = 'text';
+      } else if (IMAGE_EXTENSIONS.includes(fileExt)) {
+        fileType = 'image';
+      } else if (attachment.size > 1024 * 1024) {
+        fileType = 'binary';
+      }
+
+      fileInfo.push({
+        path: attachment.name,
+        size: attachment.size,
+        type: fileType,
+      });
+
+      if (fileType === 'text' && attachment.size < maxFileSize) {
+        totalCharacters += attachment.size;
+      }
+
+      // Include actual content if flag is set
+      if (includeFolderContents && fileType === 'text' &&
+          attachment.size < maxFileSize && totalCharacters < maxTotalSize) {
+        try {
+          const buffer = await noteStorage.getAttachmentContent(note.id, attachment.name);
+          const content = buffer.toString('utf-8');
+          const truncated = content.length > 10000;
+          contents.push({
+            path: attachment.name,
+            content: truncated ? content.substring(0, 10000) + '\n... [truncated]' : content,
+            truncated,
+          });
+        } catch (readErr) {
+          console.warn(`Could not read attachment ${attachment.name}: ${readErr}`);
         }
-
-        fileInfo.push({
-          path: relPath,
-          size: stats.size,
-          type: fileType
-        });
-
-        // Count characters for text files
-        if (fileType === 'text' && stats.size < maxFileSize) {
-          totalCharacters += stats.size;
-        }
-
-        // Include actual content if flag is set
-        if (includeFolderContents && fileType === 'text' &&
-            stats.size < maxFileSize && totalCharacters < maxTotalSize) {
-          try {
-            const content = await fs.readFile(fullPath, 'utf-8');
-            const truncated = content.length > 10000; // Truncate very long files
-            contents.push({
-              path: relPath,
-              content: truncated ? content.substring(0, 10000) + '\n... [truncated]' : content,
-              truncated
-            });
-          } catch (readErr) {
-            // Skip files that can't be read as text
-            console.warn(`Could not read file ${relPath}: ${readErr}`);
-          }
-        }
-      } catch (statErr) {
-        console.warn(`Could not stat file ${relPath}: ${statErr}`);
       }
     }
 
@@ -510,7 +509,7 @@ async function analyzeFolderContents(
       fileCount: fileInfo.length,
       totalCharacters,
       files: fileInfo,
-      contents: includeFolderContents && contents.length > 0 ? contents : undefined
+      contents: includeFolderContents && contents.length > 0 ? contents : undefined,
     };
   } catch (error) {
     console.error(`Error analyzing folder contents: ${error}`);

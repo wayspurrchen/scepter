@@ -50,7 +50,7 @@ Bodies that should NOT become note types:
 
 **Design rules:**
 - **folder**: lowercase, plural, hyphenated. Match the project's existing conventions if possible.
-- **shortcode**: 1-4 uppercase characters. Single-letter preferred for common types. `T` is ALWAYS reserved for Tasks (virtual type).
+- **shortcode**: 1-4 uppercase characters. Single-letter preferred for common types. `T` is conventionally reserved for Tasks.
 - **description**: Write for a developer who will read this in `scepter config` output. Make it clear WHEN to create a note of this type, not just what it is.
 
 ### Common Type Mappings

@@ -95,11 +95,10 @@ export async function createNote(
   let noteId: string | undefined;
   let userContent = options.content;
 
-    // If not using no-template, resolve template
+    // If not using no-template, resolve template via storage interface
     if (!options.noTemplate) {
-      const templatePath = await resolveTemplate(type, undefined, projectPath);
-      if (templatePath) {
-        const templateContent = await fs.readFile(templatePath, 'utf-8');
+      const templateContent = await projectManager.templateStorage?.getTemplate(type) ?? null;
+      if (templateContent) {
 
         // Generate ID for template substitution
         noteId = await noteManager.generateNoteId(type);

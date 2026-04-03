@@ -4,7 +4,6 @@
  */
 import { EventEmitter } from 'events';
 import * as path from 'path';
-import fs from 'fs-extra';
 import type { Note, NoteQuery, NoteQueryResult } from '../types/note';
 import type { ContextHints } from '../types/context';
 import type { Reference } from '../types/reference';
@@ -512,7 +511,6 @@ export class NoteManager extends EventEmitter {
       created: new Date(),
       modified: new Date(), // Set modified same as created initially
       contextHints: params.contextHints,
-      ...(resolvedType === 'Task' && { virtualType: true }), // Mark tasks as virtual
       ...(params.isFolder && { isFolder: true }), // Requested as folder (may be overridden by type config)
       // @implements {T011.4.1} Use finalStatus which includes default application
       ...(finalStatus && { metadata: { status: finalStatus } }),
@@ -624,9 +622,9 @@ export class NoteManager extends EventEmitter {
    * @returns The file path if found, null otherwise
    */
   async findNoteFile(noteId: string): Promise<string | null> {
-    // Check index first
+    // Check index first — verify through NoteFileManager's index
     const cached = this.fileIndex.get(noteId);
-    if (cached && (await fs.pathExists(cached))) {
+    if (cached && this.noteFileManager.getFilePath(noteId)) {
       return cached;
     }
 
@@ -912,8 +910,8 @@ export class NoteManager extends EventEmitter {
     // Add to new indexes
     this.addNoteToIndexes(updatedNote, newPath);
 
-    // Delete old file
-    await fs.unlink(oldPath);
+    // Delete old file via NoteFileManager
+    await this.noteFileManager.removeFile(oldPath);
 
     // Emit events
     this.emit('note:deleted', { note: { id: noteId }, reason: 'moved to different type' });
@@ -974,8 +972,9 @@ export class NoteManager extends EventEmitter {
     const filepath = await this.findNoteFile(noteId);
     if (!filepath) return null;
 
-    // Parse file
-    const content = await fs.readFile(filepath, 'utf-8');
+    // Read file content through NoteFileManager using the discovered path
+    const content = await this.noteFileManager.readFileByPath(filepath);
+    if (!content) return null;
 
     // Get note type
     const noteType = this.noteTypeResolver.getTypeFromNoteId(noteId);
@@ -1576,13 +1575,10 @@ export class NoteManager extends EventEmitter {
         return; // Already indexed
       }
 
-      // Read file content
-      let fileContent: string;
-      try {
-        fileContent = await fs.readFile(event.filePath, 'utf-8');
-      } catch (readError) {
-        // File doesn't exist yet, emit error and return
-        this.emit('error', readError);
+      // Read file content via NoteFileManager
+      const fileContent = await this.noteFileManager.readFileByPath(event.filePath);
+      if (!fileContent) {
+        this.emit('error', new Error(`Failed to read file: ${event.filePath}`));
         return;
       }
 
@@ -1720,8 +1716,9 @@ export class NoteManager extends EventEmitter {
       const existingNote = this.noteIndex.get(event.noteId);
       if (!existingNote) return;
 
-      // Re-read file content
-      const fileContent = await fs.readFile(event.filePath, 'utf-8');
+      // Re-read file content via NoteFileManager
+      const fileContent = await this.noteFileManager.readFileByPath(event.filePath);
+      if (!fileContent) return;
 
       // Check if file uses old inline format or new frontmatter format
       const inlineMatch = fileContent.match(/^\{([A-Z]+\d+):\s*(.+?)\}(?:\n|$)/);

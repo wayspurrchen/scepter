@@ -64,7 +64,6 @@ export class UnifiedDiscovery extends EventEmitter {
 
   /**
    * Build a map from shortcode → type name from config.
-   * Also handles virtual types like Task.
    */
   private buildShortcodeMap(): void {
     this.shortcodeToType.clear();

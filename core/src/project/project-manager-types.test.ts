@@ -8,6 +8,7 @@ import { tmpdir } from 'os';
 import { glob } from 'glob';
 import type { TypeInfo, RenameResult, DeleteResult, ProgressInfo } from './types';
 
+// fs-extra mock — used by type-reference-utils (reference scanning in rename tests)
 vi.mock('fs-extra', () => ({
   pathExists: vi.fn(),
   ensureDir: vi.fn(),
@@ -30,7 +31,8 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn().mockResolvedValue('---\ntitle: Test\ntype: Test\n---\nContent'),
   writeFile: vi.fn(),
   readdir: vi.fn().mockResolvedValue([]),
-  rmdir: vi.fn()
+  rmdir: vi.fn(),
+  mkdir: vi.fn(),
 }));
 
 describe('ProjectManager Type Operations', () => {
@@ -38,11 +40,13 @@ describe('ProjectManager Type Operations', () => {
   let projectManager: ProjectManager;
   let mockConfigManager: any;
   let mockNoteManager: any;
+  let mockNoteStorage: any;
+  let mockTemplateStorage: any;
 
   beforeEach(async () => {
     // Create temp directory
     projectPath = path.join(tmpdir(), `test-project-${Date.now()}`);
-    
+
     // Mock dependencies
     mockConfigManager = {
       getConfig: vi.fn().mockReturnValue({
@@ -78,14 +82,22 @@ describe('ProjectManager Type Operations', () => {
       on: vi.fn()
     };
 
-    // Mock fs methods
-    vi.mocked(fs.pathExists).mockResolvedValue(false);
-    vi.mocked(fs.ensureDir).mockResolvedValue();
-    vi.mocked(fs.readdir).mockResolvedValue([]);
+    mockNoteStorage = {
+      renameNotesOfType: vi.fn(),
+      archiveNotesOfType: vi.fn(),
+      getStatistics: vi.fn().mockResolvedValue({ noteCount: 0, typeBreakdown: {} }),
+    };
+
+    mockTemplateStorage = {
+      getTemplate: vi.fn().mockResolvedValue(null),
+      listTemplates: vi.fn().mockResolvedValue([]),
+    };
 
     projectManager = new ProjectManager(projectPath, {
       configManager: mockConfigManager,
-      noteManager: mockNoteManager
+      noteManager: mockNoteManager,
+      noteStorage: mockNoteStorage,
+      templateStorage: mockTemplateStorage,
     });
   });
 
@@ -127,9 +139,9 @@ describe('ProjectManager Type Operations', () => {
     });
 
     it('should include template existence info', async () => {
-      // Mock that Decision has a template
-      vi.mocked(fs.pathExists).mockImplementation(async (p) => {
-        return p.toString().includes('Decision.md');
+      // Mock that Decision has a template via templateStorage
+      mockTemplateStorage.getTemplate.mockImplementation(async (name: string) => {
+        return name === 'Decision' ? '# Template content' : null;
       });
 
       const types = await projectManager.listNoteTypes();
@@ -168,15 +180,20 @@ describe('ProjectManager Type Operations', () => {
         folder: 'architectures'
       });
 
-      expect(fs.ensureDir).toHaveBeenCalledWith(
-        path.join(projectPath, '_scepter/notes/architectures')
+      const { mkdir } = await import('fs/promises');
+      expect(mkdir).toHaveBeenCalledWith(
+        path.join(projectPath, '_scepter/notes/architectures'),
+        { recursive: true }
       );
     });
 
     it('should not create folder when none is specified', async () => {
+      const { mkdir } = await import('fs/promises');
+      vi.mocked(mkdir).mockClear();
+
       await projectManager.addNoteType('Architecture', 'ARCH');
 
-      expect(fs.ensureDir).not.toHaveBeenCalled();
+      expect(mkdir).not.toHaveBeenCalled();
     });
 
     it('should reject duplicate type names', async () => {
@@ -210,6 +227,12 @@ describe('ProjectManager Type Operations', () => {
         shortcode: 'US',
         folder: 'user-stories'
       });
+
+      const { mkdir } = await import('fs/promises');
+      expect(mkdir).toHaveBeenCalledWith(
+        path.join(projectPath, '_scepter/notes/user-stories'),
+        { recursive: true }
+      );
     });
 
     it('should add description if provided', async () => {
@@ -372,7 +395,7 @@ describe('ProjectManager Type Operations', () => {
           'TechnicalDecision',
           expect.objectContaining({
             shortcode: 'D',
-            folder: 'decisions'
+            folder: 'technicaldecisions'
           })
         );
       });
@@ -410,7 +433,7 @@ describe('ProjectManager Type Operations', () => {
 
         expect(result.executed).toBe(false);
         expect(mockConfigManager.updateNoteType).not.toHaveBeenCalled();
-        expect(fs.rename).not.toHaveBeenCalled();
+        expect(mockNoteStorage.renameNotesOfType).not.toHaveBeenCalled();
       });
     });
 
@@ -474,27 +497,16 @@ describe('ProjectManager Type Operations', () => {
         totalCount: 1,
         hasMore: false
       });
-      
+
       // Mock getAllNotes to return same notes
       mockNoteManager.getAllNotes.mockResolvedValue([
-        { 
-          id: 'D001', 
-          noteType: 'Decision', 
+        {
+          id: 'D001',
+          noteType: 'Decision',
           title: 'Use PostgreSQL',
           filePath: '/test/project/_scepter/notes/decisions/D001 Use PostgreSQL.md'
         }
       ]);
-      
-      // Mock file content for move operations
-      vi.mocked(fs.readFile).mockResolvedValue(`---
-title: Use PostgreSQL
-type: Decision
-status: draft
----
-
-# Use PostgreSQL
-
-We will use PostgreSQL as our database.` as any);
     });
 
     it('should block deletion if notes exist (default)', async () => {
@@ -511,6 +523,7 @@ We will use PostgreSQL as our database.` as any);
 
       expect(result.executed).toBe(true);
       expect(result.changes.notesArchived).toBe(1);
+      expect(mockNoteStorage.archiveNotesOfType).toHaveBeenCalledWith('Decision');
     });
 
     it('should move notes to Uncategorized type', async () => {
@@ -521,6 +534,7 @@ We will use PostgreSQL as our database.` as any);
 
       expect(result.executed).toBe(true);
       expect(result.changes.notesMoved).toBe(1);
+      expect(mockNoteStorage.renameNotesOfType).toHaveBeenCalledWith('Decision', 'Uncategorized', 'U');
     });
 
     it('should remove type from config', async () => {
@@ -545,16 +559,16 @@ We will use PostgreSQL as our database.` as any);
         hasMore: false
       });
       mockNoteManager.getAllNotes.mockResolvedValue([]);
-      
-      // Mock readdir to return empty array
-      vi.mocked(fs.readdir).mockResolvedValue([]);
+
+      // Mock readdir to return empty array (via fs/promises used by fsProjectUtils)
+      const fsPromises = await import('fs/promises');
+      vi.mocked(fsPromises.readdir).mockResolvedValue([] as any);
 
       await projectManager.deleteNoteType('Decision', {
         skipConfirmation: true
       });
 
-      const { rmdir } = await import('fs/promises');
-      expect(rmdir).toHaveBeenCalledWith(
+      expect(fsPromises.rmdir).toHaveBeenCalledWith(
         expect.stringContaining('decisions')
       );
     });
@@ -566,18 +580,18 @@ We will use PostgreSQL as our database.` as any);
         hasMore: false
       });
       mockNoteManager.getAllNotes.mockResolvedValue([]);
-      
+
       // Mock readdir to throw error for missing folder
-      const { readdir } = await import('fs/promises');
-      vi.mocked(readdir).mockRejectedValueOnce(new Error('ENOENT: no such file or directory'));
+      const fsPromises = await import('fs/promises');
+      vi.mocked(fsPromises.readdir).mockRejectedValueOnce(new Error('ENOENT: no such file or directory'));
+      vi.mocked(fsPromises.rmdir).mockClear();
 
       const result = await projectManager.deleteNoteType('Decision', {
         skipConfirmation: true
       });
 
       expect(result.executed).toBe(true);
-      const { rmdir } = await import('fs/promises');
-      expect(rmdir).not.toHaveBeenCalled();
+      expect(fsPromises.rmdir).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProjectManager } from './project-manager';
 import { ConfigManager } from '../config/config-manager';
+import { bootstrapFilesystemDirs } from '../storage/filesystem/create-filesystem-project';
 import type { SCEpterConfig } from '../types/config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -34,6 +35,9 @@ describe('ProjectManager', () => {
     };
     await configManager.setConfig(defaultTestConfig);
 
+    // Bootstrap directories (simulates what createFilesystemProject does)
+    await bootstrapFilesystemDirs(testProjectPath, defaultTestConfig);
+
     projectManager = new ProjectManager(testProjectPath, { configManager });
   });
 
@@ -48,7 +52,7 @@ describe('ProjectManager', () => {
     it('should initialize a new project with default structure', async () => {
       await projectManager.initialize();
 
-      // Check that required directories are created
+      // Check that required directories exist (created by bootstrapFilesystemDirs)
       const config = await configManager.getConfig();
 
       // Data directory
@@ -62,8 +66,7 @@ describe('ProjectManager', () => {
     });
 
     it('should create note type folders based on configuration', async () => {
-      await projectManager.initialize();
-
+      // Directories created by bootstrapFilesystemDirs in beforeEach
       const config = await configManager.getConfig();
       const notesRoot = path.join(testProjectPath, config.paths?.notesRoot || '_scepter/notes');
 
@@ -90,8 +93,7 @@ describe('ProjectManager', () => {
     });
 
     it('should create .gitkeep files in empty directories', async () => {
-      await projectManager.initialize();
-
+      // .gitkeep creation is done by bootstrapFilesystemDirs (in beforeEach)
       const config = await configManager.getConfig();
       const notesRoot = path.join(testProjectPath, config.paths?.notesRoot || '_scepter/notes');
 
@@ -134,6 +136,11 @@ describe('ProjectManager', () => {
       };
 
       await configManager.mergeConfig(customConfig);
+
+      // Bootstrap with merged config (simulates factory)
+      const mergedConfig = configManager.getConfig();
+      await bootstrapFilesystemDirs(testProjectPath, mergedConfig);
+
       await projectManager.initialize();
 
       // Check custom paths exist
@@ -144,7 +151,12 @@ describe('ProjectManager', () => {
 
   describe('Project Validation', () => {
     it('should detect missing required directories', async () => {
-      // Don't initialize, just validate
+      // Remove a bootstrapped directory to simulate missing state
+      const config = configManager.getConfig();
+      const notesRoot = path.join(testProjectPath, config.paths?.notesRoot || '_scepter/notes');
+      const firstNoteType = Object.values(config.noteTypes)[0];
+      await fs.rm(path.join(notesRoot, firstNoteType.folder!), { recursive: true });
+
       const isValid = await projectManager.validateStructure();
       expect(isValid).toBe(false);
 
@@ -154,9 +166,7 @@ describe('ProjectManager', () => {
     });
 
     it('should validate note type folder structure', async () => {
-      await projectManager.initialize();
-
-      // Remove a note type folder
+      // Dirs bootstrapped in beforeEach; remove one to test validation
       const config = await configManager.getConfig();
       const notesRoot = path.join(testProjectPath, config.paths?.notesRoot || '_scepter/notes');
       const firstNoteType = Object.values(config.noteTypes)[0];
@@ -189,11 +199,11 @@ describe('ProjectManager', () => {
       // Add new note type via config
       await configManager.addNoteType('Epic', { folder: 'epics', shortcode: 'E' });
 
-      // Update project structure
-      await projectManager.updateStructure();
+      // Bootstrap dirs for the new type (simulates what the factory does)
+      const config = await configManager.getConfig();
+      await bootstrapFilesystemDirs(testProjectPath, config);
 
       // Check new folder exists
-      const config = await configManager.getConfig();
       const notesRoot = path.join(testProjectPath, config.paths?.notesRoot || '_scepter/notes');
       const epicPath = path.join(notesRoot, 'epics');
       await expect(fs.access(epicPath)).resolves.not.toThrow();
@@ -201,8 +211,7 @@ describe('ProjectManager', () => {
 
 
     it('should clean up removed note types (with user confirmation)', async () => {
-      await projectManager.initialize();
-
+      // Dirs bootstrapped in beforeEach
       const config = await configManager.getConfig();
       const notesRoot = path.join(testProjectPath, config.paths?.notesRoot || '_scepter/notes');
 
@@ -243,9 +252,7 @@ describe('ProjectManager', () => {
     });
 
     it('should detect SCEpter project root correctly', async () => {
-      await projectManager.initialize();
-
-      // Create scepter.config.json to mark this as a SCEpter project
+      // _scepter dir bootstrapped in beforeEach; create config file to mark as project
       await fs.writeFile(
         path.join(testProjectPath, '_scepter', 'scepter.config.json'),
         JSON.stringify({ noteTypes: {} }),
@@ -273,31 +280,26 @@ describe('ProjectManager', () => {
   });
 });
 
-describe('ProjectManager - Error Handling', () => {
-  let projectManager: ProjectManager;
-  let configManager: ConfigManager;
+describe('Filesystem Bootstrap - Error Handling', () => {
   const testProjectPath = path.join(process.cwd(), '.test-tmp', 'test-project-errors');
+  const defaultTestConfig: SCEpterConfig = {
+    noteTypes: {
+      Requirement: { folder: 'requirements', shortcode: 'R' },
+    },
+  };
 
   beforeEach(async () => {
     try {
       await fs.rm(testProjectPath, { recursive: true, force: true });
     } catch {}
     await fs.mkdir(testProjectPath, { recursive: true });
-
-    configManager = new ConfigManager(testProjectPath);
-
-    // Set a default config for error tests
-    const defaultTestConfig: SCEpterConfig = {
-      noteTypes: {
-        Requirement: { folder: 'requirements', shortcode: 'R' },
-      },
-    };
-    await configManager.setConfig(defaultTestConfig);
-
-    projectManager = new ProjectManager(testProjectPath, { configManager });
   });
 
   afterEach(async () => {
+    try {
+      // Restore permissions before cleanup
+      try { await fs.chmod(path.join(testProjectPath, 'restricted'), 0o755); } catch {}
+    } catch {}
     try {
       await fs.rm(testProjectPath, { recursive: true, force: true });
     } catch {}
@@ -310,21 +312,20 @@ describe('ProjectManager - Error Handling', () => {
     }
 
     // Create directory with restricted permissions
-    await fs.mkdir(testProjectPath, { recursive: true });
     const restrictedPath = path.join(testProjectPath, 'restricted');
     await fs.mkdir(restrictedPath, { mode: 0o000 });
 
-    // Attempt to initialize (should handle permission error)
-    await expect(projectManager.initialize()).rejects.toThrow(/permission|access/i);
-
-    // Cleanup
-    await fs.chmod(restrictedPath, 0o755);
+    // bootstrapFilesystemDirs should propagate permission errors
+    await expect(
+      bootstrapFilesystemDirs(testProjectPath, defaultTestConfig)
+    ).rejects.toThrow(/permission|access/i);
   });
 
   it('should handle invalid project paths', async () => {
     const invalidPath = '/invalid/path/that/does/not/exist';
-    const invalidProjectManager = new ProjectManager(invalidPath, { configManager });
 
-    await expect(invalidProjectManager.initialize()).rejects.toThrow();
+    await expect(
+      bootstrapFilesystemDirs(invalidPath, defaultTestConfig)
+    ).rejects.toThrow();
   });
 });

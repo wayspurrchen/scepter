@@ -16,7 +16,6 @@ import { SourceCodeScanner } from '../../../scanners/source-code-scanner';
 import { ensureIndex } from '../claims/ensure-index';
 import { parseClaimAddress } from '../../../parsers/claim/claim-parser';
 import { formatClaimTrace } from '../../formatters/claim-formatter';
-import { loadVerificationStore } from '../../../claims/index';
 import { resolveClaimInput } from '../shared/resolve-claim-id';
 import type { ClaimIndexData, ClaimIndexEntry, VerificationStore } from '../../../claims/index';
 import type { Note } from '../../../types/note';
@@ -186,9 +185,7 @@ async function resolveAndDisplayClaims(
   const data = await ensureIndex(projectManager);
 
   // Load verification store for claim trace display
-  const config = projectManager.configManager.getConfig();
-  const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-  const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+  const verificationStore: VerificationStore = await projectManager.verificationStorage!.load();
 
   const outputs: string[] = [];
 

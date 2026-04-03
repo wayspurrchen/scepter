@@ -8,7 +8,6 @@ import matter from 'gray-matter';
 import type { Note } from '../types/note';
 import type { ConfigManager } from '../config/config-manager';
 import type { NoteTypeConfig } from '../types/config';
-import { TASK_VIRTUAL_TYPE_CONFIG } from '../types/config';
 import { createFolderStructure, detectFolderNote } from './folder-utils';
 
 export class NoteFileManager extends EventEmitter {
@@ -566,6 +565,32 @@ export class NoteFileManager extends EventEmitter {
   }
 
   /**
+   * Remove a file by its absolute path and clean up indexes.
+   * Used when a note file needs to be removed after being relocated
+   * (e.g., changeNoteType creates a new file then removes the old one).
+   */
+  async removeFile(filePath: string): Promise<void> {
+    await fs.unlink(filePath);
+    const noteId = this.fileToNoteId.get(filePath);
+    if (noteId) {
+      this.noteIndex.delete(noteId);
+      this.fileToNoteId.delete(filePath);
+    }
+  }
+
+  /**
+   * Read file contents by absolute path.
+   * Used by watcher event handlers that receive file paths directly.
+   */
+  async readFileByPath(filePath: string): Promise<string | null> {
+    try {
+      return await fs.readFile(filePath, 'utf-8');
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Update frontmatter fields in content
    */
   private updateFrontmatter(content: string, updates: Record<string, any>, removeFields?: string[]): string {
@@ -841,17 +866,7 @@ export class NoteFileManager extends EventEmitter {
   private async findTypeConfig(type: string): Promise<NoteTypeConfig | null> {
     const config = this.configManager.getConfig();
     
-    // Check regular note types first
-    if (config.noteTypes[type]) {
-      return config.noteTypes[type];
-    }
-    
-    // Handle virtual types (like Task)
-    if (type === 'Task') {
-      return TASK_VIRTUAL_TYPE_CONFIG;
-    }
-    
-    return null;
+    return config.noteTypes[type] || null;
   }
 
   /**

@@ -2,6 +2,32 @@
   "name": "scepter",
   "version": "0.1.0",
   "private": true,
+  "main": "./core/dist/index.js",
+  "module": "./core/dist/index.mjs",
+  "types": "./core/dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./core/dist/index.d.mts",
+        "default": "./core/dist/index.mjs"
+      },
+      "require": {
+        "types": "./core/dist/index.d.ts",
+        "default": "./core/dist/index.js"
+      }
+    },
+    "./types": {
+      "import": {
+        "types": "./core/dist/index.d.mts",
+        "default": "./core/dist/index.mjs"
+      },
+      "require": {
+        "types": "./core/dist/index.d.ts",
+        "default": "./core/dist/index.js"
+      }
+    }
+  },
   "bin": {
     "scepter": "./scepter"
   },

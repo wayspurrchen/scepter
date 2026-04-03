@@ -1,0 +1,50 @@
+{
+  "noteTypes": {
+    "Architecture": {
+      "shortcode": "A",
+      "folder": "arch"
+    },
+    "Requirement": {
+      "shortcode": "R",
+      "folder": "reqs"
+    },
+    "Specification": {
+        "shortcode": "S",
+        "folder": "specs"
+    },
+    "DetailedDesign": {
+      "shortcode": "DD",
+      "folder": "dd"
+    },
+    "TestPlan": {
+      "shortcode": "TS",
+      "folder": "tests"
+    },
+    "Task": {
+      "shortcode": "T",
+      "folder": "tasks"
+    }
+  },
+  "paths": {
+    "notesRoot": "_scepter/",
+    "templatesRoot": "_scepter/_templates",
+    "dataDir": "_scepter"
+  },
+  "project": {
+    "name": "Epi-based SCEpter Project",
+    "description": "An example SCEpter project using note types from the Epi skill"
+  },
+  "sourceCodeIntegration": {
+    "enabled": true,
+    "folders": [
+      "src"
+    ],
+    "exclude": [
+      "node_modules/**"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx"
+    ]
+  }
+}

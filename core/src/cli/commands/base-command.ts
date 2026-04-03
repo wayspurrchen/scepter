@@ -1,4 +1,5 @@
-import { ProjectManager } from '../../project/project-manager.js';
+import { createFilesystemProject } from '../../storage/filesystem/create-filesystem-project.js';
+import type { ProjectManager } from '../../project/project-manager.js';
 import chalk from 'chalk';
 
 export interface CommandContext {
@@ -17,6 +18,8 @@ export interface CommandSetupOptions {
 /**
  * Base command setup utility
  * Handles common initialization and cleanup for CLI commands
+ *
+ * @implements {DD010.§DC.15} BaseCommand uses createFilesystemProject() factory
  */
 export class BaseCommand {
   /**
@@ -24,10 +27,7 @@ export class BaseCommand {
    */
   static async setup(options: CommandSetupOptions): Promise<CommandContext> {
     const projectPath = options.projectDir || process.cwd();
-    const projectManager = new ProjectManager(projectPath);
-
-    // Load config from filesystem
-    await projectManager.configManager.loadConfigFromFilesystem();
+    const projectManager = await createFilesystemProject(projectPath);
 
     // Initialize the project with archive/delete options if needed
     await projectManager.initialize({
@@ -59,7 +59,7 @@ export class BaseCommand {
     handler: (context: CommandContext) => Promise<T>
   ): Promise<T> {
     const context = await this.setup(options);
-    
+
     try {
       return await handler(context);
     } finally {

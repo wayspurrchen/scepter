@@ -2,12 +2,10 @@
  * @implements {R005.§5.AC.01} Index summary includes importance, lifecycle, and verification counts
  */
 
-import * as path from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
-import { loadVerificationStore } from '../../../claims/index.js';
 import type { VerificationStore } from '../../../claims/index.js';
 import { formatIndexSummary } from '../../formatters/claim-formatter.js';
 import { formatClaimTree } from '../../formatters/claim-formatter.js';
@@ -28,9 +26,7 @@ export const indexCommand = new Command('index')
           const data = await ensureIndex(context.projectManager);
 
           // @implements {R005.§5.AC.01} Load verification store for verified/unverified counts
-          const config = context.projectManager.configManager.getConfig();
-          const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-          const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
 
           if (options.json) {
             // Serialize maps for JSON output

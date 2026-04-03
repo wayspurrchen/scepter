@@ -1,0 +1,221 @@
+{
+  "name": "scepter-claims",
+  "displayName": "SCEpter Claims",
+  "description": "Navigate SCEpter claim references in code and markdown",
+  "version": "0.0.1",
+  "publisher": "scepter",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:_scepter/scepter.config.json",
+    "workspaceContains:scepter.config.json"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "scepter-sidebar",
+          "title": "SCEpter",
+          "icon": "media/scepter-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "scepter-sidebar": [
+        {
+          "id": "scepter.notesExplorer",
+          "name": "Notes",
+          "contextualTitle": "SCEpter Notes"
+        },
+        {
+          "id": "scepter.claimsOutline",
+          "name": "Claims",
+          "contextualTitle": "SCEpter Claims"
+        },
+        {
+          "id": "scepter.referencesView",
+          "name": "References",
+          "contextualTitle": "SCEpter References"
+        },
+        {
+          "type": "webview",
+          "id": "scepter.traceMatrix",
+          "name": "Traceability",
+          "contextualTitle": "SCEpter Traceability",
+          "visibility": "collapsed"
+        },
+        {
+          "id": "scepter.confidenceView",
+          "name": "Confidence",
+          "contextualTitle": "SCEpter Confidence",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "scepter.notesExplorer",
+        "contents": "No SCEpter project detected in this workspace.\n[Initialize Project](command:scepter.initProject)\n\nOr open a folder containing a `_scepter/` directory.",
+        "when": "!scepter.projectDetected"
+      },
+      {
+        "view": "scepter.notesExplorer",
+        "contents": "$(loading~spin) Building claim index...",
+        "when": "scepter.projectDetected && !scepter.indexReady"
+      },
+      {
+        "view": "scepter.claimsOutline",
+        "contents": "Open a SCEpter note to see its claims.\n\nClaims are acceptance criteria and other addressable items within notes.",
+        "when": "scepter.indexReady && !scepter.activeNoteDetected"
+      },
+      {
+        "view": "scepter.referencesView",
+        "contents": "Open a SCEpter note to see its references.\n\nReferences show how notes connect to each other and to source code.",
+        "when": "scepter.indexReady && !scepter.activeNoteDetected"
+      },
+      {
+        "view": "scepter.confidenceView",
+        "contents": "No confidence data available.\n\nAdd `@confidence` annotations to source files to track review status.",
+        "when": "scepter.indexReady && !scepter.confidenceAvailable"
+      }
+    ],
+    "commands": [
+      {
+        "command": "scepter.traceClaim",
+        "title": "SCEpter: Trace Claim"
+      },
+      {
+        "command": "scepter.refreshIndex",
+        "title": "SCEpter: Refresh Claim Index"
+      },
+      {
+        "command": "scepter.searchClaims",
+        "title": "SCEpter: Search Claims",
+        "icon": "$(search)"
+      },
+      {
+        "command": "scepter.openFullMatrix",
+        "title": "SCEpter: Open Full Traceability Matrix",
+        "icon": "$(table)"
+      },
+      {
+        "command": "scepter.copyNoteId",
+        "title": "SCEpter: Copy Note ID"
+      },
+      {
+        "command": "scepter.openNote",
+        "title": "SCEpter: Open Note"
+      },
+      {
+        "command": "scepter.gatherContext",
+        "title": "SCEpter: Gather Context",
+        "icon": "$(search)"
+      },
+      {
+        "command": "scepter.showDerivations",
+        "title": "SCEpter: Show Derivation Chain",
+        "icon": "$(references)"
+      },
+      {
+        "command": "scepter.revealClaimInEditor",
+        "title": "SCEpter: Reveal Claim in Editor"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "scepter.refreshIndex",
+          "when": "view =~ /^scepter\\./",
+          "group": "navigation"
+        },
+        {
+          "command": "scepter.searchClaims",
+          "when": "view == scepter.claimsOutline",
+          "group": "navigation"
+        },
+        {
+          "command": "scepter.openFullMatrix",
+          "when": "view == scepter.traceMatrix",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "scepter.gatherContext",
+          "when": "view == scepter.notesExplorer && viewItem == noteItem",
+          "group": "inline"
+        },
+        {
+          "command": "scepter.copyNoteId",
+          "when": "view == scepter.notesExplorer && viewItem == noteItem"
+        },
+        {
+          "command": "scepter.openNote",
+          "when": "view == scepter.notesExplorer && viewItem == noteItem"
+        },
+        {
+          "command": "scepter.traceClaim",
+          "when": "view == scepter.notesExplorer && viewItem == noteItem"
+        },
+        {
+          "command": "scepter.showDerivations",
+          "when": "view == scepter.claimsOutline && viewItem == claimItem",
+          "group": "inline"
+        },
+        {
+          "command": "scepter.revealClaimInEditor",
+          "when": "view == scepter.claimsOutline && viewItem =~ /claimItem|sectionItem/"
+        },
+        {
+          "command": "scepter.openNote",
+          "when": "view == scepter.referencesView && viewItem =~ /refNote/"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "scepter.searchClaims",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s",
+        "when": "scepter.indexReady"
+      }
+    ],
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/markdown-claims.css"
+    ],
+    "markdown.previewScripts": [
+      "./media/preview-script.js"
+    ],
+    "configuration": {
+      "title": "SCEpter Claims",
+      "properties": {
+        "scepter.scepterPath": {
+          "type": "string",
+          "default": "scepter",
+          "description": "Path to the scepter CLI binary"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "scepter": "file:..",
+    "markdown-it": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20",
+    "typescript": "^5.8.3"
+  }
+}

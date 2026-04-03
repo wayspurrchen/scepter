@@ -11,14 +11,11 @@
  */
 
 import * as os from 'os';
-import * as path from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import {
-  loadVerificationStore,
-  saveVerificationStore,
   addVerificationEvent,
   removeLatestVerification,
   removeAllVerifications,
@@ -65,8 +62,6 @@ export const verifyCommand = new Command('verify')
           startWatching: true,
         },
         async (context) => {
-          const config = context.projectManager.configManager.getConfig();
-          const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
           const actor = options.actor ?? getDefaultActor();
           const date = new Date().toISOString().split('T')[0];
 
@@ -74,7 +69,7 @@ export const verifyCommand = new Command('verify')
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Load existing verification store
-          const store = await loadVerificationStore(dataDir);
+          const store = await context.projectManager.verificationStorage!.load();
 
           const claimsToVerify: string[] = [];
 
@@ -173,7 +168,7 @@ export const verifyCommand = new Command('verify')
               }
             }
 
-            await saveVerificationStore(dataDir, store);
+            await context.projectManager.verificationStorage!.save(store);
             return;
           }
 
@@ -191,7 +186,7 @@ export const verifyCommand = new Command('verify')
           }
 
           // Save updated store
-          await saveVerificationStore(dataDir, store);
+          await context.projectManager.verificationStorage!.save(store);
 
           console.log(chalk.green(`Verified ${claimsToVerify.length} claim(s):`));
           for (const claimId of claimsToVerify) {

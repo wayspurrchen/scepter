@@ -25,7 +25,7 @@ import { ensureIndex } from '../claims/ensure-index.js';
 import { searchClaims } from '../../../claims/claim-search.js';
 import type { ClaimSearchOptions } from '../../../claims/claim-search.js';
 import { formatClaimTrace, formatSearchResults as formatClaimSearchResults } from '../../formatters/claim-formatter.js';
-import { buildTraceabilityMatrix, loadVerificationStore, getLatestVerification } from '../../../claims/index.js';
+import { buildTraceabilityMatrix, getLatestVerification } from '../../../claims/index.js';
 import type { ClaimIndexData, ClaimIndexEntry, VerificationStore } from '../../../claims/index.js';
 
 // @implements {DD006.§3.DC.15} Detection algorithm per DD006 §4
@@ -189,9 +189,7 @@ async function performClaimAddressLookup(
 
   // Show claim detail with traceability
   const incoming = data.crossRefs.filter((ref) => ref.toClaim === entry.fullyQualified);
-  const config = context.projectManager.configManager.getConfig();
-  const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-  const verificationStore: VerificationStore = await loadVerificationStore(dataDir);
+  const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
 
   if (options.format === 'json') {
     const latestVerification = getLatestVerification(verificationStore, entry.fullyQualified);

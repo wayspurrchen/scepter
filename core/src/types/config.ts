@@ -74,14 +74,6 @@ export interface NoteTypeConfig {
   maxFolderSize?: number;             // Max size in MB for folder contents
 }
 
-// Virtual type configuration for Task
-// Tasks are not defined in config but exist as a runtime concept
-export const TASK_VIRTUAL_TYPE_CONFIG: NoteTypeConfig = {
-  folder: 'tasks',
-  shortcode: 'T',
-  description: 'Virtual type for task management',
-};
-
 export interface NotesConfig {
   autoCreate: boolean;
   templatePath?: string;

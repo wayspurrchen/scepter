@@ -1,7 +1,11 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/cli/index.ts'],
+  // @implements {DD011.§DC.07} Dual entry points: CLI + library
+  entry: {
+    cli: 'src/cli/index.ts',
+    index: 'src/index.ts',
+  },
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,

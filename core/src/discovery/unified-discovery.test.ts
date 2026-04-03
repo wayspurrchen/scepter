@@ -120,7 +120,7 @@ describe('UnifiedDiscovery', () => {
       expect(enriched.type).toBe('Decision');
     });
 
-    it('should resolve Task type for T prefix (virtual type)', () => {
+    it('should resolve Task type for T prefix', () => {
       const source = discovery.getSources()[0];
 
       const baseNote: Note = {

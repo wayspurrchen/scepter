@@ -9,12 +9,10 @@
  * @implements {R005.§4.AC.03} --importance and --note filtering
  */
 
-import * as path from 'path';
 import { Command } from 'commander';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import {
-  loadVerificationStore,
   computeStaleness,
 } from '../../../claims/index.js';
 import type { StalenessOptions } from '../../../claims/index.js';
@@ -39,9 +37,7 @@ export const staleCommand = new Command('stale')
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
           // Load the verification store
-          const config = context.projectManager.configManager.getConfig();
-          const dataDir = path.join(context.projectPath, config.paths?.dataDir || '_scepter');
-          const store = await loadVerificationStore(dataDir);
+          const store = await context.projectManager.verificationStorage!.load();
 
           // Build staleness options from CLI flags
           // @implements {R005.§4.AC.03} --importance and --note filtering

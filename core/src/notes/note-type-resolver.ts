@@ -39,7 +39,6 @@ interface TypeInfo {
   name: string;
   folder: string | null;
   shortcode: string;
-  virtual?: boolean;
   discovery?: string;
 }
 
@@ -259,13 +258,6 @@ export class NoteTypeResolver extends EventEmitter {
   resolveFromShortcode(shortcode: string): string | null {
     const typeInfo = this.getTypeByShortcode(shortcode);
     return typeInfo?.name || null;
-  }
-
-  /**
-   * Check if type is virtual
-   */
-  isVirtual(typeName: string): boolean {
-    return false;
   }
 
   /**

@@ -135,15 +135,30 @@ export async function ingestNotes(
         continue;
       }
 
-      // Write new content to destination
-      await fs.writeFile(destPath, newContent, 'utf-8');
+      // Create note through NoteManager instead of raw fs.writeFile
+      const noteToCreate = {
+        id: noteId,
+        type: resolvedType,
+        title,
+        content: newContent, // Already has frontmatter from matter.stringify()
+        tags: mergedData.tags || [],
+        created: mergedData.created ? new Date(mergedData.created) : now,
+        metadata: mergedData,
+      };
+      await noteManager.createNote(noteToCreate);
 
-      // Remove original (if dest is different from source)
-      if (destPath !== sourcePath) {
+      // Get the actual destination path from where NoteManager created the file
+      const actualDestPath = await noteManager.findNoteFile(noteId);
+
+      // Remove original source file (if it's different from where the note was created)
+      if (actualDestPath && actualDestPath !== sourcePath) {
+        await fs.unlink(sourcePath);
+      } else if (!actualDestPath && destPath !== sourcePath) {
+        // Fallback: remove if we know paths differ
         await fs.unlink(sourcePath);
       }
 
-      result.ingested.push({ sourcePath, destPath, noteId, title });
+      result.ingested.push({ sourcePath, destPath: actualDestPath || destPath, noteId, title });
 
       console.log(
         chalk.green(`  ${noteId}`) +
