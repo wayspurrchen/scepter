@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 // @implements {DD012.§DC.05} Config detection via findProjectRoot from core
 import { findProjectRoot } from 'scepter';
 import { ClaimIndexCache } from './claim-index';
@@ -24,6 +25,51 @@ const SUPPORTED_LANGUAGES = [
   { language: 'markdown' },
 ];
 
+interface DiscoveredProject {
+  name: string;
+  projectDir: string;
+}
+
+/**
+ * Discover all SCEpter projects in the workspace.
+ * First tries upward walk from each workspace folder, then does a downward glob.
+ */
+async function discoverProjects(outputChannel: vscode.OutputChannel): Promise<DiscoveredProject[]> {
+  const found = new Map<string, DiscoveredProject>(); // projectDir → project
+
+  // Upward walk from each workspace folder
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders) {
+    for (const folder of workspaceFolders) {
+      const dir = await findProjectRoot(folder.uri.fsPath);
+      if (dir && !found.has(dir)) {
+        found.set(dir, { name: path.basename(dir), projectDir: dir });
+      }
+    }
+  }
+
+  // Downward glob for nested projects
+  const configFiles = await vscode.workspace.findFiles(
+    '**/scepter.config.json',
+    '{**/node_modules/**,**/dist/**,**/build/**}',
+    20,
+  );
+  for (const uri of configFiles) {
+    const configDir = uri.fsPath.replace(/[/\\]scepter\.config\.json$/, '');
+    const candidate = configDir.endsWith('_scepter')
+      ? configDir.replace(/[/\\]_scepter$/, '')
+      : configDir;
+    const dir = await findProjectRoot(candidate);
+    if (dir && !found.has(dir)) {
+      found.set(dir, { name: path.basename(dir), projectDir: dir });
+    }
+  }
+
+  const projects = [...found.values()];
+  outputChannel.appendLine(`Discovered ${projects.length} SCEpter project(s): ${projects.map(p => p.name).join(', ')}`);
+  return projects;
+}
+
 // @implements {DD012.§DC.06} Async activation to await findProjectRoot
 export async function activate(context: vscode.ExtensionContext): Promise<{ extendMarkdownIt?: (md: any) => any }> {
   const outputChannel = vscode.window.createOutputChannel('SCEpter Claims');
@@ -31,51 +77,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
 
   outputChannel.appendLine('SCEpter Claims extension activating...');
 
-  // @implements {DD012.§DC.05} Replace findScepterProject with findProjectRoot
-  // Try upward walk first (workspace root IS a SCEpter project or is inside one),
-  // then fall back to downward glob (monorepo with nested SCEpter projects).
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  let projectDir: string | null = null;
-  if (workspaceFolders) {
-    for (const folder of workspaceFolders) {
-      projectDir = await findProjectRoot(folder.uri.fsPath);
-      if (projectDir) break;
-    }
-  }
+  const projects = await discoverProjects(outputChannel);
 
-  // Downward search: find nested _scepter/scepter.config.json in workspace
-  if (!projectDir) {
-    outputChannel.appendLine('Upward walk found nothing, searching workspace for nested SCEpter projects...');
-    const configFiles = await vscode.workspace.findFiles(
-      '**/scepter.config.json',
-      '{**/node_modules/**,**/dist/**,**/build/**}',
-      5,
-    );
-    for (const uri of configFiles) {
-      // Config could be at <project>/scepter.config.json or <project>/_scepter/scepter.config.json
-      const configDir = uri.fsPath.replace(/[/\\]scepter\.config\.json$/, '');
-      const candidate = configDir.endsWith('_scepter')
-        ? configDir.replace(/[/\\]_scepter$/, '')
-        : configDir;
-      projectDir = await findProjectRoot(candidate);
-      if (projectDir) {
-        outputChannel.appendLine(`Found nested SCEpter project: ${projectDir}`);
-        break;
-      }
-    }
-  }
-
-  if (!projectDir) {
-    outputChannel.appendLine(
-      'No SCEpter project found (no scepter.config.json in workspace folders or subdirectories)'
-    );
+  if (projects.length === 0) {
+    outputChannel.appendLine('No SCEpter projects found in workspace.');
     return {};
   }
 
-  outputChannel.appendLine(`SCEpter project: ${projectDir}`);
+  // Multi-project state
+  const isMultiProject = projects.length > 1;
+  let activeProject = projects[0];
+  vscode.commands.executeCommand('setContext', 'scepter.multipleProjects', isMultiProject);
+
+  outputChannel.appendLine(`Active project: ${activeProject.name} (${activeProject.projectDir})`);
 
   // Create and initialize the claim index cache
-  const index = new ClaimIndexCache(projectDir, outputChannel);
+  const index = new ClaimIndexCache(activeProject.projectDir, outputChannel);
   context.subscriptions.push({ dispose: () => index.dispose() });
 
   // Register hover and definition providers
@@ -134,11 +151,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     showCollapseAll: true,
   });
   context.subscriptions.push(notesTree, claimsTree, referencesTree, confidenceTree);
+  context.subscriptions.push(...claimsProvider.trackCollapseState(claimsTree));
+  context.subscriptions.push(...referencesProvider.trackCollapseState(referencesTree));
 
   // @implements {DD013.§DC.12} Webview View Provider for traceability sidebar
   const traceabilityProvider = new TraceabilityViewProvider(index, context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('scepter.traceMatrix', traceabilityProvider)
+  );
+
+  // Helper: update the Notes view title to show active project
+  function updateNotesViewTitle(): void {
+    if (isMultiProject) {
+      notesTree.description = activeProject.name;
+    }
+  }
+
+  // Project switcher command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('scepter.selectProject', async () => {
+      const items = projects.map(p => ({
+        label: p.name,
+        description: p.projectDir,
+        picked: p.projectDir === activeProject.projectDir,
+        project: p,
+      }));
+      const picked = await vscode.window.showQuickPick(items, {
+        title: 'Select SCEpter Project',
+        placeHolder: 'Choose which project to display',
+      });
+      if (picked && picked.project.projectDir !== activeProject.projectDir) {
+        activeProject = picked.project;
+        updateNotesViewTitle();
+        vscode.commands.executeCommand('setContext', 'scepter.indexReady', false);
+        await index.switchProject(activeProject.projectDir);
+        vscode.commands.executeCommand('setContext', 'scepter.indexReady', true);
+        outputChannel.appendLine(
+          `Switched to project: ${activeProject.name} — ${index.size} claims, ${index.noteCount} notes`
+        );
+      }
+    }),
   );
 
   // @implements {DD013.§DC.22} Active editor tracking for context-sensitive views
@@ -268,8 +320,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     `SCEpter Claims ready: ${index.size} claims across ${index.noteCount} notes`
   );
 
-  // Set initial active note
+  // Set initial active note and project title
   updateActiveNote(vscode.window.activeTextEditor);
+  updateNotesViewTitle();
 
   // @implements {DD013.§DC.08} Notes Explorer badge
   notesTree.badge = { value: index.noteCount, tooltip: `${index.noteCount} notes` };

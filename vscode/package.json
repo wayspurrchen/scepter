@@ -124,10 +124,20 @@
       {
         "command": "scepter.revealClaimInEditor",
         "title": "SCEpter: Reveal Claim in Editor"
+      },
+      {
+        "command": "scepter.selectProject",
+        "title": "SCEpter: Select Project",
+        "icon": "$(folder-library)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "scepter.selectProject",
+          "when": "view == scepter.notesExplorer && scepter.multipleProjects",
+          "group": "navigation"
+        },
         {
           "command": "scepter.refreshIndex",
           "when": "view =~ /^scepter\\./",

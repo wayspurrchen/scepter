@@ -102,7 +102,7 @@ export class ClaimIndexCache {
   private noteMap = new Map<string, NoteInfo>();
   /** Reverse index: bare claim suffix (e.g. "DC.01") → fully qualified IDs */
   private suffixIndex = new Map<string, string[]>();
-  readonly projectDir: string;
+  projectDir: string;
   private outputChannel: vscode.OutputChannel;
   private projectManager: ProjectManager | null = null;
   /** Known shortcodes from config, used for pattern matching (DC.13) */
@@ -783,6 +783,39 @@ export class ClaimIndexCache {
       watcher.dispose();
     }
     this.fileWatchers = [];
+  }
+
+  /**
+   * Switch to a different SCEpter project directory.
+   * Tears down the current project and re-initializes with the new one.
+   * All providers listening to onDidRefresh will update automatically.
+   */
+  async switchProject(newProjectDir: string): Promise<void> {
+    this.disposeWatchers();
+    if (this.refreshDebounceTimer) {
+      clearTimeout(this.refreshDebounceTimer);
+    }
+    this.projectManager?.removeAllListeners();
+    this.projectManager = null;
+    this.coreClaimIndex = null;
+
+    // Clear all caches
+    this.entries = new Map();
+    this.crossRefs = [];
+    this.noteMap = new Map();
+    this.suffixIndex = new Map();
+    this.knownShortcodes = new Set();
+    this.noteExcerptCache = new Map();
+    this.htmlExcerptCache = new Map();
+
+    // Reset ready gate
+    this.ready = new Promise((resolve) => {
+      this.resolveReady = resolve;
+    });
+
+    this.projectDir = newProjectDir;
+    this.outputChannel.appendLine(`[ClaimIndex] Switching to project: ${newProjectDir}`);
+    await this.initialize();
   }
 
   dispose(): void {

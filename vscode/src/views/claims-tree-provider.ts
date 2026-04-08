@@ -50,12 +50,34 @@ export class ClaimsTreeProvider implements vscode.TreeDataProvider<ClaimsTreeEle
   private _onDidChangeTreeData = new vscode.EventEmitter<ClaimsTreeElement | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private activeNoteId: string | null = null;
+  /** Track which sections the user has collapsed (they start expanded by default). */
+  private collapsedSections = new Set<string>();
 
   constructor(private index: ClaimIndexCache) {
     index.onDidRefresh(() => this._onDidChangeTreeData.fire(undefined));
   }
 
+  /** Call from extension.ts after creating the TreeView to track expand/collapse. */
+  trackCollapseState(treeView: vscode.TreeView<ClaimsTreeElement>): vscode.Disposable[] {
+    return [
+      treeView.onDidExpandElement(e => {
+        if (e.element.kind === 'section') {
+          this.collapsedSections.delete(e.element.sectionPath);
+        }
+      }),
+      treeView.onDidCollapseElement(e => {
+        if (e.element.kind === 'section') {
+          this.collapsedSections.add(e.element.sectionPath);
+        }
+      }),
+    ];
+  }
+
   setActiveNote(noteId: string | null): void {
+    if (noteId !== this.activeNoteId) {
+      // New note: reset collapse tracking so sections start expanded
+      this.collapsedSections.clear();
+    }
     this.activeNoteId = noteId;
     this._onDidChangeTreeData.fire(undefined);
   }
@@ -73,9 +95,10 @@ export class ClaimsTreeProvider implements vscode.TreeDataProvider<ClaimsTreeEle
 
   getTreeItem(element: ClaimsTreeElement): vscode.TreeItem {
     if (element.kind === 'section') {
+      const isCollapsed = this.collapsedSections.has(element.sectionPath);
       const item = new vscode.TreeItem(
         element.sectionHeading,
-        vscode.TreeItemCollapsibleState.Expanded,
+        isCollapsed ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded,
       );
       item.description = `${element.claimCount} claim${element.claimCount !== 1 ? 's' : ''}`;
       item.iconPath = new vscode.ThemeIcon('symbol-namespace');

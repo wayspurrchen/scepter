@@ -33,9 +33,27 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
   private _onDidChangeTreeData = new vscode.EventEmitter<RefsTreeElement | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private activeNoteId: string | null = null;
+  /** Track which direction groups the user has expanded (persists across refreshes). */
+  private expandedDirections = new Set<string>();
 
   constructor(private index: ClaimIndexCache) {
     index.onDidRefresh(() => this._onDidChangeTreeData.fire(undefined));
+  }
+
+  /** Call from extension.ts after creating the TreeView to track expand/collapse. */
+  trackCollapseState(treeView: vscode.TreeView<RefsTreeElement>): vscode.Disposable[] {
+    return [
+      treeView.onDidExpandElement(e => {
+        if (e.element.kind === 'direction') {
+          this.expandedDirections.add(e.element.direction);
+        }
+      }),
+      treeView.onDidCollapseElement(e => {
+        if (e.element.kind === 'direction') {
+          this.expandedDirections.delete(e.element.direction);
+        }
+      }),
+    ];
   }
 
   setActiveNote(noteId: string | null): void {
@@ -66,9 +84,10 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
         incoming: 'arrow-left',
         source: 'file-code',
       };
+      const isExpanded = this.expandedDirections.has(element.direction);
       const item = new vscode.TreeItem(
         `${labelMap[element.direction]} (${element.count})`,
-        vscode.TreeItemCollapsibleState.Collapsed,
+        isExpanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
       );
       item.iconPath = new vscode.ThemeIcon(iconMap[element.direction]);
       item.contextValue = 'refGroup';
@@ -91,7 +110,7 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
         item.command = {
           command: 'vscode.open',
           title: 'Open Note',
-          arguments: [vscode.Uri.file(absPath)],
+          arguments: [vscode.Uri.file(absPath), { preserveFocus: true }],
         };
       }
       item.contextValue = 'refNote';

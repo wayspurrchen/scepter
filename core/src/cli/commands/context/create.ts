@@ -55,6 +55,7 @@ export const createCommand = new Command('create')
           } else {
             console.log(chalk.green(`Created note ${chalk.cyan(result.note.id)}`));
           }
+          console.log(chalk.dim('🤖 For agents: remember to read the file first before writing or your update may fail.'));
 
           // Add folder creation confirmation
           if (result.note.isFolder && result.note.folderPath) {
