@@ -20,7 +20,6 @@ export const indexCommand = new Command('index')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const data = await ensureIndex(context.projectManager);

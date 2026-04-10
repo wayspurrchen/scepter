@@ -301,7 +301,7 @@ export class NoteManager extends EventEmitter {
     this.noteFileManager.removeAllListeners('file:moved');
 
     // Stop watching in NoteFileManager
-    this.noteFileManager.stopWatching();
+    await this.noteFileManager.stopWatching();
   }
 
   /**
@@ -317,7 +317,7 @@ export class NoteManager extends EventEmitter {
 
     // Stop watching if active
     if (this.unifiedDiscovery) {
-      this.unifiedDiscovery.stopWatching();
+      await this.unifiedDiscovery.stopWatching();
     }
 
     // Re-initialize to rebuild indexes

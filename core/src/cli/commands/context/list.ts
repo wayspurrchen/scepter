@@ -28,8 +28,7 @@ listCommand.action(async (options: ListOptions & { projectDir?: string }) => {
     const result = await BaseCommand.execute(
       {
         projectDir: options.projectDir,
-        requireNoteManager: true,
-        startWatching: true
+        requireNoteManager: true
       },
       async (context) => listNotes(options, context)
     );

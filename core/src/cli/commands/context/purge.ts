@@ -11,7 +11,6 @@ export const purgeCommand = new Command('purge')
     await BaseCommand.execute({
       projectDir: options.projectDir,
       requireNoteManager: true,
-      startWatching: true,
       includeDeleted: true,
     }, async (context) => {
       const handler = new PurgeHandler();

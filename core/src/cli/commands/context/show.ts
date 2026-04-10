@@ -27,7 +27,6 @@ showCommand.action(async (ids: string[], options: ShowOptions & { projectDir?: s
       {
         projectDir: options.projectDir,
         requireNoteManager: true,
-        startWatching: true,
       },
       async (context) => {
         // Handle source file mode differently

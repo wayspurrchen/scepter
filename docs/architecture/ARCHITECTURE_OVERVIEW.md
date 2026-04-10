@@ -370,7 +370,7 @@ Every SCEpter-enabled project has a `_scepter/` directory containing:
 ```
 _scepter/
   scepter.config.json    Configuration file
-  notes/                 Note storage (organized by type folders)
+  notes/                 Default note storage (organized by type folders)
     arch/                Architecture notes
     reqs/                Requirement notes
     specs/               Specification notes
@@ -380,6 +380,8 @@ _scepter/
     types/               Handlebars templates per note type
   verification.json      Verification event store (for claims)
 ```
+
+**Notes are not required to live under `_scepter/`.** The `_scepter/` directory is the canonical home for project-level state (config, templates, verification data), and new notes default to `_scepter/notes/[type_folder]/`, but the `discoveryPaths` configuration option tells SCEpter where to scan for existing notes. A project may set `discoveryPaths: ["."]` to discover notes anywhere in the repo, or point at specific roots like `["docs", "specs"]`. Discovery is keyed on ID prefix (e.g., `R001`, `DD003`), not folder location, so notes are portable. Code and documentation should never assume a fixed note path — always use the `scepter` CLI (`scepter ctx list`, `scepter ctx show`, `scepter config`) to locate notes.
 
 ### scepter.config.json
 

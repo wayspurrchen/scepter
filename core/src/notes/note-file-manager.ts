@@ -705,9 +705,15 @@ export class NoteFileManager extends EventEmitter {
   /**
    * Stop watching for file changes
    */
-  stopWatching(): void {
+  async stopWatching(): Promise<void> {
     if (this.watcher) {
-      this.watcher.close();
+      // Race chokidar close against a short timeout. On some macOS versions
+      // (observed on Sonoma 14.1), fs_events teardown takes 1-4s per watched
+      // path, which hangs CLI exit. Drop the reference and let the process
+      // clean up native handles on exit if close doesn't return in time.
+      const closed = this.watcher.close().catch(() => {});
+      const timeout = new Promise<void>((resolve) => setTimeout(resolve, 250));
+      await Promise.race([closed, timeout]);
       this.watcher = undefined;
     }
   }

@@ -35,7 +35,7 @@ describe('Task Discovery Integration', () => {
   });
 
   afterEach(async () => {
-    discovery?.stopWatching();
+    await discovery?.stopWatching();
     // Clean up test directory
     await fs.remove(testDir);
   });

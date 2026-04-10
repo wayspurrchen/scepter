@@ -59,7 +59,6 @@ export const verifyCommand = new Command('verify')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const actor = options.actor ?? getDefaultActor();

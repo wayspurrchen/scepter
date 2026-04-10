@@ -26,7 +26,6 @@ export const createCommand = new Command('create')
           projectDir: options.projectDir,
           requireNoteManager: true,
           requireModePrompts: false, // create doesn't use mode prompts
-          startWatching: true,
         },
         async (context) => {
           // @implements {T009} - Handle --type option with smart positional argument interpretation

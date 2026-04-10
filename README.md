@@ -125,7 +125,7 @@ T005 - Implement claim search            (Task)
 
 Note types are configurable. Define whatever taxonomy fits your project — the examples above use the "epi" boilerplate (Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task), but you could use Decision/Question/Bug/Feature or anything else.
 
-Notes are markdown files stored under `_scepter/notes/` by default, organized into type folders. Both the root path and the folder structure are configurable (see [Configuration](#configuration)). Notes are discovered by their ID prefix, not their folder location, so you can reorganize freely. Each note has YAML frontmatter for metadata (title, status, tags, dates) and a body that can contain references to other notes.
+Notes are markdown files, discovered by their ID prefix rather than by a fixed folder location. By default, new notes are created under `_scepter/notes/[type_folder]/`, but you can configure `discoveryPaths` in `scepter.config.json` to scan any set of directories — for example, `["docs", "specs"]` or even `["."]` to pick up notes anywhere in the repo. This means existing markdown scattered across a project can participate in the knowledge graph without being relocated. Each note has YAML frontmatter for metadata (title, status, tags, dates) and a body that can contain references to other notes.
 
 ### Reference Graph
 
@@ -335,8 +335,10 @@ SCEpter is driven by `_scepter/scepter.config.json`. Here's a full example:
 | Field | Description |
 |---|---|
 | `noteTypes` | Map of type name to `{shortcode, folder, description}`. Shortcodes become ID prefixes (R001, DD003). |
-| `paths.notesRoot` | Where notes live. Default: `_scepter/notes` |
-| `paths.dataDir` | Where SCEpter stores its data. Default: `_scepter` |
+| `paths.notesRoot` | Where **new** notes are created. Default: `_scepter/notes` |
+| `paths.dataDir` | Where SCEpter stores its data (config, templates, verification). Default: `_scepter` |
+| `discoveryPaths` | Directories scanned for existing notes. Default: `["_scepter"]`. Use `["."]` to discover notes anywhere in the repo, or `["docs", "specs"]` to scan specific roots. Discovery is by ID prefix, independent of folder layout. |
+| `discoveryExclude` | Additional glob patterns to exclude from discovery (on top of the built-in `node_modules`, `.git`, `dist`, etc.) |
 | `sourceCodeIntegration` | Which source files to scan for note references |
 | `claims.projectionTypes` | Note types that participate in traceability (order matters: upstream to downstream) |
 | `timestampPrecision` | `"date"` (YYYY-MM-DD, default) or `"datetime"` (full ISO 8601) for note metadata |

@@ -62,7 +62,6 @@ export const gapsCommand = new Command('gaps')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });

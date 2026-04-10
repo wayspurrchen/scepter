@@ -115,7 +115,6 @@ export const searchCommand = new Command('search')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const mode = options.mode ?? 'auto';

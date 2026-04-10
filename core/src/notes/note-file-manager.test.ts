@@ -86,7 +86,7 @@ describe('NoteFileManager', () => {
 
   afterEach(async () => {
     // Stop watching if active
-    manager.stopWatching();
+    await manager.stopWatching();
     // Clean up temp directory
     await removeTempDirectory(tempDir);
   });

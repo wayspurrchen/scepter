@@ -11,7 +11,6 @@ export const restoreCommand = new Command('restore')
     await BaseCommand.execute({
       projectDir: options.projectDir,
       requireNoteManager: true,
-      startWatching: true,
       includeArchived: true,
       includeDeleted: true,
     }, async (context) => {

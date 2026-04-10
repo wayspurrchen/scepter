@@ -22,7 +22,6 @@ export const convertCommand = new Command('convert')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const handler = new ConvertHandler();

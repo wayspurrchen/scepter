@@ -68,7 +68,6 @@ export const searchCommand = new Command('search')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           // @implements {R007.§5.AC.02} Build index before search

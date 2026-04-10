@@ -58,8 +58,8 @@ describe('UnifiedDiscovery', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    discovery.stopWatching();
+  afterEach(async () => {
+    await discovery.stopWatching();
   });
 
   describe('initialization', () => {

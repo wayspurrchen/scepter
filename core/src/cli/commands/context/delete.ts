@@ -14,7 +14,6 @@ export const deleteCommand = new Command('delete')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const handler = new DeleteHandler();

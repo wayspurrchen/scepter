@@ -53,7 +53,6 @@ gatherCommand.action(async (noteId: string, options: GatherCommandOptions & { pr
       {
         projectDir: options.projectDir,
         requireNoteManager: true,
-        startWatching: true,
       },
       async (context) => {
         // Validate options

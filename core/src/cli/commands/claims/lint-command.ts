@@ -30,7 +30,6 @@ export const lintCommand = new Command('lint')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const noteManager = context.projectManager.noteManager;

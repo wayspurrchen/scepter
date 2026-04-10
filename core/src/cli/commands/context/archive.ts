@@ -14,7 +14,6 @@ export const archiveCommand = new Command('archive')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const handler = new ArchiveHandler();

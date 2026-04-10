@@ -30,7 +30,6 @@ export const staleCommand = new Command('stale')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           // Build the claim index

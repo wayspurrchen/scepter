@@ -203,7 +203,11 @@ export class SourceCodeScanner extends EventEmitter {
    */
   async stopWatching(): Promise<void> {
     if (this.watcher) {
-      await this.watcher.close();
+      // Race chokidar close against a short timeout. See note-file-manager.ts
+      // stopWatching for the macOS Sonoma fs_events teardown issue.
+      const closed = this.watcher.close().catch(() => {});
+      const timeout = new Promise<void>((resolve) => setTimeout(resolve, 250));
+      await Promise.race([closed, timeout]);
       this.watcher = undefined;
       this.emit('watch:stopped');
     }

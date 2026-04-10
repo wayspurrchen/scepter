@@ -45,7 +45,6 @@ export const threadCommand = new Command('thread')
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
-          startWatching: true,
         },
         async (context) => {
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });

@@ -301,18 +301,20 @@ export class ProjectManager extends EventEmitter {
   }
 
   /**
-   * Cleanup all watchers and resources
+   * Cleanup all watchers and resources.
+   * Runs stopWatching calls in parallel so slow teardown on one subsystem
+   * (notably chokidar's recursive fs.watch on macOS) doesn't block the others.
+   * Each stopWatching is individually bounded by its own timeout race.
    */
   async cleanup(): Promise<void> {
-    // Stop note manager watching
+    const stops: Promise<void>[] = [];
     if (this.noteManager) {
-      await this.noteManager.stopWatching();
+      stops.push(this.noteManager.stopWatching());
     }
-
-    // Stop source scanner watching
     if (this.sourceScanner) {
-      await this.sourceScanner.stopWatching();
+      stops.push(this.sourceScanner.stopWatching());
     }
+    await Promise.all(stops);
   }
 
   // Type Management Operations
