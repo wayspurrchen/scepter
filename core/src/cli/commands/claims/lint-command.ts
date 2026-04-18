@@ -7,6 +7,7 @@
  * @implements {R006.§5.AC.01} Lint validates derivation target resolution
  * @implements {R006.§5.AC.02} Lint warns on deep derivation chains
  * @implements {R006.§5.AC.03} Lint warns on partial derivation coverage
+ * @implements {R008.§2.AC.02} Linter uses aggregated content for folder notes
  */
 
 import { Command } from 'commander';
@@ -37,8 +38,9 @@ export const lintCommand = new Command('lint')
             throw new Error('Note manager not initialized');
           }
 
-          // Read note content
-          const content = await noteManager.noteFileManager.getFileContents(noteId);
+          // Read note content — use aggregated contents so that folder notes
+          // have claims from companion sub-files included.
+          const content = await noteManager.noteFileManager.getAggregatedContents(noteId);
           if (content === null) {
             throw new Error(`Note not found: ${noteId}`);
           }

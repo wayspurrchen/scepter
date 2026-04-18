@@ -8,7 +8,7 @@ import matter from 'gray-matter';
 import type { Note } from '../types/note';
 import type { ConfigManager } from '../config/config-manager';
 import type { NoteTypeConfig } from '../types/config';
-import { createFolderStructure, detectFolderNote } from './folder-utils';
+import { createFolderStructure, detectFolderNote, scanFolderContents } from './folder-utils';
 
 export class NoteFileManager extends EventEmitter {
   private noteIndex: Map<string, string> = new Map(); // noteId -> filePath
@@ -162,6 +162,67 @@ export class NoteFileManager extends EventEmitter {
       const contents = await fs.readFile(filePath, 'utf-8');
       return contents;
     } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get aggregated file contents for a note, including companion markdown
+   * files in folder-based notes. For non-folder notes this behaves
+   * identically to getFileContents(). For folder notes it concatenates the
+   * main file with every companion .md file (sorted alphabetically for
+   * determinism), stripping frontmatter from companions so only one
+   * frontmatter block (the main file's) appears in the result.
+   *
+   * This is the method claim indexing and linting should use so that claims
+   * scattered across sub-files within a folder note are treated as part of
+   * one unified note.
+   *
+   * @implements {R008.§1.AC.01} Reads main file + all companion .md files, returns concatenated string
+   * @implements {R008.§1.AC.02} Companion files sorted alphabetically before concatenation
+   * @implements {R008.§1.AC.03} Frontmatter stripped from companion files via gray-matter
+   * @implements {R008.§1.AC.04} Only .md files included; non-markdown files excluded
+   * @implements {R008.§1.AC.05} Non-folder notes return single file content (identical to getFileContents)
+   * @implements {R008.§1.AC.06} Returns null if noteId not found in index
+   * @implements {R008.§1.AC.07} Returns null on filesystem errors (catch block)
+   */
+  async getAggregatedContents(noteId: string): Promise<string | null> {
+    const filePath = this.noteIndex.get(noteId);
+    if (!filePath) return null;
+
+    try {
+      const mainContent = await fs.readFile(filePath, 'utf-8');
+
+      // Detect folder note: parent directory name starts with the note ID
+      const dir = path.dirname(filePath);
+      const dirName = path.basename(dir);
+      const idMatch = dirName.match(/^([A-Z]+\d+)/);
+
+      if (!idMatch || idMatch[1] !== noteId) {
+        // Not a folder note — return main file only
+        return mainContent;
+      }
+
+      // Folder note — find companion .md files
+      const companionFiles = await scanFolderContents(dir);
+      const mdCompanions = companionFiles
+        .filter((f) => f.endsWith('.md'))
+        .sort(); // alphabetical for determinism
+
+      if (mdCompanions.length === 0) {
+        return mainContent;
+      }
+
+      let aggregated = mainContent;
+      for (const companion of mdCompanions) {
+        const raw = await fs.readFile(path.join(dir, companion), 'utf-8');
+        // Strip frontmatter from companions so only the main file's
+        // frontmatter survives in the concatenated output.
+        const { content: body } = matter(raw);
+        aggregated += '\n\n' + body;
+      }
+      return aggregated;
+    } catch {
       return null;
     }
   }

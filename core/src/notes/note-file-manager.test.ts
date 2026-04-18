@@ -1310,4 +1310,108 @@ Use JWT with refresh tokens`);
       expect(path.basename(archivedPath)).toBe('Q001 Should we use Node js v20 for this.md');
     });
   });
+
+  /** @validates {R008.§1} Content Aggregation */
+  describe('getAggregatedContents', () => {
+    /** @validates {R008.§1.AC.05} Non-folder notes identical to getFileContents */
+    it('should return main file content for non-folder notes', async () => {
+      const note: Note = {
+        id: 'R001',
+        type: 'Requirement',
+        title: 'Simple Note',
+        content: '---\nid: R001\n---\n\n# R001 Simple Note\n\n## §1 Section\n\n### AC.01 Criterion',
+        tags: [],
+        created: new Date(),
+      };
+
+      await manager.createNoteFile(note);
+      await manager.buildIndex();
+
+      const result = await manager.getAggregatedContents('R001');
+      expect(result).not.toBeNull();
+      expect(result).toContain('AC.01 Criterion');
+    });
+
+    /** @validates {R008.§1.AC.01} Main file + companion .md files concatenated */
+    it('should aggregate companion markdown files for folder notes', async () => {
+      // Create folder note structure manually
+      const folderPath = path.join(tempDir, '_scepter', 'notes', 'requirements', 'R001 Test Folder');
+      await ensureDir(folderPath);
+      await writeFile(
+        path.join(folderPath, 'R001.md'),
+        '---\nid: R001\n---\n\n# R001 Test Folder\n\n## §1 Main Section\n\n### AC.01 Main criterion',
+      );
+      await writeFile(
+        path.join(folderPath, 'details.md'),
+        '---\ntitle: Details\n---\n\n## §2 Detail Section\n\n### AC.01 Detail criterion',
+      );
+
+      await manager.buildIndex();
+
+      const result = await manager.getAggregatedContents('R001');
+      expect(result).not.toBeNull();
+      // Main file content present
+      expect(result).toContain('§1 Main Section');
+      expect(result).toContain('AC.01 Main criterion');
+      // Companion content present
+      expect(result).toContain('§2 Detail Section');
+      expect(result).toContain('AC.01 Detail criterion');
+    });
+
+    /** @validates {R008.§1.AC.03} Frontmatter stripped from companion files */
+    it('should strip frontmatter from companion files', async () => {
+      const folderPath = path.join(tempDir, '_scepter', 'notes', 'requirements', 'R001 Test Folder');
+      await ensureDir(folderPath);
+      await writeFile(
+        path.join(folderPath, 'R001.md'),
+        '---\nid: R001\n---\n\n# R001 Test\n\n## §1 Section',
+      );
+      await writeFile(
+        path.join(folderPath, 'companion.md'),
+        '---\ntitle: Should Be Stripped\n---\n\n## §2 Companion Section',
+      );
+
+      await manager.buildIndex();
+
+      const result = await manager.getAggregatedContents('R001');
+      expect(result).not.toBeNull();
+      // Companion frontmatter should be stripped
+      expect(result).not.toContain('Should Be Stripped');
+      // Companion body should be present
+      expect(result).toContain('§2 Companion Section');
+      // Main file frontmatter should be preserved
+      expect(result).toContain('id: R001');
+    });
+
+    /** @validates {R008.§1.AC.04} Non-markdown files excluded from aggregation */
+    it('should not include non-markdown companion files', async () => {
+      const folderPath = path.join(tempDir, '_scepter', 'notes', 'requirements', 'R001 Test Folder');
+      await ensureDir(folderPath);
+      await writeFile(
+        path.join(folderPath, 'R001.md'),
+        '---\nid: R001\n---\n\n## §1 Section',
+      );
+      await writeFile(
+        path.join(folderPath, 'data.json'),
+        '{"key": "value"}',
+      );
+      await writeFile(
+        path.join(folderPath, 'details.md'),
+        '## §2 Details',
+      );
+
+      await manager.buildIndex();
+
+      const result = await manager.getAggregatedContents('R001');
+      expect(result).not.toBeNull();
+      expect(result).not.toContain('"key"');
+      expect(result).toContain('§2 Details');
+    });
+
+    /** @validates {R008.§1.AC.06} Returns null for non-existent notes */
+    it('should return null for non-existent notes', async () => {
+      const result = await manager.getAggregatedContents('NONEXISTENT');
+      expect(result).toBeNull();
+    });
+  });
 });

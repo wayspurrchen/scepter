@@ -3,6 +3,7 @@
  *
  * @implements {DD006.§3.DC.12} Lazy initialization via cached ensureIndex()
  * @implements {DD006.§3.DC.13} Module-level caching with --reindex bypass
+ * @implements {R008.§2.AC.01} Claim index uses aggregated content for folder notes
  */
 
 import type { ProjectManager } from '../../../project/project-manager.js';
@@ -40,13 +41,14 @@ export async function ensureIndex(
   const result = await noteManager.getNotes({});
   const notes = result.notes;
 
-  // Read content for each note
+  // Read content for each note — use aggregated contents so that folder
+  // notes have claims from companion sub-files included.
   const notesWithContent: NoteWithContent[] = await Promise.all(
     notes.map(async (note) => ({
       id: note.id,
       type: note.type,
       filePath: note.filePath || '',
-      content: (await noteManager.noteFileManager.getFileContents(note.id)) || '',
+      content: (await noteManager.noteFileManager.getAggregatedContents(note.id)) || '',
     })),
   );
 
