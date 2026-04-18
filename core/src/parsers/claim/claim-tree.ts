@@ -87,6 +87,12 @@ const SECTION_ID_RE = /^§(\d+(?:\.\d+)*)\b/;
  * Matches a claim identifier at the start of text.
  * Format: optional-section-path + claim prefix + dot + number
  * Examples: §1.AC.01, AC.01, §3.AC.04, §1.2.SEC.03
+ *
+ * The two §? groups are hallucination tolerance — AI agents frequently
+ * produce §AC.01 or §DC.01 (§ on a claim prefix) when § should only
+ * appear on numeric section identifiers. The parser accepts and discards
+ * the stray § so linting still works, but this form should never be
+ * rendered into output or taught as correct syntax.
  */
 const CLAIM_ID_RE = /^§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?\b/;
 
@@ -95,6 +101,8 @@ const CLAIM_ID_RE = /^§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?\b/
  * This handles the R004 convention where claims are paragraph-level text like:
  *   §1.AC.01 The parser MUST extract section IDs...
  *   §2.AC.04:superseded=R005.§2.AC.04 Colon-suffix metadata...
+ *
+ * The §? groups are hallucination tolerance (see CLAIM_ID_RE comment).
  *
  * @implements {R005.§2.AC.04a} Accept colon after claim number for metadata
  */

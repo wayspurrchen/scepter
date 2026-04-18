@@ -137,6 +137,8 @@ When your change causes an entity to gain, lose, or change structural elements �
 
 When adding claims to a codebase that predates the claims system (no `@implements` annotations, notes in non-standard format), follow this sequence strictly. The order matters — each step depends on the previous one.
 
+**Folder notes:** If the note is folder-based, claims from ALL companion `.md` files are aggregated automatically. When retrofitting, check every sub-file in the folder — not just the main file. Run `scepter claims lint NOTEID` to verify that section and claim IDs are unique across all sub-files.
+
 1. **Verify note claim format.** Run `scepter claims trace NOTEID`. If it says "No claims found", the note uses a format the parser can't read (checkboxes, bold-only, wrong heading levels). Reformat to heading-level or `§`-prefixed paragraphs first. This is the precondition for everything else.
 
 2. **Run `scepter claims lint NOTEID`.** Fix structural issues before adding annotations. Forbidden forms, duplicates, and broken references must be resolved first.

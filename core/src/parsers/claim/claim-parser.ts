@@ -63,12 +63,14 @@ const NOTE_ID_RE = /^[A-Z]{1,5}\d{3,5}$/;
  * Forbidden form: uppercase letters immediately followed by digits with no dot.
  * This catches things like AC01, SEC03 etc. that should be AC.01, SEC.03.
  * We only flag this when the segment has both letters and digits and no dot.
+ * The §? is hallucination tolerance (see claim-tree.ts CLAIM_ID_RE comment).
  */
 const FORBIDDEN_CLAIM_RE = /^§?([A-Z]+)(\d{2,3}[a-z]?)$/;
 
 /**
  * Valid claim segment: letter prefix DOT number, optional sub-letter.
  * e.g. AC.01, SEC.03, CORE.12, AC.01a
+ * The §? is hallucination tolerance (see claim-tree.ts CLAIM_ID_RE comment).
  */
 const CLAIM_SEGMENT_RE = /^§?([A-Z]+)$/;
 const CLAIM_NUMBER_RE = /^(\d{2,3})([a-z])?$/;

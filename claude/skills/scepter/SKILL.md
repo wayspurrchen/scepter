@@ -230,6 +230,11 @@ scepter create Requirement "API Spec" --folder --tags api
 # Convert between formats
 scepter convert D001 --to-folder
 scepter convert D001 --to-folder --dry-run
+
+# Folder notes and claims: companion .md files are aggregated for claim
+# extraction. Claims in any sub-file are indexed under the parent note ID.
+# Section/claim IDs must be unique across all sub-files in the folder.
+# See claims.md "Folder Notes and Claims" for details.
 ```
 
 ### After Creating a Note

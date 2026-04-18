@@ -208,7 +208,7 @@ NoteManager is the largest single file in the codebase and handles:
 - File-system watching via chokidar for live reloading
 
 NoteManager delegates to:
-- **NoteFileManager** -- physical file I/O (read, write, move markdown files, parse frontmatter via `gray-matter`)
+- **NoteFileManager** -- physical file I/O (read, write, move markdown files, parse frontmatter via `gray-matter`). Provides `getAggregatedContents()` for folder-based notes, which concatenates the main file with all companion `.md` files (sorted alphabetically, frontmatter stripped from companions) into a single string. This is what the claim index and linter use to treat a folder note as one unified document.
 - **NoteTypeResolver** -- resolves shortcodes (e.g., "R" -> "Requirement") and determines folder paths
 - **NoteIdGenerator** -- generates sequential IDs (R001, R002, ...) with collision checking
 - **NoteTypeTemplateManager** -- renders Handlebars templates for new notes
@@ -216,7 +216,7 @@ NoteManager delegates to:
 
 Notes support two formats:
 - **File-based:** `R001 Title.md` -- single markdown file
-- **Folder-based:** `R001 Title/index.md` -- folder with main file plus additional assets (images, data)
+- **Folder-based:** `R001 Title/R001.md` -- folder with main file plus companion markdown files and other assets (images, data). For claim extraction, all `.md` files within a folder note are aggregated into a single logical document (see Claims System below).
 
 ### Reference System
 
@@ -246,7 +246,7 @@ R004
 
 - **Claim Parser** (`parsers/claim/claim-parser.ts`) -- Parses claim addresses like `R004.3.AC.01`, supports ranges (`AC.01-06`), braced and braceless forms, metadata suffixes (`:P0:security`)
 - **Claim Tree Builder** (`parsers/claim/claim-tree.ts`) -- Parses markdown into a hierarchical tree of sections and claims based on heading structure
-- **Claim Index** (`claims/claim-index.ts`) -- Builds an in-memory index across all notes, mapping fully-qualified claim IDs to their entries with cross-references
+- **Claim Index** (`claims/claim-index.ts`) -- Builds an in-memory index across all notes, mapping fully-qualified claim IDs to their entries with cross-references. For folder-based notes, the index receives aggregated content from all companion `.md` files via `NoteFileManager.getAggregatedContents()`, so claims defined in any sub-file are indexed under the parent note's ID.
 - **Traceability** (`claims/traceability.ts`) -- Builds traceability matrices showing how claims project across note types (Requirement -> Spec -> Design -> Source) and detects gaps
 - **Verification Store** (`claims/verification-store.ts`) -- Append-only JSON store (`_scepter/verification.json`) recording when claims were verified
 - **Staleness** (`claims/staleness.ts`) -- Detects stale claims by comparing source file modification times against verification dates

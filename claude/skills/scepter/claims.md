@@ -58,7 +58,7 @@ The requirement (what must hold) and the mechanism (how it currently holds) have
 
 Wrong — requirement hidden inside mechanism:
 ```markdown
-§DC.42 SnapshotFieldDef MUST include shape, versioned, and companionFieldName
+DC.42 SnapshotFieldDef MUST include shape, versioned, and companionFieldName
 properties. __SchemaSnapshot payloads capture all FieldDefinition properties —
 adding these fields preserves historical shapes automatically through the
 snapshot chain without additional storage mechanisms.
@@ -68,11 +68,11 @@ If someone later changes snapshots to selectively capture properties, the requir
 
 Right — requirement and mechanism as separate claims:
 ```markdown
-§DC.42 Schema snapshots MUST preserve blob shape metadata at every historical
+DC.42 Schema snapshots MUST preserve blob shape metadata at every historical
 point. A snapshot from any point in history MUST be sufficient to reconstruct
 the shape contract that was active at that time.
 
-§DC.43 SnapshotFieldDef MUST include shape, versioned, and companionFieldName
+DC.43 SnapshotFieldDef MUST include shape, versioned, and companionFieldName
 properties, read from FieldDefinition nodes during buildPayload(). This is the
 current mechanism for satisfying DC.42.
 ```
@@ -123,7 +123,21 @@ Reference forms, from most to least explicit:
 | Dot is mandatory | `AC.01` | `AC01` (rejected by linter) |
 | No hyphens | `AC.01` | `AC-01` (collides with JIRA) |
 | Letter prefix required | `§3.AC.01` | `§3.01` (that's a section path) |
+| § is for sections only | `§3.AC.01`, `§1.2` | `§AC.01` (§ on a claim prefix, not a section number) |
 | Monotonic, never recycled | Sequential numbering | Reusing deleted IDs |
+
+### Folder Notes and Claims
+
+Folder-based notes (`R001 Title/R001.md` with companion `.md` files) are treated as a single logical document for claim purposes. All companion markdown files are aggregated with the main file — the claim index, linter, tracer, and gap detection operate on the unified content.
+
+**What this means in practice:**
+- Claims in companion files (e.g., `R001 Title/details.md`) are indexed under the parent note's ID. A claim `§2.AC.01` in `details.md` becomes `R001.§2.AC.01`.
+- Section IDs and claim IDs must be unique across ALL files in the folder. If two sub-files both define `§3`, the linter reports a duplicate section error.
+- Companion files are included in alphabetical order by filename. Authors control logical order by naming files accordingly (e.g., `01-core.md`, `02-extensions.md`).
+- Frontmatter is stripped from companion files — only the main file's frontmatter is authoritative.
+- Sub-files are NOT independently referenceable. `{R001}` references the folder note as a whole. There is no syntax for `{R001/details.md}`.
+
+**When authoring claims in a folder note:** Distribute sections across sub-files as needed, but maintain globally unique section numbering. Run `scepter claims lint NOTEID` to verify there are no collisions.
 
 ### Metadata Suffix
 
@@ -162,7 +176,7 @@ Claims are recognized in two structural positions:
 **Paragraph-level** — a non-heading line starting with a claim pattern (bold wrapping optional):
 ```markdown
 §1.AC.01 The parser MUST extract section IDs.
-§DC.01:derives=R005.§1.AC.01 An <AppShell> MUST wrap every route.
+DC.01:derives=R005.§1.AC.01 An <AppShell> MUST wrap every route.
 **GLYPH.01**: A `GlyphSet` type MUST be defined.
 **AC.02** The system MUST support filtering.
 ```
@@ -176,12 +190,12 @@ When grouping claims under named sections, claims MUST be at a lower level — e
 ```markdown
 ### Layout Shell
 
-§DC.01:derives=ARCH015.§1.AC.01 An <AppShell> MUST wrap every route.
-§DC.02:derives=ARCH015.§1.AC.01 The <AppShell> MUST be a layout route.
+DC.01:derives=ARCH015.§1.AC.01 An <AppShell> MUST wrap every route.
+DC.02:derives=ARCH015.§1.AC.01 The <AppShell> MUST be a layout route.
 
 ### Sidebar
 
-§DC.04:derives=ARCH015.§1.AC.02 The loader MUST call getOptionalAuth().
+DC.04:derives=ARCH015.§1.AC.02 The loader MUST call getOptionalAuth().
 ```
 
 Or with heading-level claims (when claims have substantial body text):
