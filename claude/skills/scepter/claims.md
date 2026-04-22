@@ -8,7 +8,7 @@ Claims connect ideas *within* documents. They enable mechanical traceability ("d
 
 ## Nature and Purpose of Claims (READ FIRST)
 
-A claim is **a statement with a subject, a predicate, and a modal status**. The modal status is constitutive: "the DC has four methods" (IS) and "the DC SHOULD have four methods" (SHOULD) are different information requiring different operations. See `@epi vocabulary.md` §1-§4 for the full framework. This section covers the practical consequences for writing and tracking claims in SCEpter.
+A claim is **a statement with a subject, a predicate, and a modal status**. The modal status is constitutive: "the DC has four methods" (IS) and "the DC SHOULD have four methods" (SHOULD) are different information requiring different operations. See `epistemic-primer.md` in this skill directory for the vocabulary framework. This section covers the practical consequences for writing and tracking claims in SCEpter.
 
 ### Claims manifest across projections
 
@@ -20,7 +20,7 @@ An `@implements` annotation is the implementation projection's expression of a c
 
 A requirement-level claim like "autoWire runs during bind()" is naturally compound — it expresses intent without decomposition. This is appropriate at the intent projection. But as claims flow into design and specification, they are derived, decomposed, and concretized into narrower assertions, each expressible through a single cognitive mode. The same claim that was one AC at the requirement level may become three DCs at the design level: one for the algorithm, one for the lifecycle callsite, one for the config surface.
 
-This is normal and expected. The derivation operations (decompose, concretize, elaborate — see `@epi vocabulary.md` §5) are how claims become tractable at more concrete projections. A claim that resists decomposition at the design level — that still bundles multiple kinds of assertions — is a compound claim, and compound claims are the primary source of traceability gaps. When an agent annotates `@implements` on a component that satisfies one aspect of a compound claim, the trace matrix shows coverage while the other aspects remain unrealized.
+This is normal and expected. The derivation operations (decompose, concretize, elaborate — see `epistemic-primer.md` §5) are how claims become tractable at more concrete projections. A claim that resists decomposition at the design level — that still bundles multiple kinds of assertions — is a compound claim, and compound claims are the primary source of traceability gaps. When an agent annotates `@implements` on a component that satisfies one aspect of a compound claim, the trace matrix shows coverage while the other aspects remain unrealized.
 
 ### Working with claims: guidelines
 

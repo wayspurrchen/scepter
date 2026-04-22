@@ -43,7 +43,9 @@ WHAT OPERATION ARE YOU PERFORMING?
 │
 ├─ AUTHORING claims (requirements, specs, DDs)?
 │   ├─ Read claims.md (syntax, metadata, derives=)
-│   └─ Producing a formal document? Load @epi format + process for that type
+│   ├─ Need epistemic vocabulary (binding, inherence, projection, etc.)? → Read epistemic-primer.md
+│   └─ Producing a formal document? → Read artifacts/{type}.md
+│      (requirements | specification | architecture | detailed-design | test-plan | implementation)
 │
 ├─ DERIVING (concretizing claims to a new projection)?
 │   ├─ To code → Read implementing.md + claims.md

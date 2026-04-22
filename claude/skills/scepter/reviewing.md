@@ -4,7 +4,7 @@
 
 Ensure you have loaded `@scepter` (the main skill) first — it contains the non-negotiable rules, CLI reference, and core concepts. Also read `claims.md` for claim syntax and derivation.
 
-**For deeper conceptual grounding** on claim properties (binding, inherence) and projections, optionally load `@epi vocabulary.md` §2 and §4.
+**For deeper conceptual grounding** on claim properties (binding, inherence) and projections, optionally load `epistemic-primer.md` in this skill directory.
 
 ## When to Use This Guide
 

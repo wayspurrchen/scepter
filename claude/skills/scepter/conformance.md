@@ -135,6 +135,46 @@ DDs and specs sometimes assert that a requirement is satisfied automatically —
 [List of claims verified or refuted]
 ```
 
+## Reality-Conformance Pass
+
+**Scope-determining question:** "Does the real code realize the primitives the artifact depends on?" This is peer to "Does artifact X match source Y?" — additive, not a replacement for claim-to-claim conformance or format review.
+
+### When to Use
+
+Whenever the artifact under review references primitives, types, APIs, or modules with `EXTEND`, `MODIFY`, `derives=`, `@implements` (expected), or "existing mechanism" language. Run BEFORE `scepter claims trace` — trace presumes the pieces exist.
+
+### Methodology
+
+For every claim-cited primitive in the artifact under review, grep the actual code root (e.g., `src/`) and verify the primitive exists where the artifact says it does.
+
+1. Extract the primitive list from the artifact — every symbol name referenced by EXTEND/MODIFY/ADD_TO/@implements/derives, every file path the artifact claims to touch.
+2. For each primitive, run `grep -rn 'export (type|interface|class|const|function) <SymbolName>' src/` (or the project equivalent).
+3. If the artifact includes a `## Primitive Preconditions` table, spot-check 2-3 PRESENT rows by running the grep against the cited `path:line`. Confirm the declaration is at the cited line.
+4. For each ABSENT row, confirm the companion DD, deferral note, or spec-claim authorization exists and is linked.
+
+### Output
+
+Produce a primitive-presence table in the review findings:
+
+| Primitive | Artifact Citation | Reality | Verdict |
+|-----------|------------------|---------|---------|
+| `<SymbolName>` | `src/<path>.ts:<line>` | found at cited location | VERIFIED |
+| `<SymbolName>` | `src/<path>.ts:<line>` | not found / different signature | REALITY GAP |
+| `<SymbolName>` | (not cited; appears in body) | not found in `src/` | REALITY GAP — missing from manifest |
+
+### Critical Rule
+
+Reality-conformance gaps are **pre-authorship failures**, not "implementation pending." A DD cannot `EXTEND X` when X has no declaration in code; the precondition is a separate DD to build X. A reality gap blocks conformance regardless of claim-to-claim fidelity.
+
+### Relationship to Other Passes
+
+This pass replaces neither claim-to-claim conformance (§Claim Verification) nor format review. Run all three when the authority-under-review pair is document-vs-code:
+- **Reality conformance** — does `src/` realize the primitives?
+- **Claim verification** — do claims trace through projections?
+- **Format review** — does the artifact meet its format guide?
+
+A claim-to-claim conformance PASS on an artifact whose primitives are absent from `src/` is a false positive. Reality conformance is the gate that closes it.
+
 ## Claim Verification
 
 Claims (e.g., `§1.AC.01`, `R004.§3.AC.02`) are SCEpter's mechanism for sub-document traceability. When validating implementations, you MUST verify that claims have been carried forward correctly. **Read `claims.md` from this skill directory for the full claim syntax and rules.**

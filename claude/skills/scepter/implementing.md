@@ -287,7 +287,7 @@ After updating threads, a reader of any upstream note should be able to understa
 When a full rewrite of a section is overkill, use inline annotations on the existing claim:
 
 ```markdown
-§DC.03 registerSchema creates companion fields for versioned JSON fields.
+DC.03 registerSchema creates companion fields for versioned JSON fields.
 
 > **Implementation note (2026-03-18):** The codegen pipeline's `normalizeSchema()` must preserve `versioned`, `shape`, and `companionFieldName` on serialized field definitions for this to work through the generated `register()` path. Fixed in runtime.ts — see `normalizeFieldDef()`. {ARCH017.§3.AC.03}
 ```

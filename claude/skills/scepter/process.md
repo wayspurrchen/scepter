@@ -82,11 +82,11 @@ Produces artifacts. The prompt specifies what to create; the agent loads the app
 
 | Frontier item | Companion files | Inputs | Output |
 |---|---|---|---|
-| Author requirements | claims.md | Problem description, existing notes | Requirement note with ACs |
-| Write design document from requirements | claims.md, @epi detailed-design format | Requirement content, relevant code | Design doc with derived claims where needed |
-| Write test plan | claims.md, @epi test-plan format | Requirement + design doc content | Test plan with @validates references |
+| Author requirements | claims.md, artifacts/requirements.md | Problem description, existing notes | Requirement note with ACs |
+| Write design document from requirements | claims.md, artifacts/detailed-design.md | Requirement content, relevant code | Design doc with derived claims where needed |
+| Write test plan | claims.md, artifacts/test-plan.md | Requirement + design doc content | Test plan with @validates references |
 | Implement a design section | implementing.md | Design section, existing code | Code with @implements annotations |
-| Write specification | claims.md, @epi spec format | Requirement + architecture notes | Spec with claim references |
+| Write specification | claims.md, artifacts/specification.md | Requirement + architecture notes | Spec with claim references |
 | Update documentation | claims.md | Current file, feature context | Updated doc |
 
 #### sce-reviewer
@@ -109,6 +109,7 @@ Assesses artifacts. Dispatched with one of three pass types, each loading its co
 |---|---|---|
 | Implementation conformance | After implementing a design section or spec | Source document + implementation code |
 | Plan validity | Design or plan produced, before implementation | Plan + actual codebase state |
+| Reality conformance | Design, plan, or spec references EXIST primitives | Document + `src/` (grep for cited primitives; verify file:line or flag ABSENT) |
 | Claim coverage | After implementation | `scepter claims trace` + `scepter claims gaps` output |
 
 **Impact pass** (loads implementing.md `## Impact Analysis`) — "What did this structural change break?"
