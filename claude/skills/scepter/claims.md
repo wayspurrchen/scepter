@@ -85,6 +85,47 @@ Now if the mechanism changes, DC.42 still exists as a requirement that must be s
 
 **The trace matrix tracks expressions, not truth.** An `@implements` annotation is one projection's expression of a claim. It tells you that someone wrote code they believe realizes it. It does not tell you whether the claim is fully realized, correctly realized, or realized at other projections. Well-decomposed claims reduce the gap between "expression exists" and "claim is fulfilled" — when each derived claim maps to a single assertion, the presence of an expression is stronger evidence.
 
+**Unmarked claims are tentative by default.** A claim that carries no explicit origin marker, no recorded endorsement event, and no verification record is agent-drafted and unreviewed. Trust is elevated only by positive evidence: a recorded user-endorsement event, a mechanical verification (compilation, tests, reality-conformance), or derivation from a claim that itself meets those criteria. The polish of a document, the number of times a claim has been repeated in downstream artifacts, and the presence of `@implements` annotations are not evidence. This inverts the natural reading of prose — most writing asks to be read as "the author stands behind this"; SCEpter prose should be read as "someone wrote these words; trust is open until earned."
+
+---
+
+## Smuggling
+
+**Smuggling** is the compounding pattern where agent-authored content is progressively treated as user-authored across sessions, compactions, and downstream documents. A chat paraphrase becomes a handoff's "user decided"; a handoff's "user decided" becomes a DD's scope statement; a DD's scope statement spawns test cases; the test cases carry `@implements` back to a claim the user never verified. Each step looks like ordinary carry-forward discipline; the cumulative effect is that the claim binds without the user ever having endorsed it.
+
+It is one member of a broader class of failures where a label overstates what reality supports: stub `@implements` is the code variety (an annotation claims realization the code doesn't deliver); reality gaps are the primitive variety (a spec cites `EXTEND X` when X has no declaration); smuggling is the attribution variety (prose cites user authorization that no user action produced). The general principle: **a label is a factual claim, not a convenience marker.**
+
+### Why it happens
+
+Markdown prose does not distinguish speaker. "The user wants X" reads the same whether X was a verbatim request or an agent synthesis. Compaction flattens "user said X verbatim" into "user wants X" and loses the provenance. Each re-reading re-reifies the synthesis as record. Polished artifacts feel authoritative; repetition feels like ratification.
+
+### Common vectors
+
+- Compacted summaries or handoffs that paraphrase user intent without preserving verbatim quotes
+- `@implements` annotations on agent-drafted claims the user never endorsed
+- Scope paraphrases in DD §1 that read as user-approved but originate from agent synthesis
+- "User approved X," "user agreed to Y," "as agreed" assertions in docs without citation
+- A reviewer's conformance pass citing a claim as "acknowledged" when the acknowledgment was another agent's output, not a user action
+- Re-reading your own prior turn's output and treating its attributions as established fact
+
+### Read discipline
+
+When reading a document that attributes positions, decisions, or endorsements to the user, treat each attribution as a claim expression that needs verifying. Acceptable verification sources:
+
+- A verbatim user utterance in the current session
+- `scepter claims verify` or trace records
+- An explicitly user-authored note
+
+In the absence of any of these, the attribution is synthesized — flag it or rewrite it with the actual source ("per the agent synthesis in the Apr 21 handoff...") rather than carrying it forward as user-sourced.
+
+### Write discipline
+
+When producing an artifact that cites user intent, include the source of each attribution inline with the attribution itself. `The user stated: "{verbatim quote}"` with a session or document reference is durable across compactions. `The user wanted {paraphrase}` without a source is durable-as-fiction.
+
+### Review discipline
+
+Treat attribution phrases as a class of claim that requires the same rigor as any technical assertion. See `reviewing.md` for the attribution-review check and `conformance.md` for attribution-conformance verification.
+
 ---
 
 ## Syntax & Rules

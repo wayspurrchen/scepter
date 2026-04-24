@@ -112,6 +112,18 @@ When a claim changes at any projection, all other projections expressing that cl
 2. **Manually check non-Source projections** — staleness detection currently only covers Source files. DD, UI, and documentation staleness requires manual review.
 3. **Re-run `scepter claims trace`** — verify the coverage matrix still looks correct after changes
 
+### Attribution Review
+
+When an artifact attributes a position, decision, or endorsement to the user ("user chose X," "as agreed," "approved scope is Y"), verify the attribution. A coherent projection still smuggles if its source was never the user.
+
+For each user-attribution in the artifact:
+
+1. **Identify the attribution phrase** — "user chose," "we agreed," "approved," "confirmed," "stated" (when subject is the user), "wanted," "said."
+2. **Demand a source** — verbatim quote with session/document reference, `scepter claims verify` record, or an explicitly user-authored note.
+3. **Flag unsourced attributions as synthesized** — not necessarily wrong, but not user-authored. They should be rewritten with the actual source ("per the Apr 21 handoff's proposed scope...") or flagged for user verification.
+
+The failure mode this catches: an agent-synthesized scope proposal gets incorporated into a DD as "approved scope," which later derivations treat as user-authored, compounding across sessions. The attribution is the vector; the fix is catching it at review time.
+
 ## CLI Checklist
 
 Run these commands as part of any review:
@@ -165,8 +177,9 @@ This is especially valuable during Step 4 (Cross-Requirement Interactions) — s
 
 | Miss | Why it happens | How to catch it |
 |------|---------------|-----------------|
-| Missing UI projection | DD author thinks in backend terms | Step 1: enumerate ALL projections including UI/CLI/docs |
+| Absent UI projection treated as complete | DD author thinks in backend terms; UI is either out of scope or missing, not annotated either way | Step 1: enumerate relevant projections; distinguish "out of scope" (explicit) from "missing" (gap) |
 | Unspecified interaction | ACs written independently, combinations not considered | Step 2: cross AC features pairwise |
 | Assumed error handling | "The system will reject invalid input" but no AC specifies how | Step 3: enumerate invalid inputs explicitly |
 | Stale cross-requirement | New feature extends old requirement but old requirement not updated | Step 4: check upstream requirements |
 | Coarse traceability | High-binding AC traced as one unit, bug location unclear | Step 5: assess binding, decompose if needed |
+| Smuggled user-attribution | Agent-synthesized scope or decision gets cited as "user approved," "user chose," "as agreed" without a verbatim source, and downstream derivations treat it as user-authored | Attribution Review: scan for attribution phrases; demand a verbatim quote, event record, or user-authored note for each; flag the unsourced |

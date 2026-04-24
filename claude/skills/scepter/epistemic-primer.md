@@ -26,6 +26,8 @@ A claim's modal status is constitutive — the same subject carries different me
 
 RFC 2119 keywords (MUST/SHOULD/MAY) define normative strength. IS claims describe reality; MUST claims describe requirements; the gap between them is what drives change.
 
+**Alethic vs deontic.** Modal verb choice is load-bearing because it encodes which axis the claim lives on. IS claims are **alethic** — they assert what-is-the-case. MUST/SHOULD/MAY claims are **deontic** — they assert what-is-binding (required, recommended, permitted). These axes are orthogonal: a claim can be true but not binding (an observation with no enforcement), or binding but not yet true (a requirement the implementation hasn't satisfied). The modal verb tells the reader which axis to evaluate the claim on.
+
 **Primary failure mode:** treating an IS claim as MUST (or vice versa). "The system does X" is an observation; "the system must do X" is a requirement. Confusing these produces specifications that describe accidents of the current implementation as if they were contracts.
 
 ---
@@ -180,6 +182,17 @@ The default is unannotated. Claims that fit baseline expectations don't need mar
 - Uniformly-valued properties across a document — they're the document's default
 
 **The unmarked-default principle:** only deviations from expected baseline carry signal. If everything is crystallized, don't mark crystallized.
+
+**For authorship specifically: unmarked means agent-produced.** The natural reading of unmarked prose is "the author stands behind this," but for SCEpter claims the implicit default is inverted. A claim with no explicit origin marker and no recorded endorsement is agent-drafted and unreviewed, regardless of how polished the document looks or how many downstream artifacts cite it. User-authored or user-endorsed claims require positive markers; absence is not evidence.
+
+### Scope vs deficiency
+
+Not every absent projection is a gap. A projection may be out of scope for the artifact — a requirement note may intentionally omit implementation detail, a DD may defer UI considerations to a separate document. The reviewer's task is to distinguish:
+
+- **Gap:** the artifact should cover this projection but doesn't. Add the missing content.
+- **Scope statement:** the artifact is intentionally bounded and this projection lives elsewhere. Mark it explicit — "out of scope, see {other-note}" — so future readers don't re-derive the gap.
+
+An absent projection annotated as "out of scope" is complete; one that is silently absent is incomplete even if the actual intent was the same. The framing matters because a reader (human or agent) cannot tell a scope decision from a gap without the explicit annotation.
 
 ---
 

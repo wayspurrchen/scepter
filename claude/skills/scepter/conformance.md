@@ -172,8 +172,49 @@ This pass replaces neither claim-to-claim conformance (§Claim Verification) nor
 - **Reality conformance** — does `src/` realize the primitives?
 - **Claim verification** — do claims trace through projections?
 - **Format review** — does the artifact meet its format guide?
+- **Attribution conformance** (below) — do user-attributions in the artifact trace to verifiable user utterances or events?
 
 A claim-to-claim conformance PASS on an artifact whose primitives are absent from `src/` is a false positive. Reality conformance is the gate that closes it.
+
+## Attribution-Conformance Pass
+
+**Scope-determining question:** "Does every user-attribution in the artifact trace to a verifiable user utterance or recorded event?" Peer to reality-conformance — both check artifact claims against a ground-truth source. Reality-conformance grounds primitives against `src/`; attribution-conformance grounds user-intent claims against session quotes or event records.
+
+### When to Use
+
+Whenever the artifact under review attributes positions, decisions, endorsements, or intent to the user: scope statements framed as user-approved, DD §1 sections citing user goals, conformance reports asserting "user confirmed," handoffs paraphrasing user intent. Especially critical when the artifact was produced across multiple sessions or derived from a prior synthesized document.
+
+### Methodology
+
+For every user-attribution in the artifact under review, identify an acceptable source or flag as synthesized.
+
+1. **Extract attribution phrases** from the artifact. Search for: "user stated," "user said," "user chose," "user agreed," "user approved," "user confirmed," "user wants," "as agreed," "the user decided," "per user direction," "user-endorsed." Include the scope section and any framing prose.
+2. **For each attribution, classify the source**:
+   - **Verbatim quote** with session or document reference — acceptable
+   - **Event record** (`scepter claims verify` output, user-endorsement recorded in a sidecar) — acceptable
+   - **Explicitly user-authored note** (the user wrote the prose themselves, not an agent paraphrasing) — acceptable
+   - **Prose paraphrase in another document** — NOT acceptable on its own; trace to the original source
+   - **Agent synthesis** (the attribution originates from an agent's synthesis of session context) — NOT acceptable; must be flagged
+3. **Follow paraphrase chains to the root.** If the artifact cites a handoff, and the handoff cites an Axis report, and the Axis report quotes a user message — the root is acceptable. If any link in the chain is agent synthesis without a verbatim root, the attribution smuggles.
+4. **Flag each smuggled attribution** with the actual source ("the Apr 21 handoff's agent-synthesized proposed scope"), not the claimed source ("user-approved scope").
+
+### Output
+
+Produce an attribution-presence table in the review findings:
+
+| Attribution | Artifact Location | Claimed Source | Actual Source | Verdict |
+|---|---|---|---|---|
+| "user approved minimum-viable scope" | `DD052 §1.3` | "user stated" | Apr 21 handoff — agent synthesis from 5 quotes; no verbatim user utterance | SMUGGLED |
+| "user chose Pattern B" | `DD052 §2.1` | (no source given) | no traceable source in session transcripts or event records | SMUGGLED |
+| "user asked for auth work before May 24" | `DD052 §0` | (no source given) | verbatim user message 2026-04-22 in session log | VERIFIED |
+
+### Critical Rule
+
+An unsourced user-attribution is a conformance failure, not neutral prose. The correct downstream artifact cites the actual source: the handoff's synthesis, the agent that paraphrased, the section of session log where the user spoke. Smuggling compounds across derivations; the earliest catch is cheapest.
+
+### Relationship to Other Passes
+
+Peer to reality-conformance. Reality-conformance verifies primitives against code; attribution-conformance verifies user-intent claims against session or event sources. Run both when the artifact under review mixes technical claims with scope/intent claims — which is most DD and spec work.
 
 ## Claim Verification
 

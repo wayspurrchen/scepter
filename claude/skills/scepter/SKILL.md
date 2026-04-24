@@ -87,6 +87,41 @@ SCEpter is a CLI-first knowledge management system that solves context loss and 
 
 **Key differentiator — Claim-level traceability:** SCEpter doesn't just link documents; it tracks individual claims (acceptance criteria, constraints, specifications) across projections. A requirement's `§2.AC.03` can be traced through the specification, into source code `@implements` annotations, and into test `@validates` markers. This is one of SCEpter's strongest value adds — agents are encouraged to use claim-level references (`{R004.§1.AC.03}`) over note-level references (`{R004}`) whenever the specific claim is known. See `claims.md` in this skill directory for the full system.
 
+## Epistemic Stance
+
+SCEpter's purpose is to make claim-level trust state explicit across time, actors, and projections. Agents operating in SCEpter must match this stance — paranoid by default, deferential to recorded evidence, explicit about the distinction between what the agent produced and what the user authorized.
+
+### Paranoia when consuming
+
+When reading notes, handoffs, checkpoints, gathered context, or another agent's output, treat every assertion about prior state as tentative until verified. The presence of a claim in a polished document is not evidence for its truth — it is evidence that someone wrote those words. Apply the same posture to your own prior output when you re-read it in a new turn.
+
+Verification sources that count:
+- A verbatim user utterance in the current session
+- A recorded event on the claim (`scepter claims verify`, trace output showing coverage)
+- A grep in the code root that confirms a primitive exists at the cited file:line
+- Derivation from another claim that itself meets one of the above
+
+Prose attribution in a document, summary, or handoff is NOT verification. It is a claim expression that needs verifying.
+
+### Don't speak for the user
+
+When describing prior state, attribute to the artifact, not the user: "the DD states X," "the handoff claims X," "the log records X," "the claim reads X." Reserve "you said" / "you wanted" / "we agreed" for verbatim utterances in the current session. A paraphrase of a paraphrase is not a user utterance even when repeated across many documents.
+
+When summarizing session context or carrying scope forward, cite the source of each user-attribution inline: verbatim quote, event record, or explicitly user-authored note. Unsourced user-attributions must be flagged as synthesized, not carried forward as user-sourced.
+
+### Unmarked claims are tentative by default
+
+The natural reading of unmarked prose is "the author stands behind it." For SCEpter claims, invert this default. A claim with no explicit origin marker and no recorded endorsement is agent-drafted and unreviewed. Trust is earned by explicit markers and recorded events, never assumed from polish, from repetition, or from a claim's appearance in a polished document.
+
+### The trace matrix tracks expressions, not truth
+
+This is axiomatic. `scepter claims trace` shows which projections have claim expressions; it does not show whether the claims are true, correctly realized, or user-endorsed. Consequences:
+- A green trace matrix with full `@implements` coverage does not prove the system is correct.
+- `@implements` presence is evidence that someone wrote the annotation, not that the user authorized the claim.
+- Coverage metrics are necessary but not sufficient for trust. Pair with event-based endorsement and mechanical verification.
+
+See `claims.md` § Smuggling for the attribution-side failure mode that these disciplines exist to prevent, and the general principle (a label is a factual claim, not a convenience marker) that smuggling, stub `@implements`, and reality gaps are all specific cases of.
+
 ## Core Architecture
 
 ### Notes as Atomic Knowledge Units
