@@ -164,6 +164,7 @@ Reference forms, from most to least explicit:
 | Dot is mandatory | `AC.01` | `AC01` (rejected by linter) |
 | No hyphens | `AC.01` | `AC-01` (collides with JIRA) |
 | Letter prefix required | `§3.AC.01` | `§3.01` (that's a section path) |
+| Prefix is alphabetic-only | `AC.01`, `SEC.03` | `PH1.01` (rejected by linter — overlaps note-ID namespace) |
 | § is for sections only | `§3.AC.01`, `§1.2` | `§AC.01` (§ on a claim prefix, not a section number) |
 | Monotonic, never recycled | Sequential numbering | Reusing deleted IDs |
 
@@ -496,6 +497,7 @@ The verification steps (1, 2, 5) are not optional — they're how you confirm th
 | `@implements` on a stub/no-op | `@see` + `:deferred` on the claim. **This poisons the trace matrix.** |
 | `AC01` (missing dot) | `AC.01` |
 | `AC-01` (hyphen) | `AC.01` |
+| `PH1.01` (alphanumeric prefix) | Use `PHA.01` or another letter-only prefix; alphanumeric prefixes are rejected by the linter because they overlap the note-ID namespace |
 | `{R012.15}` (bare number = section, not claim) | `{R012.§1.AC.15}` |
 | Bare `AC.01` in code (ambiguous) | `{R004.§1.AC.01}` |
 | Dropping claims from reference docs | Carry forward or note as out-of-scope |

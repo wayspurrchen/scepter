@@ -98,7 +98,7 @@ The verification store MUST survive index rebuilds. It is not part of the comput
 
 **AC.01** The system MUST store verification events in `_scepter/verification.json` (or the configured data directory).
 
-**AC.02** Each verification event MUST record: fully qualified claim ID, date (ISO 8601), actor identifier (human name or agent ID), and optional method (e.g., "code review", "test run", "manual inspection").
+**AC.02:superseded=A004.§2.AC.01** Each verification event MUST record: fully qualified claim ID, date (ISO 8601), actor identifier (human name or agent ID), and optional method (e.g., "code review", "test run", "manual inspection"). [Generalized to `MetadataEvent` shape; legacy events migrate at load time. The required fields here are preserved as the back-compat subset.]
 
 **AC.03** `scepter claims verify CLAIM_ID` MUST create a verification event for the specified claim with the current date.
 
@@ -106,7 +106,7 @@ The verification store MUST survive index rebuilds. It is not part of the comput
 
 **AC.05** `scepter claims verify CLAIM_ID` MUST support `--method METHOD` to describe the verification approach.
 
-**AC.06** Multiple verification events for the same claim MUST be preserved — the store is append-only. The most recent event is the "current" verification state.
+**AC.06:superseded=A004.§1.AC.01** Multiple verification events for the same claim MUST be preserved — the store is append-only. The most recent event is the "current" verification state. [Append-only is elevated to architectural invariant in A004; the property is preserved verbatim, only its name changes.]
 
 **AC.07** `scepter claims trace` MUST show the most recent verification date for each claim when verification data exists.
 

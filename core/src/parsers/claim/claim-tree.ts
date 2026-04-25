@@ -14,6 +14,7 @@
  * @implements {R004.§1.AC.04} Ambiguous short-form references rejected (validateClaimTree)
  * @implements {R004.§1.AC.05} Monotonically increasing claim IDs checked (checkMonotonicity)
  * @implements {R004.§1.AC.06} Forbidden form PREFIX+digits without dot rejected (checkForbiddenForm)
+ * @implements {R004.§1.AC.07} Alphanumeric claim prefix rejected (checkAlphanumericPrefix)
  * @implements {R004.§3.AC.01} Section heading extraction with § requirement
  * @implements {R004.§3.AC.02} Atomic claim extraction from headings
  * @implements {R004.§3.AC.03} Hierarchical tree construction
@@ -131,6 +132,36 @@ function stripInlineFormatting(text: string): string {
  */
 const FORBIDDEN_IN_TEXT_RE = /(?:^|§|\s)([A-Z]+)(\d{2,3}[a-z]?)(?!\.\d)(?![A-Za-z])/;
 
+/**
+ * Detect alphanumeric claim prefix attempts (forbidden — collides with note ID namespace).
+ *
+ * Captures: ([A-Z]+)(\d+) followed by .\d{2,3} (optionally with sub-letter).
+ * The leading boundary `(?:^|§|\s|\.)` allows the pattern to appear at line start,
+ * after `§`, after whitespace, or after a path-separator dot.
+ *
+ * Examples caught:
+ *   PH1.01, PRD2.05, WO3.01a, R12.05 (R12 is not a valid note ID)
+ *
+ * Examples NOT caught (filtered post-match by checking NOTE_ID_RE on the leading group):
+ *   R009.AC.01    — R009 is a note ID, second segment is letters not digits
+ *   R004.§1.AC.01 — `.§` is not `.\d`
+ *   R004.3.AC.01  — `.3` is one digit, regex requires 2-3 digits
+ *   DD007.01.DC.002 — DD007 is a valid note ID; leading-group filter skips
+ *   AC01          — covered by FORBIDDEN_IN_TEXT_RE (no dot)
+ */
+const ALPHANUMERIC_PREFIX_RE = /(?:^|§|\s|\.)([A-Z]+)(\d+)\.(\d{2,3})([a-z])?\b/g;
+
+/**
+ * Anchored variant of ALPHANUMERIC_PREFIX_RE for the paragraph-leading position.
+ * Matches when a line starts (optionally with `§`) with an alphanumeric prefix
+ * followed by `.NN` and a separator. Used to detect attempted claim definitions
+ * with alphanumeric prefixes — a shape LINE_CLAIM_RE intentionally rejects.
+ */
+const LINE_ALPHANUMERIC_PREFIX_RE = /^§?([A-Z]+)(\d+)\.(\d{2,3})([a-z])?[\s:]/;
+
+/** Pattern for a note ID: 1-5 uppercase letters followed by 3-5 digits. */
+const NOTE_ID_RE_FOR_PREFIX_CHECK = /^[A-Z]{1,5}\d{3,5}$/;
+
 // ---------------------------------------------------------------------------
 // Public functions
 // ---------------------------------------------------------------------------
@@ -178,6 +209,7 @@ export function buildClaimTree(content: string): ClaimTreeResult {
 
       // Check for forbidden forms in the heading
       checkForbiddenForm(text, lineNum, errors);
+      checkAlphanumericPrefix(text, lineNum, errors);
 
       // Try to match as a claim heading first (more specific)
       const claimNode = tryParseClaimText(text, level, lineNum);
@@ -203,6 +235,11 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       const cells = tableMatch[1].split('|').map((c) => c.trim());
       const firstCell = cells[0] ?? '';
       const strippedCell = stripInlineFormatting(firstCell);
+      // Detect alphanumeric prefix attempts in table cells before the
+      // valid-claim gate (CLAIM_ID_RE only matches alphabetic prefixes).
+      if (strippedCell.length > 0) {
+        checkAlphanumericPrefix(strippedCell, lineNum, errors);
+      }
       if (strippedCell.length > 0 && CLAIM_ID_RE.test(strippedCell)) {
         checkForbiddenForm(strippedCell, lineNum, errors);
         const claimNode = tryParseClaimText(strippedCell, currentHeadingLevel + 1, lineNum);
@@ -237,6 +274,12 @@ export function buildClaimTree(content: string): ClaimTreeResult {
           lineNum,
         });
       }
+    } else if (strippedLine.length > 0 && LINE_ALPHANUMERIC_PREFIX_RE.test(strippedLine)) {
+      // Paragraph line whose first token looks like an alphanumeric prefix attempt
+      // (e.g., "PH1.01 some claim text"). LINE_CLAIM_RE rejected it because the
+      // prefix has digits — but the author was clearly trying to define a claim.
+      // Surface the rule violation so it isn't silently dropped.
+      checkAlphanumericPrefix(strippedLine, lineNum, errors);
     }
   }
 
@@ -484,6 +527,53 @@ function checkForbiddenForm(text: string, lineNum: number, errors: ClaimTreeErro
     line: lineNum,
     message: `Forbidden form "${candidate}" (missing dot between prefix and number). Use "${prefix}.${num}" instead.`,
   });
+}
+
+/**
+ * Check for alphanumeric claim prefix attempts (e.g., PH1.01, PRD2.05) and add errors if found.
+ *
+ * Claim prefixes must be alphabetic-only ([A-Z]+). Alphanumeric prefixes overlap the
+ * note-ID namespace ([A-Z]{1,5}\d{3,5}) and would create ambiguity between bare note
+ * references and claim references.
+ *
+ * The check skips matches where the leading "letters+digits" segment is itself a
+ * valid note ID (e.g., R009.05 in `DD007.01.DC.002` — DD007 is a note ID, .01 is
+ * a section reference, not an alphanumeric prefix attempt). This way, legitimate
+ * `NOTEID.SECTION` patterns are not flagged.
+ *
+ * @implements {R004.§1.AC.07} Alphanumeric prefix detection and error emission
+ */
+function checkAlphanumericPrefix(text: string, lineNum: number, errors: ClaimTreeError[]): void {
+  // Reset lastIndex since the regex has the global flag
+  ALPHANUMERIC_PREFIX_RE.lastIndex = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = ALPHANUMERIC_PREFIX_RE.exec(text)) !== null) {
+    const letters = match[1];
+    const digits = match[2];
+    const num = match[3];
+    const subLetter = match[4] || '';
+    const prefix = `${letters}${digits}`;
+
+    // Skip if the leading "letters+digits" group is a valid note ID.
+    // This avoids false positives on `NOTEID.SECTION` patterns where the
+    // section happens to be 2-3 digits (e.g., DD007.01).
+    if (NOTE_ID_RE_FOR_PREFIX_CHECK.test(prefix)) continue;
+
+    // Avoid duplicate errors on the same line for the same prefix
+    const candidate = `${prefix}.${num}${subLetter}`;
+    if (errors.some((e) => e.line === lineNum && e.claimId === candidate)) continue;
+
+    errors.push({
+      type: 'forbidden-form',
+      claimId: candidate,
+      line: lineNum,
+      message:
+        `Alphanumeric prefix "${prefix}" is forbidden. Claim prefixes must be alphabetic-only ` +
+        `(use "${letters}" or similar). Prefixes containing digits overlap the note ID namespace ` +
+        `([A-Z]{1,5}\\d{3,5}) and would create ambiguity between bare note references and claim references.`,
+    });
+  }
 }
 
 /**

@@ -459,6 +459,135 @@ describe('Claim Tree', () => {
     });
   });
 
+  describe('validateClaimTree — alphanumeric prefix detection', () => {
+    // @validates {R004.§1.AC.07} Alphanumeric prefix rejected — heading position
+    it('should detect alphanumeric prefix PH1.01 in headings', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        '#### PH1.01 Some claim',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors.length).toBeGreaterThanOrEqual(1);
+      const phError = forbiddenErrors.find((e) => e.claimId === 'PH1.01');
+      expect(phError).toBeDefined();
+      expect(phError!.message).toContain('Alphanumeric prefix "PH1" is forbidden');
+      expect(phError!.message).toContain('alphabetic-only');
+      expect(phError!.message).toContain('"PH"');
+    });
+
+    // @validates {R004.§1.AC.07} Alphanumeric prefix rejected — paragraph position
+    it('should detect alphanumeric prefix PH1.01 in paragraph claim', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        'PH1.01 The system MUST do something.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors.length).toBeGreaterThanOrEqual(1);
+      const phError = forbiddenErrors.find((e) => e.claimId === 'PH1.01');
+      expect(phError).toBeDefined();
+      expect(phError!.message).toContain('Alphanumeric prefix "PH1" is forbidden');
+    });
+
+    // @validates {R004.§1.AC.07} Alphanumeric prefix rejected — multi-letter form
+    it('should detect alphanumeric prefix PRD2.05', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        '#### PRD2.05 Bad prefix',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      const prdError = forbiddenErrors.find((e) => e.claimId === 'PRD2.05');
+      expect(prdError).toBeDefined();
+      expect(prdError!.message).toContain('"PRD2"');
+      expect(prdError!.message).toContain('"PRD"');
+    });
+
+    // @validates {R004.§1.AC.07} Alphabetic-only prefix is the control case
+    it('should NOT flag valid AC.01 heading', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        '#### AC.01 Good form',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.07} Note ID + claim prefix is not alphanumeric prefix
+    it('should NOT flag note ID followed by claim like R009.AC.01', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        '#### R009.AC.01 Cross-doc reference in heading',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.07} Fully-qualified ref in prose is not flagged
+    it('should NOT flag fully-qualified reference R004.§1.AC.01 in prose', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        'The claim R004.§1.AC.01 is referenced here.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.07} Note ID followed by section number is not flagged
+    it('should NOT flag note ID followed by section like DD007.01.DC.002', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        'See DD007.01.DC.002 for an example with section path.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.07} Existing AC01 forbidden form still fires
+    it('should still detect existing forbidden form AC01 (regression check)', () => {
+      const content = [
+        '### §1 Section',
+        '',
+        '#### AC01 Bad form (no dot)',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors.length).toBeGreaterThanOrEqual(1);
+      // The original "missing dot" check fires; the alphanumeric-prefix check
+      // should not fire because there's no `.NN` segment after the digits.
+      expect(forbiddenErrors[0].claimId).toBe('AC01');
+      expect(forbiddenErrors[0].message).toContain('missing dot');
+    });
+  });
+
   describe('validateClaimTree — ambiguity detection', () => {
     it('should detect ambiguous bare claim IDs across sections', () => {
       const content = [

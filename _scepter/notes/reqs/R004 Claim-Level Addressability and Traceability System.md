@@ -61,6 +61,8 @@ A reference is composed of up to four parts, all optional except that at least o
 
 **The form `AC01` (no dot) is FORBIDDEN.** This is always invalid syntax. The dot between the letter prefix and number is what distinguishes a claim reference from arbitrary text. Agents and LLMs MUST NOT produce this form.
 
+**The claim prefix MUST be alphabetic-only (`[A-Z]+`).** Alphanumeric prefixes (e.g., `PH1`, `PRD2`, `WO3`) are FORBIDDEN. The prefix-with-digits form overlaps the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and creates ambiguity between bare note references and claim references. Addressing depth needs are met by deeper section paths (`§1.2.AC.01`) and sub-letters (`AC.01a`), not by digits in the prefix.
+
 **The `§` symbol is optional emphasis.** The section symbol `§` MAY be placed before any section number or claim ID to explicitly mark it as a structural reference. Its presence or absence does not change the meaning — it is disambiguation and visual emphasis only. Both `REQ004.§3.§AC.01` and `REQ004.3.AC.01` parse identically.
 
 **The dot `.` is the universal separator.** Dots separate all components in a reference path: note ID from section, section from subsection, section from claim. The one exception is the dot *within* a claim ID (e.g., `AC.01`), which separates the letter prefix from the number. The parser distinguishes these by rule: a segment beginning with uppercase letters followed by a dot and digits is a claim; a purely numeric segment is a section.
@@ -144,6 +146,8 @@ The system MUST NOT require machine-generated hashes or UUIDs. The UID is the cl
 
 The form `PREFIX` + digits without a separating dot (e.g., `AC01`) is invalid syntax and MUST be rejected by the parser.
 
+The claim prefix MUST be alphabetic-only. Alphanumeric prefixes (e.g., `PH1.01`, `PRD2.05`) are invalid syntax — they collide with the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and create ambiguity between bare note references and claim references. The linter MUST reject alphanumeric prefix attempts and suggest an alphabetic-only alternative.
+
 §1.AC.01 The parser MUST extract section IDs from markdown headings that start with `§` followed by a numeric pattern (e.g., `§1`, `§3.1`). The `§` prefix is REQUIRED — bare numbers in headings are not treated as sections.
 
 §1.AC.02 The parser MUST extract claim IDs from markdown headings containing letter-prefix-dot-number patterns (e.g., `AC.01`, `SEC.03`).
@@ -155,6 +159,8 @@ The form `PREFIX` + digits without a separating dot (e.g., `AC01`) is invalid sy
 §1.AC.05 Claim IDs within a document MUST be monotonically increasing and MUST NOT be recycled after deletion.
 
 §1.AC.06 The form `PREFIX` + digits without separating dot (e.g., `AC01`) MUST be rejected as invalid syntax.
+
+§1.AC.07:5 The claim prefix MUST be alphabetic-only (`[A-Z]+`). Alphanumeric prefixes (e.g., `PH1.01`, `PRD2.05`, `WO3.01`) are FORBIDDEN because the prefix-with-digits form overlaps the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and creates ambiguity between bare note references and claim references. The linter MUST emit a `forbidden-form` error on alphanumeric prefix attempts with a diagnostic that explains the rule and suggests the alphabetic-only portion of the prefix as a replacement (e.g., for `PH1.01`, suggest `PH.01`).
 
 ### §2 Reference Matching and Configuration
 
@@ -314,6 +320,11 @@ The traceability matrix and property surface MUST support filtering and sorting 
 **Detection:** An LLM produces `AC01` (no dot between prefix and number).
 **Behavior:** The linter detects and flags this as invalid syntax. `scepter fix` MAY offer to repair it to `AC.01` if the intent is clear from context.
 
+### Alphanumeric Prefix Detection
+
+**Detection:** An LLM produces `PH1.01`, `PRD2.05`, or other alphanumeric prefixes (letters followed by digits before the dot).
+**Behavior:** The linter detects and flags this as a `forbidden-form` error. The diagnostic explains that prefixes must be alphabetic-only because alphanumeric prefixes overlap the note-ID namespace (`[A-Z]{1,5}\d{3,5}`), and suggests the letter-only portion as a replacement (e.g., `PH` for `PH1`). Authors needing more addressing depth use deeper section paths or sub-letters.
+
 ## Non-Goals
 
 - **Machine-generated persistent IDs (UUIDs, hashes)** — The UID is the persistent identity. Adding a separate machine ID creates a mapping layer that must be maintained, displayed, and synchronized. The benefit (surviving restructuring) is handled instead by the monotonic-never-recycle rule.
@@ -354,7 +365,7 @@ The traceability matrix and property surface MUST support filtering and sorting 
 
 | Category | Count | Notes |
 |----------|-------|-------|
-| §1 Claim Syntax and Addressing | 6 | |
+| §1 Claim Syntax and Addressing | 7 | AC.07 added: alphabetic-only prefix rule |
 | §2 Reference Matching and Configuration | 5 | |
 | §3 Claim Definition via Section Headings | 4 | |
 | §4 Claim Index and Cross-Reference Graph | 5 | AC.04-05 added: section-only ref filtering, fuzzy match guarding |
@@ -362,7 +373,7 @@ The traceability matrix and property surface MUST support filtering and sorting 
 | §6 CLI Tooling for Mechanical Consistency | 3 | AC.03 removed |
 | §7 Confidence Markers | 4 | AC.04 superseded by {R005.§3.AC.04} |
 | §8 Priority and Metadata on Claims | 3 | |
-| **Total** | **32** | 3 removed from original 33, 2 added (AC.04-05) |
+| **Total** | **33** | 3 removed from original 33, 3 added (§4.AC.04-05, §1.AC.07) |
 
 ## References
 
