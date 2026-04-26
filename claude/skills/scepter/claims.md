@@ -165,6 +165,7 @@ Reference forms, from most to least explicit:
 | No hyphens | `AC.01` | `AC-01` (collides with JIRA) |
 | Letter prefix required | `§3.AC.01` | `§3.01` (that's a section path) |
 | Prefix is alphabetic-only | `AC.01`, `SEC.03` | `PH1.01` (rejected by linter — overlaps note-ID namespace) |
+| One letter-prefix segment | `AC.01`, `§1.AC.01` | `FOO.AC.01`, `BAR.AC.01` (rejected by linter — see "Spec authoring with many entities" below) |
 | § is for sections only | `§3.AC.01`, `§1.2` | `§AC.01` (§ on a claim prefix, not a section number) |
 | Monotonic, never recycled | Sequential numbering | Reusing deleted IDs |
 
@@ -282,6 +283,50 @@ The prefix signals what kind of claim it is. Common prefixes:
 | `OQ` | Open questions | Any document |
 
 Don't use `AC` in a DD that decomposes requirement ACs — use `DC` to distinguish derived claims from source claims.
+
+**A claim ID has exactly one letter-prefix segment.** Two letter segments before the number — `FOO.AC.01`, `BAR.AC.01`, `BAZ.SEC.03` — are forbidden. The grammar reserves dot-segmentation for note ID, sections, and claim, with no slot for a second letter segment. The parser silently drops these forms (they fail to match `[A-Z]+\.\d{2,3}`), so the trace matrix shows zero claims while the document looks well-structured. The linter rejects them. See "Spec authoring with many entities" below for what to do instead.
+
+### Spec authoring with many entities
+
+A common case: a specification covers N parallel entities (call them Foo, Bar, Baz, …) with M acceptance criteria each. The first instinct is to combine the entity scope and the claim character into one ID — `FOO.AC.01`, `BAR.AC.01`, `BAZ.AC.01`. Don't. The grammar has no place for that shape, and the parser will produce zero claims.
+
+Two valid alternatives:
+
+**(A) Use sections for entity, prefix for character.** This is the canonical shape. Each entity gets its own `## §N` section; claims inside use `AC.NN`, `SEC.NN`, etc.
+
+```markdown
+## §1 Foo
+
+| Code | Criterion | Test Pattern |
+|------|-----------|--------------|
+| AC.01 | Create Foo with required fields | createFoo({id}) succeeds |
+| AC.02 | Reject duplicate Foo id | Second createFoo({id: 'existing'}) throws |
+
+## §2 Bar
+
+| Code | Criterion | Test Pattern |
+|------|-----------|--------------|
+| AC.01 | Create Bar with minimal properties | createBar({name, fooId}) succeeds |
+```
+
+Cross-references are fully qualified: `{S001.§1.AC.01}`, `{S001.§2.AC.01}`. The trace matrix groups by section. Tables in the body are recognized as claims (first cell = ID, full row = heading).
+
+**(B) Use a single namespacing prefix per entity.** When the document has many parallel entities and you want the claim ID itself to carry entity context (so `FOO.05` reads at a glance as "the fifth Foo claim"), drop the section layer and use the entity as the prefix.
+
+```markdown
+## Foo
+
+FOO.01 First Foo claim
+FOO.02 Second Foo claim
+
+## Bar
+
+BAR.01 First Bar claim
+```
+
+Cross-references look like `{S001.FOO.01}` (no section path). This loses the AC/SEC/PERF distinction — pick the axis that matters more for that document.
+
+What you cannot do: combine both axes into one ID (`FOO.AC.01`). If you need both axes, use (A).
 
 ### Importance
 
@@ -498,6 +543,7 @@ The verification steps (1, 2, 5) are not optional — they're how you confirm th
 | `AC01` (missing dot) | `AC.01` |
 | `AC-01` (hyphen) | `AC.01` |
 | `PH1.01` (alphanumeric prefix) | Use `PHA.01` or another letter-only prefix; alphanumeric prefixes are rejected by the linter because they overlap the note-ID namespace |
+| `FOO.AC.01` (two letter segments) | Pick one axis: section + single prefix (`§1.AC.01` inside `## §1 Foo`) or single namespacing prefix (`FOO.01`). See "Spec authoring with many entities" |
 | `{R012.15}` (bare number = section, not claim) | `{R012.§1.AC.15}` |
 | Bare `AC.01` in code (ambiguous) | `{R004.§1.AC.01}` |
 | Dropping claims from reference docs | Carry forward or note as out-of-scope |

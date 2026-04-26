@@ -148,6 +148,8 @@ The form `PREFIX` + digits without a separating dot (e.g., `AC01`) is invalid sy
 
 The claim prefix MUST be alphabetic-only. Alphanumeric prefixes (e.g., `PH1.01`, `PRD2.05`) are invalid syntax — they collide with the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and create ambiguity between bare note references and claim references. The linter MUST reject alphanumeric prefix attempts and suggest an alphabetic-only alternative.
 
+A claim ID has exactly one letter-prefix segment. Two letter segments before the number (e.g., `FOO.AC.01`, `BAR.AC.01`) are invalid syntax — the grammar reserves dot-segmentation for note ID, sections, and claim, and a second letter segment has no grammatical role. Authors who want to combine an entity scope with a claim character MUST use sections for the entity and a single prefix for the character (e.g., `§1.AC.01` inside `## §1 Foo`). Authors who prefer a single namespace MUST pick either the entity (`FOO.01`) or the character (`AC.01`), not both.
+
 §1.AC.01 The parser MUST extract section IDs from markdown headings that start with `§` followed by a numeric pattern (e.g., `§1`, `§3.1`). The `§` prefix is REQUIRED — bare numbers in headings are not treated as sections.
 
 §1.AC.02 The parser MUST extract claim IDs from markdown headings containing letter-prefix-dot-number patterns (e.g., `AC.01`, `SEC.03`).
@@ -161,6 +163,8 @@ The claim prefix MUST be alphabetic-only. Alphanumeric prefixes (e.g., `PH1.01`,
 §1.AC.06 The form `PREFIX` + digits without separating dot (e.g., `AC01`) MUST be rejected as invalid syntax.
 
 §1.AC.07:5 The claim prefix MUST be alphabetic-only (`[A-Z]+`). Alphanumeric prefixes (e.g., `PH1.01`, `PRD2.05`, `WO3.01`) are FORBIDDEN because the prefix-with-digits form overlaps the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and creates ambiguity between bare note references and claim references. The linter MUST emit a `forbidden-form` error on alphanumeric prefix attempts with a diagnostic that explains the rule and suggests the alphabetic-only portion of the prefix as a replacement (e.g., for `PH1.01`, suggest `PH.01`).
+
+§1.AC.08:4 A claim ID MUST have exactly one letter-prefix segment followed by a number (e.g., `AC.01`, `SEC.03`, `XYZ.05`). Multi-letter-segment forms like `FOO.AC.01` or `BAR.AC.01` are FORBIDDEN — the grammar reserves dot-segmentation for note ID, sections, and claim, and a second letter segment has no grammatical role. Without enforcement these forms are silently dropped by the parser (they fail to match `[A-Z]+\.\d{2,3}`), so the trace matrix shows zero claims while the document looks well-structured to a human reader. The linter MUST emit a `forbidden-form` error on multi-letter-segment attempts with a diagnostic that explains both fixes: use sections for entity scope (`§N.SECOND.NN` inside `## §N FIRST`) or flatten to a single prefix (`FIRST.NN` or `SECOND.NN`).
 
 ### §2 Reference Matching and Configuration
 
@@ -365,7 +369,7 @@ The traceability matrix and property surface MUST support filtering and sorting 
 
 | Category | Count | Notes |
 |----------|-------|-------|
-| §1 Claim Syntax and Addressing | 7 | AC.07 added: alphabetic-only prefix rule |
+| §1 Claim Syntax and Addressing | 8 | AC.07-08 added: alphabetic-only prefix rule, single-letter-segment rule |
 | §2 Reference Matching and Configuration | 5 | |
 | §3 Claim Definition via Section Headings | 4 | |
 | §4 Claim Index and Cross-Reference Graph | 5 | AC.04-05 added: section-only ref filtering, fuzzy match guarding |
@@ -373,7 +377,7 @@ The traceability matrix and property surface MUST support filtering and sorting 
 | §6 CLI Tooling for Mechanical Consistency | 3 | AC.03 removed |
 | §7 Confidence Markers | 4 | AC.04 superseded by {R005.§3.AC.04} |
 | §8 Priority and Metadata on Claims | 3 | |
-| **Total** | **33** | 3 removed from original 33, 3 added (§4.AC.04-05, §1.AC.07) |
+| **Total** | **34** | 3 removed from original 33, 4 added (§4.AC.04-05, §1.AC.07-08) |
 
 ## References
 

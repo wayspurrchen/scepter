@@ -15,6 +15,7 @@
  * @implements {R004.§1.AC.05} Monotonically increasing claim IDs checked (checkMonotonicity)
  * @implements {R004.§1.AC.06} Forbidden form PREFIX+digits without dot rejected (checkForbiddenForm)
  * @implements {R004.§1.AC.07} Alphanumeric claim prefix rejected (checkAlphanumericPrefix)
+ * @implements {R004.§1.AC.08} Multi-letter-segment claim prefix rejected (checkMultiSegmentPrefix)
  * @implements {R004.§3.AC.01} Section heading extraction with § requirement
  * @implements {R004.§3.AC.02} Atomic claim extraction from headings
  * @implements {R004.§3.AC.03} Hierarchical tree construction
@@ -159,6 +160,31 @@ const ALPHANUMERIC_PREFIX_RE = /(?:^|§|\s|\.)([A-Z]+)(\d+)\.(\d{2,3})([a-z])?\b
  */
 const LINE_ALPHANUMERIC_PREFIX_RE = /^§?([A-Z]+)(\d+)\.(\d{2,3})([a-z])?[\s:]/;
 
+/**
+ * Detect multi-letter-segment claim prefix attempts (e.g., FOO.AC.01, BAR.AC.01).
+ *
+ * A claim ID has exactly ONE letter-prefix segment followed by a number. Two
+ * letter segments before the number is a common shape when authors want to
+ * combine an entity scope and a claim character into one ID, but the grammar
+ * has no slot for it — the parser silently drops these forms (they fail to
+ * match `[A-Z]+\.\d{2,3}`), so the trace matrix shows zero claims while the
+ * document looks well-structured.
+ *
+ * Both captured groups are letters-only, so note-ID-prefixed forms (`R004.AC.01`,
+ * `S014.AC.01`) cannot match — note IDs require digits.
+ *
+ * The leading boundary includes `.` so the check fires on `S001.FOO.AC.01`
+ * (cross-note reference to a forbidden shape) as well as bare `FOO.AC.01`.
+ */
+const MULTI_SEGMENT_PREFIX_RE = /(?:^|§|\s|\||\.)([A-Z]+)\.([A-Z]+)\.(\d{2,3})([a-z])?\b/g;
+
+/**
+ * Anchored variant of MULTI_SEGMENT_PREFIX_RE for the paragraph-leading position.
+ * Detects lines whose first token is `[A-Z]+\.[A-Z]+\.\d{2,3}` — a shape that
+ * LINE_CLAIM_RE and LINE_ALPHANUMERIC_PREFIX_RE both intentionally reject.
+ */
+const LINE_MULTI_SEGMENT_PREFIX_RE = /^§?([A-Z]+)\.([A-Z]+)\.(\d{2,3})([a-z])?[\s:]/;
+
 /** Pattern for a note ID: 1-5 uppercase letters followed by 3-5 digits. */
 const NOTE_ID_RE_FOR_PREFIX_CHECK = /^[A-Z]{1,5}\d{3,5}$/;
 
@@ -210,6 +236,7 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       // Check for forbidden forms in the heading
       checkForbiddenForm(text, lineNum, errors);
       checkAlphanumericPrefix(text, lineNum, errors);
+      checkMultiSegmentPrefix(text, lineNum, errors);
 
       // Try to match as a claim heading first (more specific)
       const claimNode = tryParseClaimText(text, level, lineNum);
@@ -237,8 +264,10 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       const strippedCell = stripInlineFormatting(firstCell);
       // Detect alphanumeric prefix attempts in table cells before the
       // valid-claim gate (CLAIM_ID_RE only matches alphabetic prefixes).
+      // Same for multi-letter-segment prefix attempts.
       if (strippedCell.length > 0) {
         checkAlphanumericPrefix(strippedCell, lineNum, errors);
+        checkMultiSegmentPrefix(strippedCell, lineNum, errors);
       }
       if (strippedCell.length > 0 && CLAIM_ID_RE.test(strippedCell)) {
         checkForbiddenForm(strippedCell, lineNum, errors);
@@ -280,6 +309,12 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       // prefix has digits — but the author was clearly trying to define a claim.
       // Surface the rule violation so it isn't silently dropped.
       checkAlphanumericPrefix(strippedLine, lineNum, errors);
+    } else if (strippedLine.length > 0 && LINE_MULTI_SEGMENT_PREFIX_RE.test(strippedLine)) {
+      // Paragraph line whose first token looks like a multi-letter-segment claim
+      // attempt (e.g., "FOO.AC.01 ..."). LINE_CLAIM_RE rejected it because the
+      // shape is two letter segments before the number. Surface the rule
+      // violation so it isn't silently dropped.
+      checkMultiSegmentPrefix(strippedLine, lineNum, errors);
     }
   }
 
@@ -572,6 +607,47 @@ function checkAlphanumericPrefix(text: string, lineNum: number, errors: ClaimTre
         `Alphanumeric prefix "${prefix}" is forbidden. Claim prefixes must be alphabetic-only ` +
         `(use "${letters}" or similar). Prefixes containing digits overlap the note ID namespace ` +
         `([A-Z]{1,5}\\d{3,5}) and would create ambiguity between bare note references and claim references.`,
+    });
+  }
+}
+
+/**
+ * Check for multi-letter-segment claim prefix attempts (e.g., FOO.AC.01, BAR.AC.01)
+ * and add errors if found.
+ *
+ * A claim ID has exactly one letter-prefix segment followed by a number. Two
+ * letter segments before the number is silently dropped by the grammar — the
+ * trace matrix shows zero claims while the document looks well-structured.
+ * The error message offers both fixes: use sections for entity scope, or
+ * flatten to a single namespacing prefix.
+ *
+ * @implements {R004.§1.AC.08} Multi-letter-segment prefix detection and error emission
+ */
+function checkMultiSegmentPrefix(text: string, lineNum: number, errors: ClaimTreeError[]): void {
+  // Reset lastIndex since the regex has the global flag
+  MULTI_SEGMENT_PREFIX_RE.lastIndex = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = MULTI_SEGMENT_PREFIX_RE.exec(text)) !== null) {
+    const first = match[1];
+    const second = match[2];
+    const num = match[3];
+    const subLetter = match[4] || '';
+    const candidate = `${first}.${second}.${num}${subLetter}`;
+
+    // Avoid duplicate errors on the same line for the same candidate
+    if (errors.some((e) => e.line === lineNum && e.claimId === candidate)) continue;
+
+    errors.push({
+      type: 'forbidden-form',
+      claimId: candidate,
+      line: lineNum,
+      message:
+        `Multi-letter-segment claim prefix "${first}.${second}" is forbidden. ` +
+        `A claim ID has exactly one letter-prefix segment followed by a number. ` +
+        `Two valid alternatives: (a) use a section for the entity scope — ` +
+        `"§N.${second}.${num}${subLetter}" inside "## §N ${first}" — or ` +
+        `(b) flatten to a single namespacing prefix: "${first}.${num}${subLetter}" or "${second}.${num}${subLetter}".`,
     });
   }
 }

@@ -2886,5 +2886,17 @@
       "date": "2026-04-26T01:40:48.461Z",
       "note": "inline"
     }
+  ],
+  "R004.1.AC.08": [
+    {
+      "id": "ds1c353m7i5rfqr5eolaz754",
+      "claimId": "R004.1.AC.08",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-04-26T18:48:27.951Z",
+      "note": "inline"
+    }
   ]
 }

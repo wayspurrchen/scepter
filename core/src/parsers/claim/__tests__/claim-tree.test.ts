@@ -588,6 +588,189 @@ describe('Claim Tree', () => {
     });
   });
 
+  describe('validateClaimTree — multi-letter-segment prefix detection', () => {
+    // @validates {R004.§1.AC.08} Multi-letter-segment prefix rejected — heading position
+    it('should detect FOO.AC.01 in headings', () => {
+      const content = [
+        '### §1 Foo',
+        '',
+        '#### FOO.AC.01 First Foo claim',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(1);
+      expect(multisegErrors[0].claimId).toBe('FOO.AC.01');
+      expect(multisegErrors[0].message).toContain('"FOO.AC"');
+      expect(multisegErrors[0].message).toContain('§N.AC.01');
+      expect(multisegErrors[0].message).toContain('## §N FOO');
+    });
+
+    // @validates {R004.§1.AC.08} Multi-letter-segment prefix rejected — paragraph position
+    it('should detect FOO.AC.01 in paragraph claim', () => {
+      const content = [
+        '### §1 Foo',
+        '',
+        'FOO.AC.01 The system MUST do something.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(1);
+      expect(multisegErrors[0].claimId).toBe('FOO.AC.01');
+    });
+
+    // @validates {R004.§1.AC.08} Multi-letter-segment prefix rejected — table cell
+    it('should detect FOO.AC.01 in table first cell', () => {
+      const content = [
+        '## §1 Foo',
+        '',
+        '| Code | Criterion |',
+        '|------|-----------|',
+        '| FOO.AC.01 | First claim |',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(1);
+      expect(multisegErrors[0].claimId).toBe('FOO.AC.01');
+    });
+
+    // @validates {R004.§1.AC.08} Bold-wrapped multi-segment is detected
+    it('should detect bold-wrapped **FOO.AC.01** in table cell', () => {
+      const content = [
+        '## §1 Foo',
+        '',
+        '| Code | Criterion |',
+        '|------|-----------|',
+        '| **FOO.AC.01** | First claim |',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(1);
+      expect(multisegErrors[0].claimId).toBe('FOO.AC.01');
+    });
+
+    // @validates {R004.§1.AC.08} Multi-letter prefix variations
+    it('should detect BAR.AC.01 and BAZ.SEC.03 forms', () => {
+      const content = [
+        '## §1',
+        '',
+        '#### BAR.AC.01 First',
+        '',
+        '## §2',
+        '',
+        '#### BAZ.SEC.03 Second',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors.map((e) => e.claimId).sort()).toEqual(['BAR.AC.01', 'BAZ.SEC.03']);
+    });
+
+    // @validates {R004.§1.AC.08} Note-ID-prefixed forms are NOT flagged
+    it('should NOT flag R004.AC.01 (note ID + claim, single letter segment)', () => {
+      const content = [
+        '## §1',
+        '',
+        '#### R004.AC.01 Cross-doc claim header',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.08} Fully-qualified prose ref is not flagged
+    it('should NOT flag R004.§1.AC.01 in prose', () => {
+      const content = [
+        '## §1',
+        '',
+        'See R004.§1.AC.01 for the rule.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.08} Backtick-protected discussion is not flagged
+    it('should NOT flag backtick-protected `FOO.AC.01` in prose', () => {
+      const content = [
+        '## §1',
+        '',
+        'The `FOO.AC.01` form is forbidden — use `§1.AC.01` instead.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.08} Single-segment AC.01 control case
+    it('should NOT flag valid AC.01 heading', () => {
+      const content = [
+        '## §1',
+        '',
+        '#### AC.01 Good form',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§1.AC.08} Multi-segment claim is silently dropped without check
+    it('confirms parser silently drops multi-segment claims (regression baseline)', () => {
+      const content = [
+        '## §1 Foo',
+        '',
+        '| Code | Criterion |',
+        '|------|-----------|',
+        '| FOO.AC.01 | First claim |',
+        '| FOO.AC.02 | Second claim |',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      // The forbidden-form check fires, but no claim node is created — this is
+      // the silent-drop behavior the linter exists to surface.
+      expect(result.claims.size).toBe(0);
+      const errors = validateClaimTree(result);
+      const multisegErrors = errors.filter(
+        (e) => e.type === 'forbidden-form' && e.message.includes('Multi-letter-segment'),
+      );
+      expect(multisegErrors).toHaveLength(2);
+    });
+  });
+
   describe('validateClaimTree — ambiguity detection', () => {
     it('should detect ambiguous bare claim IDs across sections', () => {
       const content = [
