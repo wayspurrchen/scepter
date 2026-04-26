@@ -269,8 +269,10 @@ export class ClaimIndexCache {
     try {
       let content: string | null = null;
       if (this.projectManager) {
-        // @implements {DD012.§DC.10} Note content reading via ProjectManager
-        content = await this.projectManager.noteFileManager.getFileContents(entry.noteId);
+        // @implements {DD012.§DC.10} Note content reading via ProjectManager.
+        // Aggregated so claim line numbers (which were assigned against the
+        // aggregated stream during index build) resolve correctly.
+        content = await this.projectManager.noteFileManager.getAggregatedContents(entry.noteId);
       }
       if (content === null) {
         content = await fs.promises.readFile(this.resolveFilePath(entry.noteFilePath), 'utf-8');
@@ -450,11 +452,14 @@ export class ClaimIndexCache {
         );
       }
 
-      // Get all notes and build NoteWithContent array
+      // Get all notes and build NoteWithContent array.
+      // Use aggregated contents so folder-note claims defined in companion
+      // files (e.g. DD052/07-module-inventory.md) are indexed under the
+      // parent note's ID. Without this, only claims in the main file appear.
       const allNotes = await this.projectManager.noteManager.getAllNotes();
       const notesWithContent: NoteWithContent[] = [];
       for (const note of allNotes) {
-        const content = await this.projectManager.noteFileManager.getFileContents(note.id);
+        const content = await this.projectManager.noteFileManager.getAggregatedContents(note.id);
         if (content !== null) {
           notesWithContent.push({
             id: note.id,
