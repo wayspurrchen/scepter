@@ -31,6 +31,8 @@ describe('createFilesystemProject', () => {
     await fs.remove(testDir);
   });
 
+  // @validates {DD014.§3.DC.45} ProjectManager exposes metadataStorage (verificationStorage removed)
+  // @validates {DD014.§3.DC.47} Factory constructs FilesystemMetadataStorage
   it('should produce a ProjectManager with all storage interfaces wired', async () => {
     const pm = await createFilesystemProject(testDir);
 
@@ -38,7 +40,7 @@ describe('createFilesystemProject', () => {
     expect(pm.noteStorage).toBeDefined();
     expect(pm.configStorage).toBeDefined();
     expect(pm.templateStorage).toBeDefined();
-    expect(pm.verificationStorage).toBeDefined();
+    expect(pm.metadataStorage).toBeDefined();
     expect(pm.idCounterStorage).toBeDefined();
   });
 
@@ -70,18 +72,26 @@ describe('createFilesystemProject', () => {
     expect(id).toMatch(/^D\d{3,5}$/);
   });
 
-  it('should wire verificationStorage that can load/save', async () => {
+  // @validates {DD014.§3.DC.47} metadataStorage round-trips through the factory
+  it('should wire metadataStorage that can append/query', async () => {
     const pm = await createFilesystemProject(testDir);
 
-    const store = await pm.verificationStorage!.load();
-    expect(store).toEqual({});
+    const initial = await pm.metadataStorage!.load();
+    expect(initial).toEqual({});
 
-    await pm.verificationStorage!.save({
-      'TEST.01': [{ claimId: 'TEST.01', date: '2026-04-02', actor: 'test' }],
+    await pm.metadataStorage!.append({
+      id: 'evt-test-1',
+      claimId: 'TEST.01',
+      key: 'verified',
+      value: 'true',
+      op: 'add',
+      actor: 'test',
+      date: '2026-04-02T00:00:00.000Z',
     });
 
-    const reloaded = await pm.verificationStorage!.load();
-    expect(reloaded['TEST.01']).toHaveLength(1);
+    const events = await pm.metadataStorage!.query({ claimId: 'TEST.01', key: 'verified' });
+    expect(events).toHaveLength(1);
+    expect(events[0].value).toBe('true');
   });
 
   it('should throw when no config file exists', async () => {

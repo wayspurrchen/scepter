@@ -9,7 +9,7 @@ export type {
   NoteStorage,
   ConfigStorage,
   TemplateStorage,
-  VerificationStorage,
+  MetadataStorage,
   IdCounterStorage,
 } from './storage-backend';
 

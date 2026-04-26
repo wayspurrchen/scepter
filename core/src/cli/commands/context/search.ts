@@ -22,11 +22,13 @@ import { searchNotes, formatSearchResults } from './search-handler.js';
 import { BaseCommand } from '../base-command.js';
 import { parseClaimAddress } from '../../../parsers/claim/claim-parser.js';
 import { ensureIndex } from '../claims/ensure-index.js';
+import { resolveSingleClaim } from '../shared/resolve-claim-id.js';
 import { searchClaims } from '../../../claims/claim-search.js';
 import type { ClaimSearchOptions } from '../../../claims/claim-search.js';
-import { formatClaimTrace, formatSearchResults as formatClaimSearchResults } from '../../formatters/claim-formatter.js';
-import { buildTraceabilityMatrix, getLatestVerification } from '../../../claims/index.js';
-import type { ClaimIndexData, ClaimIndexEntry, VerificationStore } from '../../../claims/index.js';
+import { formatClaimTrace, formatSearchResults as formatClaimSearchResults, groupVerifiedEvents } from '../../formatters/claim-formatter.js';
+import { buildTraceabilityMatrix } from '../../../claims/index.js';
+import { parseMetadataFilters, applyMetadataFilters, collectStrings } from '../../../claims/index.js';
+import type { ClaimIndexData, ClaimIndexEntry } from '../../../claims/index.js';
 
 // @implements {DD006.§3.DC.15} Detection algorithm per DD006 §4
 type SearchDetection = 'claim-address' | 'bare-note-id' | 'text-search';
@@ -83,6 +85,10 @@ export const searchCommand = new Command('search')
   .option('--derivatives-of <claimId>', 'Find claims in the derivatives list of the specified claim ID')
   .option('--has-derivation', 'Filter to claims that declare derivation from at least one source')
   .option('--id-only', 'Restrict query matching to claim IDs only (exclude heading text)')
+  // @implements {DD014.§3.DC.55} Metadata filters: --where, --has-key, --missing-key (claim mode)
+  .option('--where <pair>', 'Filter to claims where KEY=VALUE in folded metadata (repeatable, claim mode)', collectStrings, [])
+  .option('--has-key <key>', 'Filter to claims with at least one value for KEY (repeatable, claim mode)', collectStrings, [])
+  .option('--missing-key <key>', 'Filter to claims with no value for KEY (repeatable, claim mode)', collectStrings, [])
   .option('--reindex', 'Force rebuild of claim index')
   .action(async (query: string, options: {
     mode?: string;
@@ -107,6 +113,9 @@ export const searchCommand = new Command('search')
     derivativesOf?: string;
     hasDerivation?: boolean;
     idOnly?: boolean;
+    where?: string[];
+    hasKey?: string[];
+    missingKey?: string[];
     reindex?: boolean;
     projectDir?: string;
   }) => {
@@ -165,21 +174,9 @@ async function performClaimAddressLookup(
   context: { projectManager: any; projectPath: string },
 ): Promise<void> {
   const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
-  const normalized = query.replace(/§/g, '');
-  const entry = data.entries.get(normalized);
-
+  // @implements {DD008.§1.DC.01} Centralized flexible resolver ($→§, zero-padding, suffix matching).
+  const entry = resolveSingleClaim(query, data);
   if (!entry) {
-    console.log(`Claim not found: ${query}`);
-    console.log('');
-    // Fuzzy match suggestions
-    const suffix = `.${normalized.split('.').slice(1).join('.')}`;
-    const candidates = [...data.entries.keys()].filter((k) => k.endsWith(suffix));
-    if (candidates.length > 0) {
-      console.log('Did you mean:');
-      for (const c of candidates.slice(0, 5)) {
-        console.log(`  ${c}`);
-      }
-    }
     // @implements {DD006.§3.DC.16} Hint for false-positive scenario
     console.log('');
     console.log(chalk.dim('Use --mode note to search note content instead.'));
@@ -187,18 +184,21 @@ async function performClaimAddressLookup(
   }
 
   // Show claim detail with traceability
+  // @implements {DD014.§3.DC.54} search reads via metadataStorage
   const incoming = data.crossRefs.filter((ref) => ref.toClaim === entry.fullyQualified);
-  const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
+  const verifiedEventList = await context.projectManager.metadataStorage!.query({ key: 'verified' });
+  const verifiedEvents = groupVerifiedEvents(verifiedEventList);
 
   if (options.format === 'json') {
-    const latestVerification = getLatestVerification(verificationStore, entry.fullyQualified);
+    const eventsForClaim = verifiedEvents.get(entry.fullyQualified) ?? [];
+    const latestVerification = eventsForClaim.length > 0 ? eventsForClaim[eventsForClaim.length - 1] : undefined;
     console.log(JSON.stringify({
       entry,
       incoming,
       verification: latestVerification ?? undefined,
     }, null, 2));
   } else {
-    console.log(await formatClaimTrace(entry, incoming, data.noteTypes, undefined, verificationStore));
+    console.log(await formatClaimTrace(entry, incoming, data.noteTypes, undefined, verifiedEvents));
   }
 
   // @implements {DD006.§3.DC.16} Auto-detection hint
@@ -302,6 +302,9 @@ async function performClaimSearch(
     derivesFrom?: string;
     derivativesOf?: string;
     hasDerivation?: boolean;
+    where?: string[];
+    hasKey?: string[];
+    missingKey?: string[];
     format?: string;
     limit?: number;
     reindex?: boolean;
@@ -363,6 +366,29 @@ async function performClaimSearch(
   if (result.error) {
     console.error(`Error: ${result.error}`);
     return;
+  }
+
+  // @implements {DD014.§3.DC.55} Parse and validate --where / --has-key / --missing-key
+  // @implements {DD014.§3.DC.56} AND-compose metadata filters with the existing claim-search filters
+  const filterParse = parseMetadataFilters({
+    where: options.where,
+    hasKey: options.hasKey,
+    missingKey: options.missingKey,
+  });
+  if (!filterParse.ok) {
+    console.error(chalk.red(filterParse.error));
+    process.exit(1);
+  }
+  const beforeCount = result.matches.length;
+  result.matches = await applyMetadataFilters(
+    result.matches,
+    (entry) => entry.fullyQualified,
+    context.projectManager.metadataStorage!,
+    filterParse,
+  );
+  const dropped = beforeCount - result.matches.length;
+  if (dropped > 0) {
+    result.total = Math.max(0, result.total - dropped);
   }
 
   console.log(formatClaimSearchResults(result, format));

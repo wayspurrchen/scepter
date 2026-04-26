@@ -12,7 +12,64 @@ import * as path from 'path';
 import * as os from 'os';
 import { computeStaleness } from '../staleness';
 import type { ClaimIndexData, ClaimIndexEntry, ClaimCrossReference } from '../claim-index';
-import type { VerificationStore } from '../verification-store';
+import type { MetadataEvent, MetadataStore } from '../metadata-event';
+import { applyFold } from '../metadata-event';
+import type { MetadataStorage } from '../../storage/storage-backend';
+
+/**
+ * Build an in-memory MetadataStorage from a legacy-shape verification map.
+ * Adapter shim: each VerificationStore-style entry becomes a single
+ * `add verified=true` event.
+ */
+function makeMetadataStorageFromLegacy(
+  legacy: Record<string, Array<{ claimId: string; date: string; actor: string; method?: string }>>,
+): MetadataStorage {
+  const store: MetadataStore = {};
+  for (const [claimId, events] of Object.entries(legacy)) {
+    store[claimId] = events.map((e, i) => ({
+      id: `id-${claimId}-${i}`,
+      claimId: e.claimId,
+      key: 'verified',
+      value: 'true',
+      op: 'add',
+      actor: e.actor,
+      date: e.date,
+      ...(e.method ? { note: `method=${e.method}` } : {}),
+    }));
+  }
+  return makeMetadataStorage(store);
+}
+
+function makeMetadataStorage(store: MetadataStore): MetadataStorage {
+  return {
+    async load() {
+      return store;
+    },
+    async save(s) {
+      Object.assign(store, s);
+    },
+    async append(event: MetadataEvent) {
+      const existing = store[event.claimId] ?? [];
+      existing.push(event);
+      store[event.claimId] = existing;
+    },
+    async query(filter) {
+      const claimIds = filter.claimId ? [filter.claimId] : Object.keys(store);
+      const out: MetadataEvent[] = [];
+      for (const claimId of claimIds) {
+        const events = store[claimId] ?? [];
+        for (const event of events) {
+          if (filter.key !== undefined && event.key !== filter.key) continue;
+          out.push(event);
+        }
+      }
+      return out;
+    },
+    async fold(claimId: string) {
+      return applyFold(store[claimId] ?? []);
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,9 +142,9 @@ describe('computeStaleness', () => {
     });
 
     const index = makeIndex([entry]);
-    const store: VerificationStore = {};
+    const storage = makeMetadataStorageFromLegacy({});
 
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results).toHaveLength(0);
   });
 
@@ -108,9 +165,9 @@ describe('computeStaleness', () => {
     };
 
     const index = makeIndex([entry], [crossRef]);
-    const store: VerificationStore = {};
+    const storage = makeMetadataStorageFromLegacy({});
 
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('unverified');
     expect(results[0].claimId).toBe('R004.1.AC.01');
@@ -137,16 +194,16 @@ describe('computeStaleness', () => {
     const index = makeIndex([entry], [crossRef]);
 
     // Verification was in the past
-    const store: VerificationStore = {
+    const storage = makeMetadataStorageFromLegacy({
       'R004.1.AC.01': [{
         claimId: 'R004.1.AC.01',
         date: '2020-01-01',
         actor: 'dev',
       }],
-    };
+    });
 
     // File is more recent than 2020
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('stale');
     expect(results[0].lastVerified).toBe('2020-01-01');
@@ -171,15 +228,15 @@ describe('computeStaleness', () => {
     const index = makeIndex([entry], [crossRef]);
 
     // Verification far in the future
-    const store: VerificationStore = {
+    const storage = makeMetadataStorageFromLegacy({
       'R004.1.AC.01': [{
         claimId: 'R004.1.AC.01',
         date: '2099-01-01',
         actor: 'dev',
       }],
-    };
+    });
 
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('current');
   });
@@ -207,7 +264,7 @@ describe('computeStaleness', () => {
 
     const index = makeIndex(entries, crossRefs);
 
-    const store: VerificationStore = {
+    const storage = makeMetadataStorageFromLegacy({
       // AC.01: stale (verified in past, file more recent)
       'R004.1.AC.01': [{
         claimId: 'R004.1.AC.01',
@@ -221,9 +278,9 @@ describe('computeStaleness', () => {
         date: '2099-01-01',
         actor: 'dev',
       }],
-    };
+    });
 
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results).toHaveLength(3);
     expect(results[0].status).toBe('stale');
     expect(results[0].claimId).toBe('R004.1.AC.01');
@@ -244,9 +301,9 @@ describe('computeStaleness', () => {
     ];
 
     const index = makeIndex([entry1, entry2], crossRefs);
-    const store: VerificationStore = {};
+    const storage = makeMetadataStorageFromLegacy({});
 
-    const results = await computeStaleness(index, store, { noteId: 'R004' });
+    const results = await computeStaleness(index, storage, { noteId: 'R004' });
     expect(results).toHaveLength(1);
     expect(results[0].claimId).toBe('R004.1.AC.01');
   });
@@ -263,9 +320,9 @@ describe('computeStaleness', () => {
     ];
 
     const index = makeIndex([entry1, entry2, entry3], crossRefs);
-    const store: VerificationStore = {};
+    const storage = makeMetadataStorageFromLegacy({});
 
-    const results = await computeStaleness(index, store, { minImportance: 3 });
+    const results = await computeStaleness(index, storage, { minImportance: 3 });
     expect(results).toHaveLength(1);
     expect(results[0].claimId).toBe('R004.1.AC.01');
   });
@@ -283,10 +340,10 @@ describe('computeStaleness', () => {
     ];
 
     const index = makeIndex([entry], crossRefs);
-    const store: VerificationStore = {};
+    const storage = makeMetadataStorageFromLegacy({});
 
     // Should not crash; should produce no results since no valid files remain
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results).toHaveLength(0);
   });
 
@@ -307,9 +364,9 @@ describe('computeStaleness', () => {
     };
 
     const index = makeIndex([entry], [crossRef]);
-    const store: VerificationStore = {};
+    const storage = makeMetadataStorageFromLegacy({});
 
-    const results = await computeStaleness(index, store);
+    const results = await computeStaleness(index, storage);
     expect(results[0].importance).toBe(5);
   });
 });

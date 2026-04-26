@@ -8,9 +8,9 @@
 import { describe, it, expect } from 'vitest';
 import { ClaimIndex } from '../claim-index';
 import type { NoteWithContent, ClaimIndexData } from '../claim-index';
-import type { VerificationStore } from '../verification-store';
 import { buildClaimThread, buildClaimThreadsForNote } from '../claim-thread';
-import type { ClaimThreadNode } from '../claim-thread';
+import type { ClaimThreadNode, VerifiedEventsByClaim } from '../claim-thread';
+import type { MetadataEvent } from '../metadata-event';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -74,18 +74,26 @@ function buildTestIndex(notes: NoteWithContent[]): { data: ClaimIndexData; claim
 }
 
 /**
- * A verification store with an event for R010.1.AC.01.
+ * A verified-events map equivalent to the legacy verification store.
+ * The metadata-event log expresses the same data via key="verified".
  */
-const testVerificationStore: VerificationStore = {
-  'R010.1.AC.01': [
-    {
-      claimId: 'R010.1.AC.01',
-      date: '2026-03-18',
-      actor: 'developer',
-      method: 'code-review',
-    },
+const testVerifiedEvents: VerifiedEventsByClaim = new Map<string, MetadataEvent[]>([
+  [
+    'R010.1.AC.01',
+    [
+      {
+        id: 'evt-1',
+        claimId: 'R010.1.AC.01',
+        key: 'verified',
+        value: 'true',
+        op: 'add',
+        date: '2026-03-18',
+        actor: 'developer',
+        note: 'method=code-review',
+      },
+    ],
   ],
-};
+]);
 
 // ---------------------------------------------------------------------------
 // Tests: buildClaimThread
@@ -187,14 +195,15 @@ describe('buildClaimThread', () => {
       data,
       claimIndex.getDerivatives.bind(claimIndex),
       { depth: 1 },
-      testVerificationStore,
+      testVerifiedEvents,
     );
 
     expect(result).not.toBeNull();
     const verified = result!.children.filter((c) => c.relationship === 'verified');
     expect(verified).toHaveLength(1);
     expect(verified[0].actor).toBe('developer');
-    expect(verified[0].method).toBe('code-review');
+    // DD014: legacy `method` is now carried as `note: "method=..."`.
+    expect(verified[0].method).toBe('method=code-review');
     expect(verified[0].date).toContain('2026-03-18');
   });
 
@@ -205,7 +214,7 @@ describe('buildClaimThread', () => {
       data,
       claimIndex.getDerivatives.bind(claimIndex),
       { depth: 1 },
-      testVerificationStore,
+      testVerifiedEvents,
     );
 
     expect(result).not.toBeNull();
@@ -352,20 +361,24 @@ describe('claim thread JSON structure', () => {
     expect(refNode!.noteId).toBe('S010');
   });
 
-  it('verified nodes include date, actor, and method', () => {
+  it('verified nodes include date, actor, and method (carried via note)', () => {
+    // Under DD014, the legacy `method` field is now stored as `note` on the
+    // metadata event, with the legacy convention preserved by prefixing the
+    // value with "method=". The thread node's `method` field exposes the
+    // event's `note` directly.
     const { data, claimIndex } = buildTestIndex([requirementNote]);
     const result = buildClaimThread(
       'R010.1.AC.01',
       data,
       claimIndex.getDerivatives.bind(claimIndex),
       { depth: 1 },
-      testVerificationStore,
+      testVerifiedEvents,
     );
 
     const verifiedNode = result!.children.find((c) => c.relationship === 'verified');
     expect(verifiedNode).toBeDefined();
     expect(verifiedNode!.date).toBe('2026-03-18');
     expect(verifiedNode!.actor).toBe('developer');
-    expect(verifiedNode!.method).toBe('code-review');
+    expect(verifiedNode!.method).toBe('method=code-review');
   });
 });

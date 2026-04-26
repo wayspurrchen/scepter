@@ -35,9 +35,6 @@ export const staleCommand = new Command('stale')
           // Build the claim index
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
-          // Load the verification store
-          const store = await context.projectManager.verificationStorage!.load();
-
           // Build staleness options from CLI flags
           // @implements {R005.§4.AC.03} --importance and --note filtering
           const stalenessOptions: StalenessOptions = {};
@@ -48,8 +45,13 @@ export const staleCommand = new Command('stale')
             stalenessOptions.noteId = options.note;
           }
 
-          // Compute staleness
-          const entries = await computeStaleness(data, store, stalenessOptions);
+          // Compute staleness via metadata fold projection.
+          // @implements {DD014.§3.DC.48} stale-command reads via metadataStorage
+          const entries = await computeStaleness(
+            data,
+            context.projectManager.metadataStorage!,
+            stalenessOptions,
+          );
 
           if (options.json) {
             console.log(JSON.stringify(entries, null, 2));

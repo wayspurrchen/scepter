@@ -20,7 +20,7 @@ import { ProjectManager } from '../../project/project-manager';
 import { FilesystemNoteStorage } from './filesystem-note-storage';
 import { FilesystemConfigStorage } from './filesystem-config-storage';
 import { FilesystemTemplateStorage } from './filesystem-template-storage';
-import { FilesystemVerificationStorage } from './filesystem-verification-storage';
+import { FilesystemMetadataStorage } from './filesystem-metadata-storage';
 import { FilesystemIdCounterStorage } from './filesystem-id-counter-storage';
 import type { SCEpterConfig } from '../../types/config';
 import type { SimpleLLMFunction } from '../../llm/types';
@@ -177,9 +177,9 @@ export async function createFilesystemProject(
     noteTypeResolver,
   );
   const templateStorage = new FilesystemTemplateStorage(projectPath, configManager);
-  const verificationStorage = new FilesystemVerificationStorage(
-    path.join(projectPath, config.paths?.dataDir || '_scepter'),
-  );
+  const dataDir = path.join(projectPath, config.paths?.dataDir || '_scepter');
+  // @implements {DD014.§3.DC.47} factory constructs FilesystemMetadataStorage; injected as metadataStorage
+  const metadataStorage = new FilesystemMetadataStorage(dataDir);
   const idCounterStorage = new FilesystemIdCounterStorage(noteStorage);
 
   // 4. Construct ProjectManager with storage interfaces injected
@@ -190,7 +190,7 @@ export async function createFilesystemProject(
     noteStorage,
     configStorage,
     templateStorage,
-    verificationStorage,
+    metadataStorage,
     idCounterStorage,
     llmFunction: options?.llmFunction,
   });

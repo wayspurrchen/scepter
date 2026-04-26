@@ -12,7 +12,7 @@
  */
 
 import type { ClaimIndexData, ClaimIndexEntry, ClaimCrossReference } from './claim-index.js';
-import type { VerificationStore, VerificationEvent } from './verification-store.js';
+import type { MetadataEvent } from './metadata-event.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,12 +62,20 @@ export interface ClaimThreadOptions {
 }
 
 /**
+ * Pre-projected verified-event map: claimId -> chronologically-ordered
+ * `verified` events from the metadata store.
+ *
+ * @implements {DD014.§3.DC.54a}
+ */
+export type VerifiedEventsByClaim = Map<string, MetadataEvent[]>;
+
+/**
  * Context object passed to buildClaimThread to avoid repeated parameter passing.
  */
 interface ThreadBuildContext {
   data: ClaimIndexData;
   getDerivatives: (claimId: string) => string[];
-  verificationStore?: VerificationStore;
+  verifiedEvents?: VerifiedEventsByClaim;
   maxDepth: number;
   visited: Set<string>;
 }
@@ -88,7 +96,7 @@ export function buildClaimThread(
   data: ClaimIndexData,
   getDerivatives: (claimId: string) => string[],
   options?: ClaimThreadOptions,
-  verificationStore?: VerificationStore,
+  verifiedEvents?: VerifiedEventsByClaim,
 ): ClaimThreadNode | null {
   const entry = data.entries.get(claimFqid);
   if (!entry) return null;
@@ -98,7 +106,7 @@ export function buildClaimThread(
   const ctx: ThreadBuildContext = {
     data,
     getDerivatives,
-    verificationStore,
+    verifiedEvents,
     maxDepth,
     visited: new Set(),
   };
@@ -116,7 +124,7 @@ export function buildClaimThreadsForNote(
   data: ClaimIndexData,
   getDerivatives: (claimId: string) => string[],
   options?: ClaimThreadOptions,
-  verificationStore?: VerificationStore,
+  verifiedEvents?: VerifiedEventsByClaim,
 ): ClaimThreadNode[] {
   const results: ClaimThreadNode[] = [];
 
@@ -143,7 +151,7 @@ export function buildClaimThreadsForNote(
       data,
       getDerivatives,
       options,
-      verificationStore,
+      verifiedEvents,
     );
     if (node) {
       results.push(node);
@@ -265,8 +273,9 @@ function buildNodeAtDepth(
   }
 
   // --- Verification events ---
-  if (ctx.verificationStore) {
-    const events = ctx.verificationStore[entry.fullyQualified];
+  // @implements {DD014.§3.DC.54a} verification read via metadata fold projection
+  if (ctx.verifiedEvents) {
+    const events = ctx.verifiedEvents.get(entry.fullyQualified);
     if (events && events.length > 0) {
       // Show the latest verification event
       const latest = events[events.length - 1];
@@ -275,7 +284,9 @@ function buildNodeAtDepth(
         relationship: 'verified',
         date: latest.date,
         actor: latest.actor,
-        method: latest.method,
+        // The new metadata-event shape uses `note` (not `method`); preserve
+        // the legacy field name in the thread node by reading from the event.
+        method: latest.note,
         children: [],
       });
     }

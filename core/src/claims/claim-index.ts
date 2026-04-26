@@ -27,6 +27,10 @@ import { parseNoteId } from '../parsers/note/shared-note-utils.js';
 import type { SourceReference } from '../types/reference.js';
 import { parseClaimMetadata } from './claim-metadata.js';
 import type { LifecycleState } from './claim-metadata.js';
+import { reconcileNoteEvents } from './metadata-ingest.js';
+import type { IngestClaimEntry } from './metadata-ingest.js';
+import type { MetadataEvent, MetadataStore } from './metadata-event.js';
+import type { MetadataStorage } from '../storage/storage-backend.js';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -556,6 +560,74 @@ export class ClaimIndex {
         filePath: ref.filePath,
       });
     }
+  }
+
+  /**
+   * Compute the suffix-grammar ingest deltas for this index against the given
+   * metadata store, but DO NOT commit them. The caller is responsible for
+   * invoking `metadataStorage.append()` for each event in the result.
+   *
+   * Separating planning from commitment enables `--dry-run` semantics for
+   * Phase-2 commands and keeps the index a pure data structure.
+   *
+   * @implements {DD014.§3.DC.44} applyAuthorDeltas computes deltas; caller commits
+   */
+  computeAuthorDeltas(
+    notesById: Map<string, NoteWithContent>,
+    store: MetadataStore,
+    eventDateProvider: (note: NoteWithContent) => string,
+    notePathResolver: (note: NoteWithContent) => string,
+  ): { toAppend: MetadataEvent[]; toRetract: MetadataEvent[] } {
+    const toAppend: MetadataEvent[] = [];
+    const toRetract: MetadataEvent[] = [];
+
+    for (const note of notesById.values()) {
+      const entries: IngestClaimEntry[] = [];
+      for (const entry of this.data.entries.values()) {
+        if (entry.noteId !== note.id) continue;
+        entries.push({ fullyQualified: entry.fullyQualified, metadata: entry.metadata });
+      }
+      if (entries.length === 0) continue;
+      const result = reconcileNoteEvents(
+        notePathResolver(note),
+        entries,
+        store,
+        eventDateProvider(note),
+      );
+      toAppend.push(...result.toAppend);
+      toRetract.push(...result.toRetract);
+    }
+
+    return { toAppend, toRetract };
+  }
+
+  /**
+   * Compute and commit the suffix-grammar ingest deltas in one shot. Convenience
+   * wrapper around `computeAuthorDeltas` that calls `metadataStorage.append`
+   * for each emitted event.
+   *
+   * @implements {DD014.§3.DC.44}
+   */
+  async applyAuthorDeltas(
+    notesById: Map<string, NoteWithContent>,
+    metadataStorage: MetadataStorage,
+    eventDateProvider: (note: NoteWithContent) => string,
+    notePathResolver: (note: NoteWithContent) => string,
+  ): Promise<{ appended: number; retracted: number }> {
+    const store = await metadataStorage.load();
+    const { toAppend, toRetract } = this.computeAuthorDeltas(
+      notesById,
+      store,
+      eventDateProvider,
+      notePathResolver,
+    );
+    for (const event of toAppend) {
+      await metadataStorage.append(event);
+    }
+    for (const event of toRetract) {
+      await metadataStorage.append(event);
+    }
+    return { appended: toAppend.length, retracted: toRetract.length };
   }
 
   // -------------------------------------------------------------------------

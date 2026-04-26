@@ -102,13 +102,13 @@ Reject-on-contention is the right semantic because: (a) two CLI processes writin
 
 ```typescript
 interface MetadataEvent {
-  id: string;              // ULID, generated at append time (see §6 OQ resolution)
+  id: string;              // cuid2, generated at append time (see §6 OQ resolution)
   claimId: string;         // fully qualified claim ID (e.g., "R009.§1.AC.01")
   key: string;             // matches /^[a-z][a-z0-9._-]*$/
   value: string;           // UTF-8 string; empty iff op === "unset"
   op: "add" | "set" | "unset" | "retract";
   actor: string;           // free-form label; "author:<path>" or any other string
-  date: string;            // ISO 8601 YYYY-MM-DD
+  date: string;            // ISO 8601 datetime, e.g., "2026-04-25T15:30:42.123Z"
   note?: string;           // optional free-text annotation
 }
 ```
@@ -134,7 +134,7 @@ interface EventFilter {
   key?: string;
   actor?: string;
   op?: MetadataEvent["op"];
-  since?: string;  // YYYY-MM-DD
+  since?: string;  // ISO 8601 datetime; date-only YYYY-MM-DD accepted (treated as start-of-day UTC)
   until?: string;
 }
 ```
@@ -147,9 +147,9 @@ interface EventFilter {
 
 The legacy filename is preserved (resolves R009 OQ.01). Renaming would force every project through a one-time migration with no functional benefit — the contents of the file are a strict superset of legacy verification events, but the storage location is unchanged. Future renaming is not blocked: `ConfigStorage.load()` may surface a configurable `metadataStorePath` setting in a downstream phase.
 
-### §2.AC.05 Event identifiers MUST be ULIDs.
+### §2.AC.05 Event identifiers MUST be cuid2 strings.
 
-Each event carries a ULID generated at append time (resolves R009 OQ.02). ULIDs are 26 characters, lexicographically sortable by generation time, and survive log compaction (an array index would not). The choice is final — alternatives considered in §6.
+Each event carries a cuid2 generated at append time (resolves R009 OQ.02). cuid2 IDs are 24 characters, URL-safe, collision-resistant, and explicitly NOT time-sortable (a deliberate security property to avoid leaking generation timestamps). The system does not depend on ID sort order — events are ordered by their position in the per-claim array, not by ID — so the lack of lexicographic time-sortability is not a constraint here. The choice is final — alternatives considered in §6.
 
 ### §2.AC.06 The interface MUST follow {A002.§2.AC.06} (async signatures throughout).
 
@@ -163,7 +163,7 @@ Two ingest grammars produce events. The architecture's job is to keep them compo
 
 ### §3.AC.01:4 Suffix-token ingest MUST emit one event per token.
 
-When the claim index is built (or rebuilt), every `key=value` token in a claim's metadata suffix produces one implicit event with `op="add"`, `actor="author:<notepath>"`, `date = <note file mtime as YYYY-MM-DD>`, and `note = "inline"`. Bare-token shorthands (`:5`, `:closed`, `:deferred`, `:removed`, `:superseded=TARGET`, `:derives=TARGET`, freeform tags) normalize to k=v form before becoming events, per the rules in §3.AC.02. High binding: every R005-era claim in every project carries such tokens, and this rule governs how they enter the generalized store.
+When the claim index is built (or rebuilt), every `key=value` token in a claim's metadata suffix produces one implicit event with `op="add"`, `actor="author:<notepath>"`, `date = <note file mtime as ISO 8601 datetime>`, and `note = "inline"`. Bare-token shorthands (`:5`, `:closed`, `:deferred`, `:removed`, `:superseded=TARGET`, `:derives=TARGET`, freeform tags) normalize to k=v form before becoming events, per the rules in §3.AC.02. High binding: every R005-era claim in every project carries such tokens, and this rule governs how they enter the generalized store.
 
 ### §3.AC.02 Bare-token shorthand normalization MUST be lossless.
 
@@ -280,7 +280,7 @@ The R005 file MUST be updated to add `:superseded=A004.§1.AC.01` on §3.AC.06 a
 **Data flow:**
 1. `FilesystemMetadataStorage.load()` opens `verification.json`.
 2. For each event, the loader applies the existing `timestamp → date` normalization (`verification-store.ts:64-71` precedent), THEN maps to `MetadataEvent` with `key="verified"`, `value="true"`, `op="add"`, preserving `actor`, `date`, and setting `note = method ? "method=" + method : undefined`.
-3. The loader generates a ULID for each migrated event (id field is new in A004).
+3. The loader generates a cuid2 for each migrated event (id field is new in A004).
 4. The store is in-memory ready; subsequent `verify` CLI calls and `trace --where verified=true` filters work identically to the legacy world.
 
 **Verdict:** Holds. Migration is a pure projection at load time; no on-disk rewrite required. Round-trip invariant: `getLatestVerification(legacy_store, claimId)` and `metadataStorage.fold(claimId).verified[0]` produce equivalent results.
@@ -305,7 +305,7 @@ The R005 file MUST be updated to add `:superseded=A004.§1.AC.01` on §3.AC.06 a
 **Setup:** Project convention: track multiple reviewers under `reviewer` key. Three CLI calls: `meta add R009.§1.AC.01 reviewer=alice`, `meta add reviewer=bob`, `meta add reviewer=charlie`.
 
 **Data flow:**
-1. Three `add` events appended to the log, each with its own ULID, actor (OS username), and date.
+1. Three `add` events appended to the log, each with its own cuid2, actor (OS username), and timestamp.
 2. Fold for `R009.§1.AC.01` produces `reviewer: [alice, bob, charlie]`.
 3. `scepter claims trace R009 --where reviewer=alice` includes the claim. `--where reviewer=david` excludes it. `--has-key reviewer` includes it.
 
@@ -319,7 +319,7 @@ The R005 file MUST be updated to add `:superseded=A004.§1.AC.01` on §3.AC.06 a
 1. `scepter claims meta compact R009.§1.AC.01` runs.
 2. The compactor folds the events to current state, then synthesizes a minimal event sequence reproducing that state: one `set` per current key with one value, `add` events for additional values, no orphan `retract`/`unset` events.
 3. Log shrinks (e.g., 200 → 8 events). Folded state is identical.
-4. Subsequent `revert --event <ULID>` against a compacted-away event reports "event not in log" per R009 §6 edge case.
+4. Subsequent `revert --event <cuid2>` against a compacted-away event reports "event not in log" per R009 §6 edge case.
 
 **Verdict:** Holds, with the documented trade-off: compaction trades history depth for log size. Users who need full history avoid compaction or run it with `--keep-last N`.
 
@@ -359,14 +359,15 @@ Resolves R009 OQ.01.
 - *Rename to `meta.json`* — Semantically cleaner. **Rejected**: forces every project through a one-time file rename for zero functional benefit; the file's semantics generalize but its location is unchanged.
 - *Configurable filename via `scepter.config.json`* — Maximum flexibility. **Rejected**: introduces a config field that 99% of users will never touch; the default-only path is simpler and can be extended later if real demand emerges.
 
-### Adopted: ULID per event
+### Adopted: cuid2 per event
 
-Resolves R009 OQ.02.
+Resolves R009 OQ.02. Library: `@paralleldrive/cuid2`. IDs are 24-char URL-safe collision-resistant strings, NOT time-sortable. The system orders events by array position (their position in the per-claim event list), not by ID, so time-sortability is not load-bearing. The cuid2 author argues that time-sortable IDs leak generation time and enable timing attacks; for a local file-backed log this is academic, but the property gain (compact, opaque, broadly portable) is worth the deliberate choice over time-sortable alternatives.
 
 **Alternatives considered:**
 - *Auto-incrementing integer counter* — Smallest, simplest. **Rejected**: doesn't survive compaction (renumbering breaks references); doesn't sort well across distributed scenarios (relevant if backends ever diverge).
 - *Content hash (SHA of event fields)* — Naturally unique. **Rejected**: long (64+ chars); collides if two identical events are deliberately recorded (allowed in the model); slow to compute.
-- *UUID v4* — Common. **Rejected**: not lexicographically sortable; ULID gets the time-ordering property for free.
+- *UUID v4* — Common. **Rejected**: longer (36 chars with hyphens); cuid2 has comparable collision resistance with smaller surface and better URL-handling.
+- *ULID* — Time-sortable, 26 chars. **Rejected** in favor of cuid2's opacity and slightly shorter length; the time-sort property is unused.
 
 ### Adopted: Incremental re-ingest reconciliation
 
@@ -402,19 +403,19 @@ Resolves the reviewer's blocker on R009 §7.AC.06.
 - *Drop `ParsedMetadata` and force consumers to read folded state directly* — Cleaner long-term. **Rejected**: would require rewriting every consumer of `parseClaimMetadata()` in this same change; combinatorial blast radius.
 - *Hard-deprecate `parseClaimMetadata` after one phase* — Forces migration. **Rejected**: out of scope; this architecture is about substrate generalization, not API churn.
 
-### Adopted: ULID-based event IDs added to MVS schema
+### Adopted: cuid2-based event IDs added to MVS schema
 
-R009 §8 Phase-1 MVS includes `MetadataEvent` schema (§1.AC.01). The ULID id field is part of the schema from day one, even though `revert` (which uses it) is deferred to a later phase. Adding the id later would be a non-breaking schema extension, but adding it up front is simpler and supports the "log is faithful to invocations" property even before revert ships.
+R009 §8 Phase-1 MVS includes `MetadataEvent` schema (§1.AC.01). The cuid2 id field is part of the schema from day one, even though `revert` (which uses it) is deferred to a later phase. Adding the id later would be a non-breaking schema extension, but adding it up front is simpler and supports the "log is faithful to invocations" property even before revert ships.
 
 ### Adopted: Compaction algorithm is fold-then-synthesize-minimal-sequence
 
-`compact` folds the targeted events to current state, then synthesizes a minimal event sequence that reproduces that state from scratch (typically: one `set` per current key with one value, one or more `add` events for additional values, no orphan `retract`/`unset` events). Surviving events get fresh ULIDs at compaction time.
+`compact` folds the targeted events to current state, then synthesizes a minimal event sequence that reproduces that state from scratch (typically: one `set` per current key with one value, one or more `add` events for additional values, no orphan `retract`/`unset` events). Surviving events get fresh cuid2 IDs at compaction time.
 
 **Alternatives considered:**
-- *Peephole removal of provably-redundant pairs (`add X; retract X`)* — Preserves ULIDs of unaffected events and original temporal ordering. **Rejected**: complexity grows with the set of recognized peephole patterns; users running `compact` have already opted into history loss; the simpler algorithm matches the "shrink my log" mental model.
+- *Peephole removal of provably-redundant pairs (`add X; retract X`)* — Preserves IDs of unaffected events and original temporal ordering. **Rejected**: complexity grows with the set of recognized peephole patterns; users running `compact` have already opted into history loss; the simpler algorithm matches the "shrink my log" mental model.
 - *Hybrid (peephole within recent window, fold-and-synthesize for older)* — Best of both. **Rejected**: introduces two algorithms maintained in parallel; the `--keep-last N` and `--older-than DATE` flags already give users granularity controls without algorithm complexity.
 
-The fold-equivalence invariant (R009 §6.AC.03) is the binding requirement; this decision specifies the algorithm that satisfies it. Users who need to preserve ULID identity for cross-system references should not run `compact`.
+The fold-equivalence invariant (R009 §6.AC.03) is the binding requirement; this decision specifies the algorithm that satisfies it. Users who need to preserve cuid2 identity for cross-system references should not run `compact`.
 
 ### Adopted: Concurrent writes are detected and rejected via file-level locking
 

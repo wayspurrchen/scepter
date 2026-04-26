@@ -144,7 +144,7 @@ before encountering specific requirements.]
 
 ## Requirements
 
-### [ID].1 — [Cluster Name]
+### [Cluster Name]
 [Requirement prose with MUST/SHOULD language.
 Each requirement is a single coherent thought that says
 what the system must do, what it must NOT do, and names
@@ -154,7 +154,7 @@ the concrete artifacts.]
 requirement it tests. No section-hopping.]
 **AC.02:** ...
 
-### [ID].2 — [Cluster Name]
+### [Second Cluster Name]
 ...
 
 ## Edge Cases
@@ -167,14 +167,16 @@ requirement it tests. No section-hopping.]
 
 ## Acceptance Criteria Summary
 
-| Category | Count |
-|----------|-------|
-| [ID].1 Cluster | N |
-| [ID].2 Cluster | N |
+| Cluster | Count |
+|---------|-------|
+| [First Cluster Name] | N |
+| [Second Cluster Name] | N |
 | **Total** | **N** |
 
 ## References
 ```
+
+> **Important:** Cluster headings use the cluster's domain name only — never the `[ID].N` pattern (e.g., `R075.1`). The lint parser interprets `R075.1` as a malformed claim ID and emits a `FORBIDDEN-FORM` warning. Use plain semantic names like `### Schema-Layer Declaration` or `### Identity-Layer Hooks`.
 
 #### Design Principles Section
 

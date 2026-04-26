@@ -62,7 +62,7 @@ The store MUST persist claim metadata as an append-only event log. Each event re
 
 #### Event schema
 
-§1.AC.01:5 The system MUST define a `MetadataEvent` type with the fields `claimId: string`, `key: string`, `value: string`, `op: "add" | "set" | "unset" | "retract"`, `actor: string`, `date: string` (ISO 8601 YYYY-MM-DD), and optional `note?: string` (free-text annotation). High binding: this schema is the contract between every writer, every reader, every migration path, and every consumer.
+§1.AC.01:5 The system MUST define a `MetadataEvent` type with the fields `claimId: string`, `key: string`, `value: string`, `op: "add" | "set" | "unset" | "retract"`, `actor: string`, `date: string` (ISO 8601 datetime, e.g., `"2026-04-25T15:30:42.123Z"`), and optional `note?: string` (free-text annotation). High binding: this schema is the contract between every writer, every reader, every migration path, and every consumer.
 
 §1.AC.02 The `value` field MUST be a string. The system MUST NOT interpret the value as a number, boolean, JSON literal, or any other typed form. Consumers that need typed values encode them as strings (e.g., `"true"`, `"42"`) and decode on read.
 
@@ -92,7 +92,7 @@ The store MUST persist claim metadata as an append-only event log. Each event re
 
 ### §2 — Write Operations
 
-All write commands live under the subcommand group `scepter claims meta`. Every write accepts the common options `--actor <name>` (default: OS username), `--date <YYYY-MM-DD>` (default: today's date), and `--note <text>` (optional free-text annotation).
+All write commands live under the subcommand group `scepter claims meta`. Every write accepts the common options `--actor <name>` (default: OS username), `--date <ISO-8601>` (default: now, full datetime; the option accepts either a date `YYYY-MM-DD` (treated as start-of-day UTC) or a full ISO 8601 datetime), and `--note <text>` (optional free-text annotation).
 
 #### Single-claim writes
 
@@ -178,7 +178,7 @@ Read commands produce either folded current-state views or raw event logs.
 
 The note-body metadata suffix grammar (defined in {R004.§2.AC.04}, clarified in {R005.§2.AC.04a}, {R005.§2.AC.04b}) carries `key=value` tokens today. This requirement promotes those tokens to first-class implicit events in the store at ingest time.
 
-§4.AC.01:4 Every `key=value` token in a claim's metadata suffix MUST be interpreted at claim-index time as an implicit `op=add` event with `actor="author:<notepath>"`, `date = <note file mtime as YYYY-MM-DD>`, and `note = "inline"`. High binding: every R005-era claim in the project carries such tokens, and this rule governs how they enter the generalized store.
+§4.AC.01:4 Every `key=value` token in a claim's metadata suffix MUST be interpreted at claim-index time as an implicit `op=add` event with `actor="author:<notepath>"`, `date = <note file mtime as ISO 8601 datetime>`, and `note = "inline"`. High binding: every R005-era claim in the project carries such tokens, and this rule governs how they enter the generalized store.
 
 §4.AC.02 Bare importance digits (`:1` through `:5`) MUST normalize to implicit events `importance=<digit>` per §4.AC.01. This makes R005 §1 importance a consumer convention on the `importance` key rather than a special-case field.
 
@@ -366,7 +366,7 @@ All four original open questions have been resolved by {A004} (Claim Metadata St
 
 ### OQ.02 Event identifier shape — RESOLVED in {A004.§2.AC.05}
 
-**Resolution:** ULID per event. The `id` field is part of the `MetadataEvent` schema from Phase 1, even though `revert` (which uses it) is deferred. Adding it later would be a non-breaking schema extension; adding it up front is simpler.
+**Resolution:** cuid2 per event. The `id` field is part of the `MetadataEvent` schema from Phase 1, even though `revert` (which uses it) is deferred. Adding it later would be a non-breaking schema extension; adding it up front is simpler.
 
 ### OQ.03 Implicit-event re-ingest atomicity — RESOLVED in {A004.§3.AC.03}
 

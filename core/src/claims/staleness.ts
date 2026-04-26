@@ -21,8 +21,7 @@
 
 import * as fs from 'fs/promises';
 import type { ClaimIndexData } from './claim-index.js';
-import type { VerificationStore } from './verification-store.js';
-import { getLatestVerification } from './verification-store.js';
+import type { MetadataStorage } from '../storage/storage-backend.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,7 +73,7 @@ export interface StalenessOptions {
  */
 export async function computeStaleness(
   index: ClaimIndexData,
-  store: VerificationStore,
+  metadataStorage: MetadataStorage,
   options?: StalenessOptions,
 ): Promise<StalenessEntry[]> {
   const entries: StalenessEntry[] = [];
@@ -127,15 +126,21 @@ export async function computeStaleness(
       continue;
     }
 
-    // Get latest verification event
-    const latestVerification = getLatestVerification(store, fullyQualified);
+    // Get latest verification event via metadata fold projection.
+    // @implements {DD014.§3.DC.49} latest verified=true derived from event log
+    const verifiedEvents = await metadataStorage.query({
+      claimId: fullyQualified,
+      key: 'verified',
+    });
+    const latestVerifiedEvent =
+      verifiedEvents.length > 0 ? verifiedEvents[verifiedEvents.length - 1] : null;
 
     // Determine status
     let status: StalenessEntry['status'];
-    if (!latestVerification) {
+    if (!latestVerifiedEvent) {
       status = 'unverified';
     } else {
-      const verifiedAt = new Date(latestVerification.date);
+      const verifiedAt = new Date(latestVerifiedEvent.date);
       if (latestMtime && latestMtime > verifiedAt) {
         status = 'stale';
       } else {
@@ -147,7 +152,7 @@ export async function computeStaleness(
       claimId: fullyQualified,
       status,
       importance: claim.importance,
-      lastVerified: latestVerification?.date,
+      lastVerified: latestVerifiedEvent?.date,
       lastModified: latestMtime?.toISOString(),
       implementingFiles: validFiles,
     });

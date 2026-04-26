@@ -16,7 +16,7 @@ import type {
   NoteStorage,
   ConfigStorage,
   TemplateStorage,
-  VerificationStorage,
+  MetadataStorage,
   IdCounterStorage,
 } from '../storage';
 import * as path from 'path';
@@ -44,7 +44,9 @@ export interface ProjectManagerDependencies {
   noteStorage?: NoteStorage;
   configStorage?: ConfigStorage;
   templateStorage?: TemplateStorage;
-  verificationStorage?: VerificationStorage;
+  // @implements {DD014.§3.DC.45} verificationStorage slot renamed to metadataStorage
+  // @implements {DD014.§3.DC.46} import switched from VerificationStorage to MetadataStorage
+  metadataStorage?: MetadataStorage;
   idCounterStorage?: IdCounterStorage;
 }
 
@@ -81,7 +83,8 @@ export class ProjectManager extends EventEmitter {
   public readonly noteStorage?: NoteStorage;
   public readonly configStorage?: ConfigStorage;
   public readonly templateStorage?: TemplateStorage;
-  public readonly verificationStorage?: VerificationStorage;
+  // @implements {DD014.§3.DC.45} verificationStorage field renamed to metadataStorage
+  public readonly metadataStorage?: MetadataStorage;
   public readonly idCounterStorage?: IdCounterStorage;
 
   private validationErrors: ValidationError[] = [];
@@ -100,7 +103,7 @@ export class ProjectManager extends EventEmitter {
     this.noteStorage = deps.noteStorage;
     this.configStorage = deps.configStorage;
     this.templateStorage = deps.templateStorage;
-    this.verificationStorage = deps.verificationStorage;
+    this.metadataStorage = deps.metadataStorage;
     this.idCounterStorage = deps.idCounterStorage;
 
     // Create all dependencies with defaults if not provided

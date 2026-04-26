@@ -40,20 +40,31 @@ export type {
   ParsedMetadata,
 } from './claim-metadata.js';
 
-// Verification store
-export {
-  loadVerificationStore,
-  saveVerificationStore,
-  addVerificationEvent,
-  getLatestVerification,
-  removeLatestVerification,
-  removeAllVerifications,
-} from './verification-store.js';
+// Metadata event log (replaces the legacy verification store; see DD014)
+// @implements {DD014.§3.DC.13} Legacy verification-store re-exports removed; metadata types exported
+export { applyFold } from './metadata-event.js';
 
 export type {
-  VerificationEvent,
-  VerificationStore,
-} from './verification-store.js';
+  MetadataEvent,
+  MetadataStore,
+  EventFilter,
+} from './metadata-event.js';
+
+// Metadata filters (--where, --has-key, --missing-key)
+// @implements {DD014.§3.DC.56}
+export {
+  parseMetadataFilters,
+  matchesMetadataFilters,
+  applyMetadataFilters,
+  parseAndApplyMetadataFilters,
+  collectStrings,
+} from './metadata-filters.js';
+
+export type {
+  MetadataFilterOptions,
+  ParsedWhereClause,
+  FilterParseResult,
+} from './metadata-filters.js';
 
 // Staleness detection
 export { computeStaleness } from './staleness.js';

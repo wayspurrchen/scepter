@@ -120,6 +120,7 @@ export function isDerivationTag(tag: string): boolean {
  * @implements {R006.§1.AC.01} derives=TARGET extraction to derivedFrom[]
  * @implements {R006.§1.AC.02} Multiple derives= entries independently collected
  * @implements {R006.§1.AC.04} Derivation coexists with lifecycle (separate concern)
+ * @implements {DD014.§3.DC.58} ParsedMetadata shape preserved; raw-token interpreter (Phase 1)
  */
 export function parseClaimMetadata(rawMetadata: string[]): ParsedMetadata {
   let importance: number | undefined;

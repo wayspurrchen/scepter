@@ -11,6 +11,7 @@
  * @implements {DD008.§1.DC.02} Zero-padding rules for shortcodes and claim numbers
  */
 
+import chalk from 'chalk';
 import type { ClaimIndexData, ClaimIndexEntry } from '../../../claims/index.js';
 import { parseNoteId } from '../../../parsers/note/shared-note-utils.js';
 
@@ -91,6 +92,79 @@ export function resolveClaimInput(input: string, data: ClaimIndexData): ResolveR
 
   // No matches
   return { matches: [], normalized };
+}
+
+/**
+ * Resolve a user-typed claim ID to a single index entry, printing a
+ * uniform user-facing diagnostic on no-match or ambiguous-match.
+ *
+ * - Single match → returns the entry.
+ * - Zero matches → prints "Claim not found" with up-to-5 suffix-fuzzy
+ *   suggestions, returns null.
+ * - Multiple matches (e.g., section reference like `R009.1`) → prints
+ *   "Ambiguous" with the candidate list, returns null.
+ *
+ * Use this in commands that operate on a specific claim. Commands that
+ * accept section references (and want to act on every claim under a
+ * section) should call `resolveClaimInput` directly and handle the
+ * full match array themselves.
+ *
+ * @implements {DD008.§1.DC.04} Single-match path
+ * @implements {DD008.§1.DC.05} Ambiguous-match disambiguation
+ * @implements {DD008.§1.DC.06} Zero-match fuzzy suggestions
+ */
+export function resolveSingleClaim(
+  input: string,
+  data: ClaimIndexData,
+): ClaimIndexEntry | null {
+  const result = resolveClaimInput(input, data);
+
+  if (result.matches.length === 1) {
+    return result.matches[0];
+  }
+
+  if (result.matches.length > 1) {
+    console.log(
+      chalk.yellow(
+        `Ambiguous claim address "${input}" matches ${result.matches.length} claims:`,
+      ),
+    );
+    console.log('');
+    for (const entry of result.matches.slice(0, 10)) {
+      const heading = entry.heading.replace(/\*\*/g, '').trim();
+      console.log(
+        `  ${chalk.cyan(entry.fullyQualified)}  ${heading}  ${chalk.gray(`L${entry.line}`)}`,
+      );
+    }
+    if (result.matches.length > 10) {
+      console.log(`  ... and ${result.matches.length - 10} more`);
+    }
+    console.log('');
+    console.log(
+      chalk.gray(
+        'Specify the section number to disambiguate (e.g., ' +
+          result.matches[0].fullyQualified +
+          ')',
+      ),
+    );
+    return null;
+  }
+
+  console.log(chalk.red(`Claim not found: ${input}`));
+  const normalized = result.normalized;
+  const dotParts = normalized.split('.');
+  if (dotParts.length >= 2) {
+    const suffix = '.' + dotParts.slice(1).join('.');
+    const candidates = [...data.entries.keys()].filter((k) => k.endsWith(suffix));
+    if (candidates.length > 0) {
+      console.log('');
+      console.log('Did you mean:');
+      for (const c of candidates.slice(0, 5)) {
+        console.log(`  ${c}`);
+      }
+    }
+  }
+  return null;
 }
 
 /**

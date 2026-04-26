@@ -12,7 +12,11 @@
 import type { Note, NoteQuery, NoteQueryResult } from '../types/note';
 import type { Reference } from '../types/reference';
 import type { SCEpterConfig } from '../types/config';
-import type { VerificationStore } from '../claims/verification-store';
+import type {
+  MetadataEvent,
+  MetadataStore,
+  EventFilter,
+} from '../claims/metadata-event';
 import type {
   StorageEvent,
   Attachment,
@@ -79,14 +83,30 @@ export interface TemplateStorage {
 }
 
 /**
- * Verification event persistence.
+ * Generalized claim metadata persistence (replaces VerificationStorage).
  *
- * @implements {A002.§2.AC.04} VerificationStorage interface for verification persistence
- * @implements {DD010.§DC.05} VerificationStorage interface definition
+ * Six methods, exact surface area: load (read whole store), save (write whole
+ * store), append (single event), query (filter the log), fold (project to
+ * key→values for one claim), watch (optional change notification).
+ *
+ * Replaces VerificationStorage per A004.§2.AC.03; the two MUST NOT coexist
+ * in the shipped state (DD014 §9 sequences a transient overlap during
+ * consumer migration only).
+ *
+ * @implements {A004.§2.AC.02} MetadataStorage interface (six methods)
+ * @implements {A004.§2.AC.03} Replaces VerificationStorage; no parallel coexistence
+ * @implements {A004.§2.AC.06} All methods Promise-based async signatures
+ * @implements {DD014.§3.DC.10} VerificationStorage removed; MetadataStorage is the sole interface
+ * @implements {DD014.§3.DC.11} Six methods exactly
+ * @implements {DD014.§3.DC.12} Imports MetadataEvent, MetadataStore, EventFilter
  */
-export interface VerificationStorage {
-  load(): Promise<VerificationStore>;
-  save(store: VerificationStore): Promise<void>;
+export interface MetadataStorage {
+  load(): Promise<MetadataStore>;
+  save(store: MetadataStore): Promise<void>;
+  append(event: MetadataEvent): Promise<void>;
+  query(filter: EventFilter): Promise<MetadataEvent[]>;
+  fold(claimId: string): Promise<Record<string, string[]>>;
+  watch?(callback: (event: StorageEvent) => void): Unsubscribe;
 }
 
 /**

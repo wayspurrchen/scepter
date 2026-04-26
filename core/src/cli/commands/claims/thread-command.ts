@@ -16,9 +16,9 @@ import { Command } from 'commander';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import { buildClaimThread, buildClaimThreadsForNote } from '../../../claims/claim-thread.js';
-import type { VerificationStore } from '../../../claims/index.js';
 import { parseClaimAddress } from '../../../parsers/claim/index.js';
-import { formatClaimThread, formatClaimThreadJson } from '../../formatters/claim-formatter.js';
+import { resolveSingleClaim } from '../shared/resolve-claim-id.js';
+import { formatClaimThread, formatClaimThreadJson, groupVerifiedEvents } from '../../formatters/claim-formatter.js';
 
 /**
  * Detect whether the argument is a claim-level ID (contains dots with a claim prefix)
@@ -27,9 +27,12 @@ import { formatClaimThread, formatClaimThreadJson } from '../../formatters/claim
  * Reuses the same pattern as trace-command.ts.
  */
 function isClaimId(id: string): boolean {
+  // A claim ID has dots and contains an uppercase claim prefix followed by a number.
+  // Use a regex predicate (not parseClaimAddress) so leading-zero shortcuts like
+  // `DD14.§11.OQ.01` classify correctly — the centralized `resolveSingleClaim`
+  // normalizes them downstream.
   if (!id.includes('.')) return false;
-  const addr = parseClaimAddress(id);
-  return addr !== null && addr.claimPrefix !== undefined;
+  return /[A-Z]+\.\d{2,3}/.test(id.replace(/[$§]/g, ''));
 }
 
 // @implements {DD005.§DC.22} Default depth 1, --depth N flag
@@ -49,8 +52,10 @@ export const threadCommand = new Command('thread')
         async (context) => {
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
-          // Load verification store for verified events
-          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
+          // Load verification events from the metadata store.
+          // @implements {DD014.§3.DC.54} thread-command reads via metadataStorage
+          const verifiedEventList = await context.projectManager.metadataStorage!.query({ key: 'verified' });
+          const verifiedEvents = groupVerifiedEvents(verifiedEventList);
 
           // Get derivatives lookup from claim index
           const claimIndex = context.projectManager.claimIndex;
@@ -60,28 +65,22 @@ export const threadCommand = new Command('thread')
 
           // @implements {DD005.§DC.25} Bare note ID threads all claims in the note
           if (isClaimId(id)) {
-            // Single claim thread
-            const normalized = id.replace(/§/g, '');
+            // Single claim thread — uses the centralized flexible resolver
+            // ($→§, zero-padding, suffix matching, fuzzy suggestions).
+            const entry = resolveSingleClaim(id, data);
+            if (!entry) {
+              return;
+            }
             const node = buildClaimThread(
-              normalized,
+              entry.fullyQualified,
               data,
               getDerivatives,
               threadOptions,
-              verificationStore,
+              verifiedEvents,
             );
-
             if (!node) {
+              // Theoretically unreachable: resolver returned an entry but the thread builder didn't.
               console.log(`Claim not found: ${id}`);
-              console.log('');
-              // Try fuzzy match
-              const suffix = `.${normalized.split('.').slice(1).join('.')}`;
-              const candidates = [...data.entries.keys()].filter((k) => k.endsWith(suffix));
-              if (candidates.length > 0) {
-                console.log('Did you mean:');
-                for (const c of candidates.slice(0, 5)) {
-                  console.log(`  ${c}`);
-                }
-              }
               return;
             }
 
@@ -103,7 +102,7 @@ export const threadCommand = new Command('thread')
               data,
               getDerivatives,
               threadOptions,
-              verificationStore,
+              verifiedEvents,
             );
 
             if (nodes.length === 0) {

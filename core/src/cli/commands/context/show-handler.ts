@@ -15,9 +15,9 @@ import { formatNote, formatNotes, formatNotesAsJson } from '../../formatters/not
 import { SourceCodeScanner } from '../../../scanners/source-code-scanner';
 import { ensureIndex } from '../claims/ensure-index';
 import { parseClaimAddress } from '../../../parsers/claim/claim-parser';
-import { formatClaimTrace } from '../../formatters/claim-formatter';
+import { formatClaimTrace, groupVerifiedEvents } from '../../formatters/claim-formatter';
 import { resolveClaimInput } from '../shared/resolve-claim-id';
-import type { ClaimIndexData, ClaimIndexEntry, VerificationStore } from '../../../claims/index';
+import type { ClaimIndexData, ClaimIndexEntry } from '../../../claims/index';
 import type { Note } from '../../../types/note';
 import type { SourceReference } from '../../../types/reference';
 import type { CommandContext } from '../base-command';
@@ -184,8 +184,10 @@ async function resolveAndDisplayClaims(
   const { projectManager } = context;
   const data = await ensureIndex(projectManager);
 
-  // Load verification store for claim trace display
-  const verificationStore: VerificationStore = await projectManager.verificationStorage!.load();
+  // Load verification events from the metadata store for trace display.
+  // @implements {DD014.§3.DC.54} show-handler reads via metadataStorage
+  const verifiedEventList = await projectManager.metadataStorage!.query({ key: 'verified' });
+  const verifiedEvents = groupVerifiedEvents(verifiedEventList);
 
   const outputs: string[] = [];
 
@@ -196,7 +198,7 @@ async function resolveAndDisplayClaims(
       // @implements {DD008.§1.DC.04} Single match: display with formatClaimTrace
       const entry = result.matches[0];
       const incoming = data.crossRefs.filter(ref => ref.toClaim === entry.fullyQualified);
-      const traceOutput = await formatClaimTrace(entry, incoming, data.noteTypes, {}, verificationStore);
+      const traceOutput = await formatClaimTrace(entry, incoming, data.noteTypes, {}, verifiedEvents);
       outputs.push(traceOutput);
 
     } else if (result.matches.length > 1) {

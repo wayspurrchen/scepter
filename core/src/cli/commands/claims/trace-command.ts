@@ -15,10 +15,12 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
-import { buildTraceabilityMatrix, getLatestVerification } from '../../../claims/index.js';
-import type { ClaimIndexData, ClaimIndexEntry, VerificationStore, TraceabilityMatrix, TraceabilityRow, ProjectionPresence } from '../../../claims/index.js';
+import { buildTraceabilityMatrix } from '../../../claims/index.js';
+import type { ClaimIndexData, ClaimIndexEntry, MetadataEvent, TraceabilityMatrix, TraceabilityRow, ProjectionPresence } from '../../../claims/index.js';
+import { parseMetadataFilters, applyMetadataFilters, collectStrings } from '../../../claims/index.js';
 import { parseClaimAddress, parseRangeSuffix, expandClaimRange } from '../../../parsers/claim/index.js';
-import { formatTraceabilityMatrix, formatClaimTrace } from '../../formatters/claim-formatter.js';
+import { resolveSingleClaim } from '../shared/resolve-claim-id.js';
+import { formatTraceabilityMatrix, formatClaimTrace, groupVerifiedEvents } from '../../formatters/claim-formatter.js';
 import type { TraceDisplayOptions, ClaimTraceOptions } from '../../formatters/claim-formatter.js';
 import type { SourceReference } from '../../../types/reference.js';
 
@@ -27,10 +29,12 @@ import type { SourceReference } from '../../../types/reference.js';
  * vs a plain note ID (just letters + digits like R004).
  */
 function isClaimId(id: string): boolean {
-  // A claim ID has dots and resolves to something with a claim prefix
+  // A claim ID has dots and contains an uppercase claim prefix followed by a number.
+  // Use a regex predicate (not parseClaimAddress) so leading-zero shortcuts like
+  // `DD14.§11.OQ.01` classify correctly — the centralized `resolveSingleClaim`
+  // normalizes them downstream.
   if (!id.includes('.')) return false;
-  const addr = parseClaimAddress(id);
-  return addr !== null && addr.claimPrefix !== undefined;
+  return /[A-Z]+\.\d{2,3}/.test(id.replace(/[$§]/g, ''));
 }
 
 /**
@@ -186,7 +190,11 @@ export const traceCommand = new Command('trace')
   .option('--json', 'Output as JSON')
   // @implements {DD006.§3.DC.21} Verbose flag controls note-level source ref detail
   .option('--verbose', 'Show full detail for note-level source references')
-  .action(async (id: string, options: { importance?: number; sort?: string; width?: number; full?: boolean; excerpts?: boolean; showDerived?: boolean; reindex?: boolean; json?: boolean; verbose?: boolean; projectDir?: string }) => {
+  // @implements {DD014.§3.DC.55} Metadata filters: --where, --has-key, --missing-key
+  .option('--where <pair>', 'Filter to claims where KEY=VALUE in folded metadata (repeatable)', collectStrings, [])
+  .option('--has-key <key>', 'Filter to claims with at least one value for KEY (repeatable)', collectStrings, [])
+  .option('--missing-key <key>', 'Filter to claims with no value for KEY (repeatable)', collectStrings, [])
+  .action(async (id: string, options: { importance?: number; sort?: string; width?: number; full?: boolean; excerpts?: boolean; showDerived?: boolean; reindex?: boolean; json?: boolean; verbose?: boolean; where?: string[]; hasKey?: string[]; missingKey?: string[]; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -196,8 +204,33 @@ export const traceCommand = new Command('trace')
         async (context) => {
           const data = await ensureIndex(context.projectManager, { reindex: options.reindex });
 
-          // @implements {R005.§3.AC.07} Load verification store for date display
-          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
+          // @implements {R005.§3.AC.07} Load verification events from metadata store for date display
+          // @implements {DD014.§3.DC.52} trace-command reads via metadataStorage
+          const verifiedEventList = await context.projectManager.metadataStorage!.query({ key: 'verified' });
+          const verifiedEvents = groupVerifiedEvents(verifiedEventList);
+
+          // Helper to get the latest `verified` event for a claim from the
+          // pre-grouped map.
+          const getLatestVerified = (claimId: string): MetadataEvent | undefined => {
+            const events = verifiedEvents.get(claimId);
+            return events && events.length > 0 ? events[events.length - 1] : undefined;
+          };
+
+          // @implements {DD014.§3.DC.55} Parse and validate --where / --has-key / --missing-key
+          const filterParse = parseMetadataFilters({
+            where: options.where,
+            hasKey: options.hasKey,
+            missingKey: options.missingKey,
+          });
+          if (!filterParse.ok) {
+            console.error(chalk.red(filterParse.error));
+            process.exit(1);
+          }
+          // @implements {DD014.§3.DC.56} Apply metadata filters to TraceabilityRow[] AND-composed with importance
+          const metadataStorage = context.projectManager.metadataStorage!;
+          const applyFilters = async <R extends { claimId: string }>(rows: R[]): Promise<R[]> => {
+            return applyMetadataFilters(rows, (row) => row.claimId, metadataStorage, filterParse);
+          };
 
           // @implements {R006.§4.AC.02} Get derivatives lookup from claim index
           const claimIndex = context.projectManager.claimIndex;
@@ -228,11 +261,15 @@ export const traceCommand = new Command('trace')
             const matrix = buildMergedClaimMatrix(allFound, data);
 
             // Apply importance filter
+            // @implements {DD014.§3.DC.57} --importance preserved unchanged at user-facing level
             if (options.importance !== undefined) {
               matrix.rows = matrix.rows.filter((row) =>
                 row.importance !== undefined && row.importance >= options.importance!,
               );
             }
+
+            // @implements {DD014.§3.DC.56} AND-compose metadata filters with importance
+            matrix.rows = await applyFilters(matrix.rows);
 
             // Apply sort
             if (options.sort === 'importance') {
@@ -247,7 +284,7 @@ export const traceCommand = new Command('trace')
               const serializable = {
                 ...matrix,
                 rows: matrix.rows.map((row) => {
-                  const latestVerification = getLatestVerification(verificationStore, row.claimId);
+                  const latestVerification = getLatestVerified(row.claimId);
                   return {
                     ...row,
                     projections: Object.fromEntries(row.projections),
@@ -269,28 +306,15 @@ export const traceCommand = new Command('trace')
             };
             if (options.width !== undefined) displayOpts.titleWidth = options.width;
             if (options.full) displayOpts.full = true;
-            console.log(formatTraceabilityMatrix(matrix, displayOpts, verificationStore));
+            console.log(formatTraceabilityMatrix(matrix, displayOpts, verifiedEvents));
             return;
           }
 
-          // Single-claim trace: show all documents referencing this specific claim
+          // Single-claim trace: show all documents referencing this specific claim.
+          // Uses the centralized flexible resolver ($→§, zero-padding, suffix matching).
           if (isClaimId(id)) {
-            // Normalize: strip § for index lookup
-            const normalized = id.replace(/§/g, '');
-            const entry = data.entries.get(normalized);
-
+            const entry = resolveSingleClaim(id, data);
             if (!entry) {
-              console.log(`Claim not found: ${id}`);
-              console.log('');
-              // Try fuzzy match
-              const suffix = `.${normalized.split('.').slice(1).join('.')}`;
-              const candidates = [...data.entries.keys()].filter((k) => k.endsWith(suffix));
-              if (candidates.length > 0) {
-                console.log('Did you mean:');
-                for (const c of candidates.slice(0, 5)) {
-                  console.log(`  ${c}`);
-                }
-              }
               return;
             }
 
@@ -299,7 +323,7 @@ export const traceCommand = new Command('trace')
             if (options.json) {
               // @implements {R005.§5.AC.03} JSON includes importance, lifecycle, verification
               // @implements {R006.§4.AC.01} JSON includes derivedFrom
-              const latestVerification = getLatestVerification(verificationStore, entry.fullyQualified);
+              const latestVerification = getLatestVerified(entry.fullyQualified);
               const derivatives = options.showDerived
                 ? claimIndex.getDerivatives(entry.fullyQualified)
                 : undefined;
@@ -318,7 +342,7 @@ export const traceCommand = new Command('trace')
               getClaimEntry: (fqid: string) => data.entries.get(fqid) ?? null,
             };
             if (options.excerpts === false) traceOpts.excerpts = false;
-            console.log(await formatClaimTrace(entry, incoming, data.noteTypes, traceOpts, verificationStore));
+            console.log(await formatClaimTrace(entry, incoming, data.noteTypes, traceOpts, verifiedEvents));
             return;
           }
 
@@ -326,11 +350,15 @@ export const traceCommand = new Command('trace')
           const matrix = buildTraceabilityMatrix(id, data);
 
           // @implements {R005.§1.AC.02} Filter rows by minimum importance level
+          // @implements {DD014.§3.DC.57} --importance preserved unchanged at user-facing level
           if (options.importance !== undefined) {
             matrix.rows = matrix.rows.filter((row) =>
               row.importance !== undefined && row.importance >= options.importance!,
             );
           }
+
+          // @implements {DD014.§3.DC.56} AND-compose metadata filters with importance
+          matrix.rows = await applyFilters(matrix.rows);
 
           // @implements {R005.§1.AC.04} Sort rows by importance descending
           if (options.sort === 'importance') {
@@ -353,7 +381,7 @@ export const traceCommand = new Command('trace')
             const serializable = {
               ...matrix,
               rows: matrix.rows.map((row) => {
-                const latestVerification = getLatestVerification(verificationStore, row.claimId);
+                const latestVerification = getLatestVerified(row.claimId);
                 return {
                   ...row,
                   projections: Object.fromEntries(row.projections),
@@ -381,7 +409,7 @@ export const traceCommand = new Command('trace')
           };
           if (options.width !== undefined) displayOpts.titleWidth = options.width;
           if (options.full) displayOpts.full = true;
-          console.log(formatTraceabilityMatrix(matrix, displayOpts, verificationStore));
+          console.log(formatTraceabilityMatrix(matrix, displayOpts, verifiedEvents));
 
           // @implements {DD006.§3.DC.19} Bare note-level source references section
           // @implements {DD006.§3.DC.20} Format as "Source References (note-level)"

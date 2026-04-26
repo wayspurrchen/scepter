@@ -6,6 +6,7 @@
 // @implements {DD011.§DC.04} Only public API symbols exported
 // @implements {DD011.§DC.05} No imports from cli/, llm/, or chat/
 // @implements {DD011.§DC.06} Internal modules explicitly excluded
+// @implements {DD014.§3.DC.54b} Legacy verification-store re-exports removed; metadata symbols added
 
 // --- Project ---
 export {
@@ -19,7 +20,7 @@ export type {
   NoteStorage,
   ConfigStorage,
   TemplateStorage,
-  VerificationStorage,
+  MetadataStorage,
   IdCounterStorage,
   StorageEvent,
   Attachment,
@@ -37,7 +38,7 @@ export {
   FilesystemNoteStorage,
   FilesystemConfigStorage,
   FilesystemTemplateStorage,
-  FilesystemVerificationStorage,
+  FilesystemMetadataStorage,
   FilesystemIdCounterStorage,
 } from './storage/filesystem/index.js';
 
@@ -92,13 +93,8 @@ export {
   isLifecycleTag,
   isDerivationTag,
   LIFECYCLE_TAGS,
-  // Verification
-  loadVerificationStore,
-  saveVerificationStore,
-  addVerificationEvent,
-  getLatestVerification,
-  removeLatestVerification,
-  removeAllVerifications,
+  // Metadata event log (DD014)
+  applyFold,
   // Staleness
   computeStaleness,
   // Search
@@ -135,9 +131,10 @@ export type {
   LifecycleType,
   LifecycleState,
   ParsedMetadata,
-  // Verification types
-  VerificationEvent,
-  VerificationStore,
+  // Metadata event log types (DD014)
+  MetadataEvent,
+  MetadataStore,
+  EventFilter,
   // Staleness types
   StalenessEntry,
   StalenessOptions,

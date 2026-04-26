@@ -32,12 +32,77 @@ import type {
   ClaimIndexData,
   ClaimIndexEntry,
   ClaimCrossReference,
-  VerificationStore,
   StalenessEntry,
   ClaimSearchResult,
+  MetadataEvent,
 } from '../../claims/index.js';
-import { getLatestVerification } from '../../claims/index.js';
 import type { ClaimThreadNode } from '../../claims/claim-thread.js';
+
+/**
+ * Pre-projected verified-event map consumed by synchronous formatters.
+ *
+ * Maps fully-qualified claim ID to its chronologically-ordered list of
+ * `verified` events. Callers populate via
+ * `metadataStorage.query({key: "verified"})`, then group by claimId.
+ *
+ * @implements {DD014.§3.DC.50} Pre-folded projection for synchronous formatter contexts
+ */
+export type VerifiedEventsByClaim = Map<string, MetadataEvent[]>;
+
+function getLatestVerifiedEvent(
+  byClaim: VerifiedEventsByClaim | undefined,
+  claimId: string,
+): MetadataEvent | undefined {
+  if (!byClaim) return undefined;
+  const events = byClaim.get(claimId);
+  if (!events || events.length === 0) return undefined;
+  return events[events.length - 1];
+}
+
+/**
+ * Group a flat list of `verified` events by claimId.
+ *
+ * Callers obtain the flat list via `metadataStorage.query({key: "verified"})`
+ * and pass the result here to produce the synchronous formatter input.
+ *
+ * @implements {DD014.§3.DC.50}
+ */
+export function groupVerifiedEvents(events: MetadataEvent[]): VerifiedEventsByClaim {
+  const map: VerifiedEventsByClaim = new Map();
+  for (const event of events) {
+    const existing = map.get(event.claimId);
+    if (existing) {
+      existing.push(event);
+    } else {
+      map.set(event.claimId, [event]);
+    }
+  }
+  return map;
+}
+
+/**
+ * Render an arbitrary `(claim, key)` projection cell from a folded state.
+ *
+ * Phase-1 callers: `meta get` (the sole consumer). Trace/gaps integration of
+ * arbitrary keys is via filter, not display, in Phase 1; future
+ * `--show-key`/`--group-by` modes will invoke this.
+ *
+ * @implements {DD014.§3.DC.51}
+ */
+export function formatMetadataKey(
+  claimId: string,
+  key: string,
+  folded: Record<string, string[]>,
+): string {
+  const values = folded[key] ?? [];
+  if (values.length === 0) {
+    return `${chalk.cyan(claimId)} ${chalk.gray(key)}: ${chalk.gray('(empty)')}`;
+  }
+  if (values.length === 1) {
+    return `${chalk.cyan(claimId)} ${chalk.gray(key)}: ${values[0]}`;
+  }
+  return `${chalk.cyan(claimId)} ${chalk.gray(key)}: [${values.join(', ')}]`;
+}
 import type {
   TraceabilityMatrix,
   GapReport,
@@ -75,8 +140,10 @@ export interface TraceDisplayOptions {
  * Extract the descriptive portion of a claim/section heading by stripping the
  * leading ID pattern (e.g., "§1 Parser Architecture" -> "Parser Architecture",
  * "§1.AC.01 Claim Grammar" -> "Claim Grammar").
+ *
+ * Exported for reuse by other display surfaces (e.g., command preambles).
  */
-function extractTitle(heading: string): string {
+export function extractTitle(heading: string): string {
   // Strip leading claim ID patterns. Handles both:
   //   §1.AC.01 Title...  (section-prefixed)
   //   §AC.01 Title...    (bare prefix, no section number)
@@ -98,8 +165,10 @@ function extractTitle(heading: string): string {
 
 /**
  * Truncate a string to a maximum width, appending '...' if truncated.
+ *
+ * Exported for reuse by other display surfaces (e.g., command preambles).
  */
-function truncateString(str: string, maxWidth: number): string {
+export function truncateString(str: string, maxWidth: number): string {
   if (str.length <= maxWidth) return str;
   if (maxWidth <= 3) return str.slice(0, maxWidth);
   return str.slice(0, maxWidth - 3) + '...';
@@ -118,7 +187,7 @@ function truncateString(str: string, maxWidth: number): string {
 export function formatTraceabilityMatrix(
   matrix: TraceabilityMatrix,
   displayOptions?: TraceDisplayOptions,
-  verificationStore?: VerificationStore,
+  verifiedEvents?: VerifiedEventsByClaim,
 ): string {
   const lines: string[] = [];
 
@@ -185,8 +254,9 @@ export function formatTraceabilityMatrix(
   }
 
   // Check if any row in a section has verification data
-  const hasVerification = verificationStore && matrix.rows.some(row => {
-    const v = getLatestVerification(verificationStore, row.claimId);
+  // @implements {DD014.§3.DC.50} verification rendering routed through fold projection
+  const hasVerification = verifiedEvents && matrix.rows.some(row => {
+    const v = getLatestVerifiedEvent(verifiedEvents, row.claimId);
     return v !== undefined;
   });
 
@@ -339,8 +409,9 @@ export function formatTraceabilityMatrix(
       }
 
       // @implements {R005.§3.AC.07} Show verification date when store provided
-      if (hasVerification && verificationStore) {
-        const latestVerif = getLatestVerification(verificationStore, row.claimId);
+      // @implements {DD014.§3.DC.50}
+      if (hasVerification && verifiedEvents) {
+        const latestVerif = getLatestVerifiedEvent(verifiedEvents, row.claimId);
         if (latestVerif) {
           cells.push(chalk.green(padRight(latestVerif.date, verifiedColWidth)));
         } else {
@@ -487,7 +558,7 @@ export async function formatClaimTrace(
   incoming: ClaimCrossReference[],
   noteTypes: Map<string, string>,
   options?: ClaimTraceOptions,
-  verificationStore?: VerificationStore,
+  verifiedEvents?: VerifiedEventsByClaim,
 ): Promise<string> {
   const showExcerpts = options?.excerpts !== false;
   const excerptWidth = options?.excerptWidth ?? 100;
@@ -514,15 +585,16 @@ export async function formatClaimTrace(
   }
 
   // @implements {R005.§3.AC.07} Show full verification history in single-claim trace
-  if (verificationStore) {
-    const events = verificationStore[entry.fullyQualified];
+  // @implements {DD014.§3.DC.50} verification history routed through fold projection
+  if (verifiedEvents) {
+    const events = verifiedEvents.get(entry.fullyQualified);
     if (events && events.length > 0) {
       lines.push(`  ${chalk.gray('Verification history:')}`);
       // Show most recent first
       for (const event of [...events].reverse()) {
         const parts = [event.date];
         if (event.actor) parts.push(`by ${event.actor}`);
-        if (event.method) parts.push(`(${event.method})`);
+        if (event.note) parts.push(`(${event.note})`);
         lines.push(`    ${chalk.green(parts.join(' '))}`);
       }
     }
@@ -838,7 +910,7 @@ export function formatClaimTree(nodes: ClaimNode[], depth: number = 0): string {
  *
  * @implements {R005.§5.AC.01} Summary includes importance, lifecycle, and verification counts
  */
-export function formatIndexSummary(data: ClaimIndexData, verificationStore?: VerificationStore): string {
+export function formatIndexSummary(data: ClaimIndexData, verifiedEvents?: VerifiedEventsByClaim): string {
   const lines: string[] = [];
 
   lines.push(chalk.bold('Claim Index Summary'));
@@ -901,11 +973,12 @@ export function formatIndexSummary(data: ClaimIndexData, verificationStore?: Ver
   }
 
   // @implements {R005.§5.AC.01} Verification counts
-  if (verificationStore) {
+  // @implements {DD014.§3.DC.50}
+  if (verifiedEvents) {
     let verified = 0;
     let unverified = 0;
     for (const fullyQualified of data.entries.keys()) {
-      const events = verificationStore[fullyQualified];
+      const events = verifiedEvents.get(fullyQualified);
       if (events && events.length > 0) {
         verified++;
       } else {

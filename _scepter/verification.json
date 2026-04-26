@@ -1,66 +1,2890 @@
 {
   "DD006.3.DC.10": [
     {
+      "id": "xsqddh2f1wyy56li7dvsyo9d",
       "claimId": "DD006.3.DC.10",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "vrom529za0k5pcg7c0peft8g",
+      "claimId": "DD006.3.DC.10",
+      "key": "derives",
+      "value": "A001.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.11": [
     {
+      "id": "qjjf904myrrhbsr8wkj7i7e1",
       "claimId": "DD006.3.DC.11",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "c2dt91kl1dj65v65ysnzgiro",
+      "claimId": "DD006.3.DC.11",
+      "key": "derives",
+      "value": "A001.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.24": [
     {
+      "id": "nxq8c87wq437g0nnbx8rgptn",
       "claimId": "DD006.3.DC.24",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "fzh2qv9a0x49b2yrlp2ledk1",
+      "claimId": "DD006.3.DC.24",
+      "key": "derives",
+      "value": "A001.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.25": [
     {
+      "id": "xn8v1rbc5ir2pe30k2z95otu",
       "claimId": "DD006.3.DC.25",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "ynogn2v0psf4779h8mh64oe4",
+      "claimId": "DD006.3.DC.25",
+      "key": "derives",
+      "value": "A001.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.26": [
     {
+      "id": "ffs8prw7nbb610z8lxhjv7cd",
       "claimId": "DD006.3.DC.26",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "efa909nyylogbipy65ls3z5a",
+      "claimId": "DD006.3.DC.26",
+      "key": "derives",
+      "value": "A001.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.27": [
     {
+      "id": "lncwrp1f2e6qu2mdd4626nnd",
       "claimId": "DD006.3.DC.27",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "zmj6a02zgi08bem1s1lskp05",
+      "claimId": "DD006.3.DC.27",
+      "key": "derives",
+      "value": "A001.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.28": [
     {
+      "id": "xll3otqy05o658yum64uxodg",
       "claimId": "DD006.3.DC.28",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "t0gxhogn83g1wjug2px55237",
+      "claimId": "DD006.3.DC.28",
+      "key": "derives",
+      "value": "A001.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
     }
   ],
   "DD006.3.DC.29": [
     {
+      "id": "p7brae2g5f5no4nofsiu6at1",
       "claimId": "DD006.3.DC.29",
-      "date": "2026-04-02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
       "actor": "orchestrator",
-      "method": "file-deletion"
+      "date": "2026-04-02T00:00:00.000Z",
+      "note": "method=file-deletion"
+    },
+    {
+      "id": "snepa5v79ha2f87055xhflxv",
+      "claimId": "DD006.3.DC.29",
+      "key": "derives",
+      "value": "A001.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "R009.1.AC.01": [
+    {
+      "id": "yg5oi7hv9qu33z3ap5t7gemc",
+      "claimId": "R009.1.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.1.AC.06": [
+    {
+      "id": "l5ukn9cm1hqhch0cx4tp74sx",
+      "claimId": "R009.1.AC.06",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.2.AC.01": [
+    {
+      "id": "zy95z4azoubtlw3hfir9rnqf",
+      "claimId": "R009.2.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.2.AC.02": [
+    {
+      "id": "fg9g3hzjpsgwkmmm4xw6b5py",
+      "claimId": "R009.2.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.2.AC.11": [
+    {
+      "id": "aa7rr4pmptav8gs6lf4t5ufc",
+      "claimId": "R009.2.AC.11",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.4.AC.01": [
+    {
+      "id": "etklpnjby4u3ns3c3hd9qxk2",
+      "claimId": "R009.4.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.7.AC.01": [
+    {
+      "id": "ve0kchfsxdxem9ckl1jcc5qv",
+      "claimId": "R009.7.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R009.7.AC.04": [
+    {
+      "id": "lswm1w2i80y6tw7e06pwne5c",
+      "claimId": "R009.7.AC.04",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "R008.1.AC.01": [
+    {
+      "id": "j1udoafdb4la31eumwl90k99",
+      "claimId": "R008.1.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R008 Folder Note Claim Aggregation.md",
+      "date": "2026-04-17T21:24:37.378Z",
+      "note": "inline"
+    }
+  ],
+  "R008.2.AC.01": [
+    {
+      "id": "tq0tusrz9qih61zap982a1d1",
+      "claimId": "R008.2.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R008 Folder Note Claim Aggregation.md",
+      "date": "2026-04-17T21:24:37.378Z",
+      "note": "inline"
+    }
+  ],
+  "R008.2.AC.02": [
+    {
+      "id": "pzwq511h2fshxe00yig3ji65",
+      "claimId": "R008.2.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R008 Folder Note Claim Aggregation.md",
+      "date": "2026-04-17T21:24:37.378Z",
+      "note": "inline"
+    }
+  ],
+  "R007.1.AC.01": [
+    {
+      "id": "gc7iufp58kz5we0ctnm3zvcq",
+      "claimId": "R007.1.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R007 Claim Index Search.md",
+      "date": "2026-03-20T03:02:32.492Z",
+      "note": "inline"
+    }
+  ],
+  "R007.1.AC.05": [
+    {
+      "id": "hrlvoa1dmrynovqc65f1l27m",
+      "claimId": "R007.1.AC.05",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R007 Claim Index Search.md",
+      "date": "2026-03-20T03:02:32.492Z",
+      "note": "inline"
+    }
+  ],
+  "R007.5.AC.01": [
+    {
+      "id": "kuxo5kqofe7v6474n7leq9ra",
+      "claimId": "R007.5.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R007 Claim Index Search.md",
+      "date": "2026-03-20T03:02:32.492Z",
+      "note": "inline"
+    }
+  ],
+  "R005.3.AC.02": [
+    {
+      "id": "tl5rpuamot87mbxu7m2he8yr",
+      "claimId": "R005.3.AC.02",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R005 Claim Metadata, Verification, and Lifecycle.md",
+      "date": "2026-04-25T03:47:24.012Z",
+      "note": "inline"
+    },
+    {
+      "id": "xct3qoepolimmsnw3h5b2wv5",
+      "claimId": "R005.3.AC.02",
+      "key": "supersededBy",
+      "value": "A004.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R005 Claim Metadata, Verification, and Lifecycle.md",
+      "date": "2026-04-25T03:47:24.012Z",
+      "note": "inline"
+    }
+  ],
+  "R005.3.AC.06": [
+    {
+      "id": "i70lcyqixo94e6umatytrmj8",
+      "claimId": "R005.3.AC.06",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R005 Claim Metadata, Verification, and Lifecycle.md",
+      "date": "2026-04-25T03:47:24.012Z",
+      "note": "inline"
+    },
+    {
+      "id": "kz9d0uqqi6i92kg0a90m4ki8",
+      "claimId": "R005.3.AC.06",
+      "key": "supersededBy",
+      "value": "A004.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R005 Claim Metadata, Verification, and Lifecycle.md",
+      "date": "2026-04-25T03:47:24.012Z",
+      "note": "inline"
+    }
+  ],
+  "R004.1.AC.07": [
+    {
+      "id": "d6lu8bvvknb0ep4w3uk1jl0n",
+      "claimId": "R004.1.AC.07",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-04-25T03:23:58.029Z",
+      "note": "inline"
+    }
+  ],
+  "R004.2.AC.04": [
+    {
+      "id": "wifm300xeb56uis7qbggsu25",
+      "claimId": "R004.2.AC.04",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-04-25T03:23:58.029Z",
+      "note": "inline"
+    },
+    {
+      "id": "niivnbckw4edy8bo2isr9z3j",
+      "claimId": "R004.2.AC.04",
+      "key": "supersededBy",
+      "value": "R005.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-04-25T03:23:58.029Z",
+      "note": "inline"
+    }
+  ],
+  "R004.7.AC.04": [
+    {
+      "id": "t0idqnkz4zjnzlc5ro07lgft",
+      "claimId": "R004.7.AC.04",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-04-25T03:23:58.029Z",
+      "note": "inline"
+    },
+    {
+      "id": "xdxipcbdamski3bdda19xotj",
+      "claimId": "R004.7.AC.04",
+      "key": "supersededBy",
+      "value": "R005.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-04-25T03:23:58.029Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.01": [
+    {
+      "id": "jyet3k1qn94ao9e8552c3jmu",
+      "claimId": "DD014.3.DC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "uvks361kynlldnh0vcvyfi0n",
+      "claimId": "DD014.3.DC.01",
+      "key": "derives",
+      "value": "A004.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "h7zxf82arikzbvauwaigmjp1",
+      "claimId": "DD014.3.DC.01",
+      "key": "reviewer",
+      "value": "test",
+      "op": "add",
+      "actor": "way",
+      "date": "2026-04-25T07:41:47.093Z",
+      "note": "DD014 Step 8 smoke test"
+    },
+    {
+      "id": "ol44exmdntleuw7tqh9r7n7f",
+      "claimId": "DD014.3.DC.01",
+      "key": "reviewer",
+      "value": "",
+      "op": "unset",
+      "actor": "way",
+      "date": "2026-04-25T07:43:21.150Z",
+      "note": "Cleanup of DD014 Step 8 smoke-test pollution"
+    }
+  ],
+  "DD014.3.DC.02": [
+    {
+      "id": "gly8yj52xznles0amfjrew8h",
+      "claimId": "DD014.3.DC.02",
+      "key": "derives",
+      "value": "R009.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.03": [
+    {
+      "id": "q3gr8i61c3yt77o7uk8m4f09",
+      "claimId": "DD014.3.DC.03",
+      "key": "derives",
+      "value": "R009.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.04": [
+    {
+      "id": "ji5cl8zfg0si2ddqzavnva5m",
+      "claimId": "DD014.3.DC.04",
+      "key": "derives",
+      "value": "R009.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.05": [
+    {
+      "id": "eqthev474don9lfduk950djs",
+      "claimId": "DD014.3.DC.05",
+      "key": "derives",
+      "value": "R009.§1.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.06": [
+    {
+      "id": "dvxituztdupwytv324qpzpht",
+      "claimId": "DD014.3.DC.06",
+      "key": "derives",
+      "value": "R009.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.07": [
+    {
+      "id": "mol1au44a9zjob3oj37apeoh",
+      "claimId": "DD014.3.DC.07",
+      "key": "derives",
+      "value": "A004.§1.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.08": [
+    {
+      "id": "x1rzjvp8jtwt532g9sf6952o",
+      "claimId": "DD014.3.DC.08",
+      "key": "derives",
+      "value": "A004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.09": [
+    {
+      "id": "crmprpdts98thh1r9oc5u0vy",
+      "claimId": "DD014.3.DC.09",
+      "key": "derives",
+      "value": "R009.§3.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.09a": [
+    {
+      "id": "b4h0prgu9sbc0g1so8vioy52",
+      "claimId": "DD014.3.DC.09a",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "vzn10knrjo1blrb7ll3z0x0v",
+      "claimId": "DD014.3.DC.09a",
+      "key": "derives",
+      "value": "A004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.10": [
+    {
+      "id": "pyoy4tl2mhjcp3da6ld0vbur",
+      "claimId": "DD014.3.DC.10",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "w5qdqwemyh3se8al6ovsqa7e",
+      "claimId": "DD014.3.DC.10",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.11": [
+    {
+      "id": "ywbh82f30yy0mby8a67x37rr",
+      "claimId": "DD014.3.DC.11",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "akta5823lw8wnvac5lqzlpe5",
+      "claimId": "DD014.3.DC.11",
+      "key": "derives",
+      "value": "A004.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.12": [
+    {
+      "id": "mfrohz9jn9rgmcuo4vbkthuy",
+      "claimId": "DD014.3.DC.12",
+      "key": "derives",
+      "value": "A004.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.13": [
+    {
+      "id": "ukhx33kmgkc1tsg21uroa2l6",
+      "claimId": "DD014.3.DC.13",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.14": [
+    {
+      "id": "elt81e5agtjj8lcf9rh07wz6",
+      "claimId": "DD014.3.DC.14",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "g2jlfmo7unhx1hn4f45dvo7w",
+      "claimId": "DD014.3.DC.14",
+      "key": "derives",
+      "value": "A004.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.15": [
+    {
+      "id": "avph5rg3iah6tmsyupkbu2pz",
+      "claimId": "DD014.3.DC.15",
+      "key": "derives",
+      "value": "A004.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.16": [
+    {
+      "id": "z3ddy0z1b8uui0xyrkhy30uh",
+      "claimId": "DD014.3.DC.16",
+      "key": "derives",
+      "value": "R009.§1.AC.10",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.17": [
+    {
+      "id": "ty893nriurqn6hk8i0ejjmf7",
+      "claimId": "DD014.3.DC.17",
+      "key": "derives",
+      "value": "R009.§1.AC.10",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.18": [
+    {
+      "id": "jfeharr2ynr5nry41026lime",
+      "claimId": "DD014.3.DC.18",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "ie8l790frmw27cpt5n2grauo",
+      "claimId": "DD014.3.DC.18",
+      "key": "derives",
+      "value": "R009.§1.AC.12",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.19": [
+    {
+      "id": "vxemcelfr21iuumaaa7alvh2",
+      "claimId": "DD014.3.DC.19",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "tobxxeupkorw05n3tsu4o3wg",
+      "claimId": "DD014.3.DC.19",
+      "key": "derives",
+      "value": "R009.§7.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.20": [
+    {
+      "id": "imkphrzi2fgdyafyxwvgetbq",
+      "claimId": "DD014.3.DC.20",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "cuxix1nk8tgyyvqry30t36w7",
+      "claimId": "DD014.3.DC.20",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:05.619Z",
+      "note": "FilesystemVerificationStorage and its test deleted; absence verified via git status and Glob"
+    }
+  ],
+  "DD014.3.DC.21": [
+    {
+      "id": "c760prmhnfijjujm9yk7e8h6",
+      "claimId": "DD014.3.DC.21",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "uwaagig3nrgz8fooqbui5igx",
+      "claimId": "DD014.3.DC.21",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:09.439Z",
+      "note": "verification-store.ts and its test deleted; absence verified via git status and Glob"
+    }
+  ],
+  "DD014.3.DC.22": [
+    {
+      "id": "qct6fqp6dft76rjzb2kh6ljk",
+      "claimId": "DD014.3.DC.22",
+      "key": "derives",
+      "value": "A004.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "nq34ai975f78u28hlw1q8vn6",
+      "claimId": "DD014.3.DC.22",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:13.352Z",
+      "note": "@paralleldrive/cuid2 ^2.x present in core/package.json dependencies"
+    }
+  ],
+  "DD014.3.DC.23": [
+    {
+      "id": "yrwpzn72iymf4gw22cifmxgz",
+      "claimId": "DD014.3.DC.23",
+      "key": "derives",
+      "value": "A004.§1.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "pqdtywf0jdwyoe15f2r71ufu",
+      "claimId": "DD014.3.DC.23",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:17.842Z",
+      "note": "proper-lockfile ^4.x present in core/package.json dependencies and types entry @types/proper-lockfile"
+    }
+  ],
+  "DD014.3.DC.24": [
+    {
+      "id": "nkfsekec46sea8f7yvot24pw",
+      "claimId": "DD014.3.DC.24",
+      "key": "derives",
+      "value": "R009.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.25": [
+    {
+      "id": "a6sl5mnj8b3vmr46z0m2r7ky",
+      "claimId": "DD014.3.DC.25",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "djpbdvsaklo9abo4ujeu9e1n",
+      "claimId": "DD014.3.DC.25",
+      "key": "derives",
+      "value": "R009.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.26": [
+    {
+      "id": "midpmy09afwz8i9jlit0vl8c",
+      "claimId": "DD014.3.DC.26",
+      "key": "derives",
+      "value": "R009.§2.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.27": [
+    {
+      "id": "xe9tk3a7kdzxfih1egbys96v",
+      "claimId": "DD014.3.DC.27",
+      "key": "derives",
+      "value": "R009.§2.AC.08",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.28": [
+    {
+      "id": "wn8tcv7merlolwr9r5iri9lh",
+      "claimId": "DD014.3.DC.28",
+      "key": "derives",
+      "value": "R009.§2.AC.09",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.29": [
+    {
+      "id": "yj8o7w3d6zlz4up40k8zncxx",
+      "claimId": "DD014.3.DC.29",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "x9l3sobvv3nc7temjx0x65qh",
+      "claimId": "DD014.3.DC.29",
+      "key": "derives",
+      "value": "R009.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.30": [
+    {
+      "id": "qti11ay5401geir5a11pn426",
+      "claimId": "DD014.3.DC.30",
+      "key": "derives",
+      "value": "R009.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.31": [
+    {
+      "id": "o36odsu3l0kfwb1fi6r23inh",
+      "claimId": "DD014.3.DC.31",
+      "key": "derives",
+      "value": "R009.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.32": [
+    {
+      "id": "v0a0roh47pd61wmtco2qg31i",
+      "claimId": "DD014.3.DC.32",
+      "key": "derives",
+      "value": "R009.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.33": [
+    {
+      "id": "w7qhog19esp8gwidlicnjj9w",
+      "claimId": "DD014.3.DC.33",
+      "key": "derives",
+      "value": "R009.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.34": [
+    {
+      "id": "kcmnwy7n0hi0ntmp38slek72",
+      "claimId": "DD014.3.DC.34",
+      "key": "derives",
+      "value": "R009.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.35": [
+    {
+      "id": "rxgaqx7x04vknv7y1e8jvcih",
+      "claimId": "DD014.3.DC.35",
+      "key": "derives",
+      "value": "R009.§3.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.36": [
+    {
+      "id": "wuj2rshhjk9v46m3qgkwx6ii",
+      "claimId": "DD014.3.DC.36",
+      "key": "derives",
+      "value": "A004.§1.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.37": [
+    {
+      "id": "vzrlmslgksf1l5kt4q9si35b",
+      "claimId": "DD014.3.DC.37",
+      "key": "derives",
+      "value": "A004.§1.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.38": [
+    {
+      "id": "tzep07irgy247rbq7wjlvftv",
+      "claimId": "DD014.3.DC.38",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "gvfaou324gp773x5uzpbh5l6",
+      "claimId": "DD014.3.DC.38",
+      "key": "derives",
+      "value": "A004.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.39": [
+    {
+      "id": "h09mf3uyx26slbvpfo3colly",
+      "claimId": "DD014.3.DC.39",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "fhwpi3rix8kzghj3yjx7exo5",
+      "claimId": "DD014.3.DC.39",
+      "key": "derives",
+      "value": "A004.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.40": [
+    {
+      "id": "njpe0fz2omxn3wvr0mrwfh0t",
+      "claimId": "DD014.3.DC.40",
+      "key": "derives",
+      "value": "A004.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.41": [
+    {
+      "id": "oys9e21wcsnt04w17ijqdgfk",
+      "claimId": "DD014.3.DC.41",
+      "key": "derives",
+      "value": "A004.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.42": [
+    {
+      "id": "as759kwexdk1kk72vwjorg8j",
+      "claimId": "DD014.3.DC.42",
+      "key": "derives",
+      "value": "A004.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.43": [
+    {
+      "id": "y8p18us187nrwwftuznz7ozt",
+      "claimId": "DD014.3.DC.43",
+      "key": "derives",
+      "value": "A004.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.44": [
+    {
+      "id": "q6vjc3tvr8hjt59xtl8ip8z0",
+      "claimId": "DD014.3.DC.44",
+      "key": "derives",
+      "value": "A004.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.45": [
+    {
+      "id": "gi67vlueis94536wec2b21l8",
+      "claimId": "DD014.3.DC.45",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "eh7l90e8rk7ae3dlpj4imuoq",
+      "claimId": "DD014.3.DC.45",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.46": [
+    {
+      "id": "up36vz2z8utibicreb9sfrtg",
+      "claimId": "DD014.3.DC.46",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.47": [
+    {
+      "id": "ei0qq0es9nn82vsxghxlzajw",
+      "claimId": "DD014.3.DC.47",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.48": [
+    {
+      "id": "l73qla9stqu6gfq3n3y1gezt",
+      "claimId": "DD014.3.DC.48",
+      "key": "derives",
+      "value": "A004.§4.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.49": [
+    {
+      "id": "pqpvummh85ldobe56dustgsj",
+      "claimId": "DD014.3.DC.49",
+      "key": "derives",
+      "value": "A004.§4.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.50": [
+    {
+      "id": "rxphlwtksjwxvonvhih9ov98",
+      "claimId": "DD014.3.DC.50",
+      "key": "derives",
+      "value": "A004.§4.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.51": [
+    {
+      "id": "ksq62cdk8109n16nm93t8jof",
+      "claimId": "DD014.3.DC.51",
+      "key": "derives",
+      "value": "A004.§4.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.52": [
+    {
+      "id": "i03fk0fruy0nrbpifk1ag19q",
+      "claimId": "DD014.3.DC.52",
+      "key": "derives",
+      "value": "A004.§4.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.53": [
+    {
+      "id": "o70bzmxgxajb29mrlg2ia7cw",
+      "claimId": "DD014.3.DC.53",
+      "key": "derives",
+      "value": "A004.§4.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.54": [
+    {
+      "id": "rwk4rctzkp7mhl212pvqpbt9",
+      "claimId": "DD014.3.DC.54",
+      "key": "derives",
+      "value": "A004.§4.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.54a": [
+    {
+      "id": "s1suqn21vbi5yxc5y4cfia93",
+      "claimId": "DD014.3.DC.54a",
+      "key": "derives",
+      "value": "A004.§4.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.54b": [
+    {
+      "id": "zvz7we8nyxv2e7j88i7tjp7j",
+      "claimId": "DD014.3.DC.54b",
+      "key": "derives",
+      "value": "A004.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.55": [
+    {
+      "id": "f2afwajrj9ls0deph763p5q4",
+      "claimId": "DD014.3.DC.55",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "fjqgmcbd5t96uiw06fnb8jy4",
+      "claimId": "DD014.3.DC.55",
+      "key": "derives",
+      "value": "R009.§5.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.56": [
+    {
+      "id": "qsasbf7rvhycfgpdpwc8b6s9",
+      "claimId": "DD014.3.DC.56",
+      "key": "derives",
+      "value": "R009.§5.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.57": [
+    {
+      "id": "wif06dtf621v2c7ab339x244",
+      "claimId": "DD014.3.DC.57",
+      "key": "derives",
+      "value": "R009.§5.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.58": [
+    {
+      "id": "kqebuwzcj9ivldl6l3bx3m1w",
+      "claimId": "DD014.3.DC.58",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "qthb47zqf6218pbsrqed895v",
+      "claimId": "DD014.3.DC.58",
+      "key": "derives",
+      "value": "A004.§4.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.59": [
+    {
+      "id": "ud9sctql9zu86vdde1d0nwh7",
+      "claimId": "DD014.3.DC.59",
+      "key": "derives",
+      "value": "A004.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "q330p3z5v0ycjqctewhxnkch",
+      "claimId": "DD014.3.DC.59",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:22.182Z",
+      "note": "lossless invariant test exists at core/src/claims/__tests__/claim-metadata.lossless.test.ts with @validates annotation; passing; not visible in trace Source column because project config excludes **/*.test.ts from source scanning"
+    }
+  ],
+  "DD014.3.DC.60": [
+    {
+      "id": "b29rs32mresboz7rj0bmdek3",
+      "claimId": "DD014.3.DC.60",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "vp5vl34z69gw6tjlwtihykhd",
+      "claimId": "DD014.3.DC.60",
+      "key": "derives",
+      "value": "R009.§7.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.61": [
+    {
+      "id": "a00k7132zo6rdrwlctis4ycb",
+      "claimId": "DD014.3.DC.61",
+      "key": "derives",
+      "value": "R009.§7.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.62": [
+    {
+      "id": "gacf6ops5p894moidgx3gvf7",
+      "claimId": "DD014.3.DC.62",
+      "key": "derives",
+      "value": "R009.§7.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.63": [
+    {
+      "id": "uzd94u2ywhd3gnbhj03fwjx2",
+      "claimId": "DD014.3.DC.63",
+      "key": "derives",
+      "value": "R009.§7.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.64": [
+    {
+      "id": "de9pzm48lihllc49m5clewgi",
+      "claimId": "DD014.3.DC.64",
+      "key": "derives",
+      "value": "R009.§7.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.65": [
+    {
+      "id": "ky7xuzr1gkcx7192nrc1y5mg",
+      "claimId": "DD014.3.DC.65",
+      "key": "derives",
+      "value": "A004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.3.DC.66": [
+    {
+      "id": "a46dcksk5cc0wlrpz0syg8k1",
+      "claimId": "DD014.3.DC.66",
+      "key": "derives",
+      "value": "A004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "n0t5mn9tv6y3p54j95zfdtiu",
+      "claimId": "DD014.3.DC.66",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:27.461Z",
+      "note": "watch-mode adapter ships in FilesystemMetadataStorage per DC.65; absence of Phase-1 subscriber is by design per DD014 §10 (Phase-2 work)"
+    }
+  ],
+  "DD013.DC.01": [
+    {
+      "id": "czbqf48lpozj7yxfbnsvmw90",
+      "claimId": "DD013.DC.01",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.02": [
+    {
+      "id": "nl44iagh1yu62gcju65h2qn0",
+      "claimId": "DD013.DC.02",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.07": [
+    {
+      "id": "e42y5ad59fc12bsymp7x20cg",
+      "claimId": "DD013.DC.07",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.08": [
+    {
+      "id": "iefvjt457gro2mibk3xcgzhs",
+      "claimId": "DD013.DC.08",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.09": [
+    {
+      "id": "ssqq6xih7wfs8jku9ag4zl5w",
+      "claimId": "DD013.DC.09",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.11": [
+    {
+      "id": "njws70xfoauelepmziwa656q",
+      "claimId": "DD013.DC.11",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.12": [
+    {
+      "id": "e3ff5p3gbphwf4k6iykjequw",
+      "claimId": "DD013.DC.12",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.18": [
+    {
+      "id": "q2sqpkkwgaxz8nq40p2boldv",
+      "claimId": "DD013.DC.18",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD013.DC.19": [
+    {
+      "id": "wd4jmscybf8cp6foyexjmajr",
+      "claimId": "DD013.DC.19",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD013 VS Code Rich Views - Sidebar TreeViews Traceability and Search.md",
+      "date": "2026-04-03T13:28:32.377Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.01": [
+    {
+      "id": "ibt8526clsy28rjeh3ippdfz",
+      "claimId": "DD012.DC.01",
+      "key": "derives",
+      "value": "A003.§5.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.02": [
+    {
+      "id": "no5v0lcesw6w9l4p5lsebnnd",
+      "claimId": "DD012.DC.02",
+      "key": "derives",
+      "value": "A003.§5.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.03": [
+    {
+      "id": "iggnj31jwh17r2z7hk0o1g28",
+      "claimId": "DD012.DC.03",
+      "key": "derives",
+      "value": "A003.§7.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.04": [
+    {
+      "id": "f1p7cg4hjzu2c5k5xe63aici",
+      "claimId": "DD012.DC.04",
+      "key": "derives",
+      "value": "A003.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.05": [
+    {
+      "id": "o8fro9osctgd8u4fwgxexzdd",
+      "claimId": "DD012.DC.05",
+      "key": "derives",
+      "value": "A003.§1.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.06": [
+    {
+      "id": "ligr64ovrs2h5vmlfnqbud0f",
+      "claimId": "DD012.DC.06",
+      "key": "derives",
+      "value": "A003.§5.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.07": [
+    {
+      "id": "bfm95d73impkdm409ex7v170",
+      "claimId": "DD012.DC.07",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.08": [
+    {
+      "id": "c1csci7wbgomf8kvb1zjp0qt",
+      "claimId": "DD012.DC.08",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.09": [
+    {
+      "id": "ry9rz8lhjwhvjat4665yf9g4",
+      "claimId": "DD012.DC.09",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.10": [
+    {
+      "id": "nhxrkrmb5bboej5aal56apqf",
+      "claimId": "DD012.DC.10",
+      "key": "derives",
+      "value": "A003.§4.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.11": [
+    {
+      "id": "mnttjh5e4ntvgx5erw5kuc30",
+      "claimId": "DD012.DC.11",
+      "key": "derives",
+      "value": "A003.§1.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.12": [
+    {
+      "id": "fauhv9o83bgxua2h3vtm68c5",
+      "claimId": "DD012.DC.12",
+      "key": "derives",
+      "value": "A003.§1.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.13": [
+    {
+      "id": "tp3akht2nc9hzozgjxjuupct",
+      "claimId": "DD012.DC.13",
+      "key": "derives",
+      "value": "A003.§1.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.14": [
+    {
+      "id": "fqxedp3s3jd6rjqdzh7d61s1",
+      "claimId": "DD012.DC.14",
+      "key": "derives",
+      "value": "A003.§4.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.15": [
+    {
+      "id": "oaj8ann06u1on09wihyq42wa",
+      "claimId": "DD012.DC.15",
+      "key": "derives",
+      "value": "A003.§4.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD012.DC.16": [
+    {
+      "id": "nzrllskzyz09lrklv3a5issi",
+      "claimId": "DD012.DC.16",
+      "key": "derives",
+      "value": "A003.§4.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD012 VS Code Extension Migration - CLI to Library API.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.01": [
+    {
+      "id": "yy6zln3xsxeza1krisndu0b6",
+      "claimId": "DD011.DC.01",
+      "key": "derives",
+      "value": "A003.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.02": [
+    {
+      "id": "filu1nfz4yffodeacsf01iiu",
+      "claimId": "DD011.DC.02",
+      "key": "derives",
+      "value": "A003.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.03": [
+    {
+      "id": "sd0rcdejkvrkjid2pkt7tmcg",
+      "claimId": "DD011.DC.03",
+      "key": "derives",
+      "value": "A003.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.04": [
+    {
+      "id": "tph4hqf2pdqf5drfvi2wzulu",
+      "claimId": "DD011.DC.04",
+      "key": "derives",
+      "value": "A003.§3.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.05": [
+    {
+      "id": "c2lx3jtbjmjufosh2kkujn7m",
+      "claimId": "DD011.DC.05",
+      "key": "derives",
+      "value": "A003.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.06": [
+    {
+      "id": "mp2qsa7mm8445nz7wxs6uejq",
+      "claimId": "DD011.DC.06",
+      "key": "derives",
+      "value": "A003.§3.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.07": [
+    {
+      "id": "gb8yjb2lwim2u4mvbmnqpjdz",
+      "claimId": "DD011.DC.07",
+      "key": "derives",
+      "value": "A003.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.08": [
+    {
+      "id": "fo005lqxi1f28w7t1ig5ar4o",
+      "claimId": "DD011.DC.08",
+      "key": "derives",
+      "value": "A003.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.09": [
+    {
+      "id": "qwkcgpyfaxdfd8kfjg2f6810",
+      "claimId": "DD011.DC.09",
+      "key": "derives",
+      "value": "A003.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.10": [
+    {
+      "id": "w6krkjas5nvkdj1lsbsvz2q9",
+      "claimId": "DD011.DC.10",
+      "key": "derives",
+      "value": "A003.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.11": [
+    {
+      "id": "vlm2umm89n1z7di7iy4fbgir",
+      "claimId": "DD011.DC.11",
+      "key": "derives",
+      "value": "A003.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.12": [
+    {
+      "id": "gev8m1mocileqv11oyrj6lil",
+      "claimId": "DD011.DC.12",
+      "key": "derives",
+      "value": "A003.§5.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD011.DC.13": [
+    {
+      "id": "tenwp6be9v8wq0gps6k33vwj",
+      "claimId": "DD011.DC.13",
+      "key": "derives",
+      "value": "A003.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD011 Library API Surface - Barrel Exports and Build Configuration.md",
+      "date": "2026-04-03T13:28:32.376Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.01": [
+    {
+      "id": "dhnqwbprvb4asxumct88zr7a",
+      "claimId": "DD010.DC.01",
+      "key": "derives",
+      "value": "A002.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.02": [
+    {
+      "id": "ukc2zmd93lw03p4303vybg0e",
+      "claimId": "DD010.DC.02",
+      "key": "derives",
+      "value": "A002.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.03": [
+    {
+      "id": "mrx5ntcv45exgs030iied9yy",
+      "claimId": "DD010.DC.03",
+      "key": "derives",
+      "value": "A002.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.04": [
+    {
+      "id": "vu39fbuoxv9txrv936nwqrku",
+      "claimId": "DD010.DC.04",
+      "key": "derives",
+      "value": "A002.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.05": [
+    {
+      "id": "wqjtman0o0ki67ej7tdvxngd",
+      "claimId": "DD010.DC.05",
+      "key": "derives",
+      "value": "A002.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.06": [
+    {
+      "id": "co95tjzy0kv5no571jyi42ys",
+      "claimId": "DD010.DC.06",
+      "key": "derives",
+      "value": "A002.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.07": [
+    {
+      "id": "wsf15xenwenkveteceffquq6",
+      "claimId": "DD010.DC.07",
+      "key": "derives",
+      "value": "A002.§2.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.08": [
+    {
+      "id": "wk5p205mg7zkjwpd1ja5uiq1",
+      "claimId": "DD010.DC.08",
+      "key": "derives",
+      "value": "A002.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.09": [
+    {
+      "id": "f8tg7te1h02weurpsmogt3oz",
+      "claimId": "DD010.DC.09",
+      "key": "derives",
+      "value": "A002.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.10": [
+    {
+      "id": "zankdn8p00a8u55v6gc2i9d0",
+      "claimId": "DD010.DC.10",
+      "key": "derives",
+      "value": "A002.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.11": [
+    {
+      "id": "esc0rzopbsdgol1oixk2gzsn",
+      "claimId": "DD010.DC.11",
+      "key": "derives",
+      "value": "A002.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.12": [
+    {
+      "id": "og4e10qd8a9nhu4g8n844mz1",
+      "claimId": "DD010.DC.12",
+      "key": "derives",
+      "value": "A002.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.13": [
+    {
+      "id": "wn908m00td88uzfjg08yuqp4",
+      "claimId": "DD010.DC.13",
+      "key": "derives",
+      "value": "A002.§3.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.14": [
+    {
+      "id": "na04g2wiglx15q9ledw6puxt",
+      "claimId": "DD010.DC.14",
+      "key": "derives",
+      "value": "A002.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.15": [
+    {
+      "id": "tq9yz22ajqffjv1xud3olxcv",
+      "claimId": "DD010.DC.15",
+      "key": "derives",
+      "value": "A002.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.16": [
+    {
+      "id": "j79auug53h89on3paoo61hel",
+      "claimId": "DD010.DC.16",
+      "key": "derives",
+      "value": "A002.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.17": [
+    {
+      "id": "h1rnd9vxhb485hcsi0mt15f7",
+      "claimId": "DD010.DC.17",
+      "key": "derives",
+      "value": "A002.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.18": [
+    {
+      "id": "aljhd37iymrea25tzwdzjxr3",
+      "claimId": "DD010.DC.18",
+      "key": "derives",
+      "value": "A002.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.19": [
+    {
+      "id": "uq1q3sbo1r4qt8r3n2ztur1d",
+      "claimId": "DD010.DC.19",
+      "key": "derives",
+      "value": "A002.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.20": [
+    {
+      "id": "kcsylz1yjsacjqy0yocv33kx",
+      "claimId": "DD010.DC.20",
+      "key": "derives",
+      "value": "A002.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.21": [
+    {
+      "id": "z7kfwkx5g9zkb45wpb2k91u4",
+      "claimId": "DD010.DC.21",
+      "key": "derives",
+      "value": "A002.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.22": [
+    {
+      "id": "qat5lv7shzcklftevh2x3r8y",
+      "claimId": "DD010.DC.22",
+      "key": "derives",
+      "value": "A002.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.23": [
+    {
+      "id": "pjizgce5y95qapt1qd3kp9vk",
+      "claimId": "DD010.DC.23",
+      "key": "derives",
+      "value": "A002.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.24": [
+    {
+      "id": "uq08tal71dtmvbha256chotx",
+      "claimId": "DD010.DC.24",
+      "key": "derives",
+      "value": "A002.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.25": [
+    {
+      "id": "omuf6132es9h1t3wimnep3eg",
+      "claimId": "DD010.DC.25",
+      "key": "derives",
+      "value": "A002.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.26": [
+    {
+      "id": "onin264ymzu0tezrtx6rs57d",
+      "claimId": "DD010.DC.26",
+      "key": "derives",
+      "value": "A002.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD010.DC.27": [
+    {
+      "id": "m84bg3ko0hbfx8ahfikyq55l",
+      "claimId": "DD010.DC.27",
+      "key": "derives",
+      "value": "A002.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD010 Storage Protocol Extraction - Implementation Blueprint.md",
+      "date": "2026-04-03T13:28:32.375Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.01": [
+    {
+      "id": "lgunnawhx8t886o305r1wuw6",
+      "claimId": "DD006.3.DC.01",
+      "key": "derives",
+      "value": "A001.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.02": [
+    {
+      "id": "imhlewop892pk6bq67n59s6l",
+      "claimId": "DD006.3.DC.02",
+      "key": "derives",
+      "value": "A001.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.03": [
+    {
+      "id": "h1y8qxcc2vb07t3h0hd8u3pc",
+      "claimId": "DD006.3.DC.03",
+      "key": "derives",
+      "value": "A001.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.04": [
+    {
+      "id": "axsp9nce87rjphvmhefhykl0",
+      "claimId": "DD006.3.DC.04",
+      "key": "derives",
+      "value": "A001.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.05": [
+    {
+      "id": "bj6k0iyp33m1p4y8p5iosssa",
+      "claimId": "DD006.3.DC.05",
+      "key": "derives",
+      "value": "A001.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.06": [
+    {
+      "id": "y6ienikgusjn8ue70b8jvafl",
+      "claimId": "DD006.3.DC.06",
+      "key": "derives",
+      "value": "A001.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.07": [
+    {
+      "id": "tgv7sebtp4tw2jo75qbcsw9c",
+      "claimId": "DD006.3.DC.07",
+      "key": "derives",
+      "value": "A001.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.08": [
+    {
+      "id": "ix20abnxhjvfmod3awvn3a2l",
+      "claimId": "DD006.3.DC.08",
+      "key": "derives",
+      "value": "A001.§5.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.09": [
+    {
+      "id": "f9ghiqoyrismm3v3uvs7ayoy",
+      "claimId": "DD006.3.DC.09",
+      "key": "derives",
+      "value": "A001.§5.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.12": [
+    {
+      "id": "s4stnsqvgyvc1zabjv1jdy45",
+      "claimId": "DD006.3.DC.12",
+      "key": "derives",
+      "value": "A001.§2.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.13": [
+    {
+      "id": "aq6cvpt1rx0e8y37z5dkdm6c",
+      "claimId": "DD006.3.DC.13",
+      "key": "derives",
+      "value": "A001.§4.AC.10",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.14": [
+    {
+      "id": "tdlew2n0wekvphasnomc6i4w",
+      "claimId": "DD006.3.DC.14",
+      "key": "derives",
+      "value": "A001.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.15": [
+    {
+      "id": "exsmughm1mhe53bkvqis4of6",
+      "claimId": "DD006.3.DC.15",
+      "key": "derives",
+      "value": "A001.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.16": [
+    {
+      "id": "gir5tz2o8dmiw8gri0jkyc6q",
+      "claimId": "DD006.3.DC.16",
+      "key": "derives",
+      "value": "A001.§5.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.17": [
+    {
+      "id": "mc05xdcyu4m0mdwr9io7b7jm",
+      "claimId": "DD006.3.DC.17",
+      "key": "derives",
+      "value": "A001.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.18": [
+    {
+      "id": "gdcpfyqqtdx6up8919sat7qt",
+      "claimId": "DD006.3.DC.18",
+      "key": "derives",
+      "value": "A001.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.19": [
+    {
+      "id": "xycvc6viemj31di35tf0fzud",
+      "claimId": "DD006.3.DC.19",
+      "key": "derives",
+      "value": "A001.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.20": [
+    {
+      "id": "bshh8ovxgoe7l93bhiojnocy",
+      "claimId": "DD006.3.DC.20",
+      "key": "derives",
+      "value": "A001.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.21": [
+    {
+      "id": "j44eg2ukonbwm0230c5zee5l",
+      "claimId": "DD006.3.DC.21",
+      "key": "derives",
+      "value": "A001.§5.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.22": [
+    {
+      "id": "l1y6iqio6pu3x5ccncgmcmr6",
+      "claimId": "DD006.3.DC.22",
+      "key": "derives",
+      "value": "A001.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "DD006.3.DC.23": [
+    {
+      "id": "yafzqwkxntr8pg7yhd86imay",
+      "claimId": "DD006.3.DC.23",
+      "key": "derives",
+      "value": "A001.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD006 CLI Unification - Implementation Blueprint.md",
+      "date": "2026-04-02T02:30:00.703Z",
+      "note": "inline"
+    }
+  ],
+  "A004.1.AC.01": [
+    {
+      "id": "yau5lzwysvvqug4vlowxqlol",
+      "claimId": "A004.1.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.1.AC.02": [
+    {
+      "id": "cclv8cl5lxrv6orcq7c4djyy",
+      "claimId": "A004.1.AC.02",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.1.AC.03": [
+    {
+      "id": "biu24vyei7rosl63jgh4v97r",
+      "claimId": "A004.1.AC.03",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.1.AC.06": [
+    {
+      "id": "hzgjq45m0cy6ik1qjmgf4bcx",
+      "claimId": "A004.1.AC.06",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.2.AC.01": [
+    {
+      "id": "hglx6grs86ztmjj40tzypwar",
+      "claimId": "A004.2.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.2.AC.03": [
+    {
+      "id": "qsnrmjsvfeq6wem7vu3m01cx",
+      "claimId": "A004.2.AC.03",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.3.AC.01": [
+    {
+      "id": "y52val31kx4aimdg65xlpoui",
+      "claimId": "A004.3.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.3.AC.03": [
+    {
+      "id": "njdevcs0on3nacc642kmwp05",
+      "claimId": "A004.3.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A004.4.AC.01": [
+    {
+      "id": "nusxsujexwylqrpqqfkymlbz",
+      "claimId": "A004.4.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    }
+  ],
+  "A003.1.AC.01": [
+    {
+      "id": "muv3vwrqc9o06j1hoxor2dbn",
+      "claimId": "A003.1.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A003 Library API Surface - Core as Importable Package.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A003.1.AC.02": [
+    {
+      "id": "xkfx27vwbsgt21dmystu3rup",
+      "claimId": "A003.1.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A003 Library API Surface - Core as Importable Package.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A003.1.AC.03": [
+    {
+      "id": "so6gvwg74jhqhcbr5ch0nyy6",
+      "claimId": "A003.1.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A003 Library API Surface - Core as Importable Package.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A003.3.AC.01": [
+    {
+      "id": "lf66ppxyor1k7skouwtzaw2v",
+      "claimId": "A003.3.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A003 Library API Surface - Core as Importable Package.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A003.3.AC.03": [
+    {
+      "id": "klx7lajd5ptrw50idgn5opib",
+      "claimId": "A003.3.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A003 Library API Surface - Core as Importable Package.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A003.3.AC.06": [
+    {
+      "id": "ifzsyks5a65gslpsq7pu89vl",
+      "claimId": "A003.3.AC.06",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A003 Library API Surface - Core as Importable Package.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A002.1.AC.01": [
+    {
+      "id": "owugddzwscmujce4ih6nb2br",
+      "claimId": "A002.1.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A002 Backend Agnosticism - Storage Protocol Extraction.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A002.2.AC.01": [
+    {
+      "id": "u4tfozxxxpsfcqzhpw6h8uqh",
+      "claimId": "A002.2.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A002 Backend Agnosticism - Storage Protocol Extraction.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A002.3.AC.04": [
+    {
+      "id": "cyo1200xura9s28r10hitauu",
+      "claimId": "A002.3.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A002 Backend Agnosticism - Storage Protocol Extraction.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "A002.4.AC.02": [
+    {
+      "id": "w36305liwh61ssfhs0wm17nq",
+      "claimId": "A002.4.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A002 Backend Agnosticism - Storage Protocol Extraction.md",
+      "date": "2026-04-03T13:28:32.374Z",
+      "note": "inline"
+    }
+  ],
+  "DD014.11.OQ.01": [
+    {
+      "id": "by1118crlm06jzt9w8vc5itn",
+      "claimId": "DD014.11.OQ.01",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:31.255Z",
+      "note": "resolved by DC.23: proper-lockfile selected and shipped"
+    },
+    {
+      "id": "d4txlt1smdc9r8nipt9bd0es",
+      "claimId": "DD014.11.OQ.01",
+      "key": "lifecycle",
+      "value": "closed",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:31.255Z",
+      "note": "resolved by DC.23: proper-lockfile selected and shipped"
+    }
+  ],
+  "DD014.11.OQ.02": [
+    {
+      "id": "nq5yr5u7q6beygqvklqm7wne",
+      "claimId": "DD014.11.OQ.02",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:35.972Z",
+      "note": "resolved by DC.58: parseClaimMetadata kept as raw-token interpreter for Phase 1; lossless invariant test (DC.59) cross-checks against fold path"
+    },
+    {
+      "id": "mnc6k4zdrkvf31h4iobjl17j",
+      "claimId": "DD014.11.OQ.02",
+      "key": "lifecycle",
+      "value": "closed",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:35.972Z",
+      "note": "resolved by DC.58: parseClaimMetadata kept as raw-token interpreter for Phase 1; lossless invariant test (DC.59) cross-checks against fold path"
+    }
+  ],
+  "DD014.11.OQ.03": [
+    {
+      "id": "hyefdf5nfen6pkfk7q9lv76c",
+      "claimId": "DD014.11.OQ.03",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:40.501Z",
+      "note": "resolved by DC.08: fold rule kept unified across all four ops; per-op test isolation in T-Fold-1..T-Fold-5"
+    },
+    {
+      "id": "sibifv2pcsexrszbm4hu7k0m",
+      "claimId": "DD014.11.OQ.03",
+      "key": "lifecycle",
+      "value": "closed",
+      "op": "add",
+      "actor": "claude-orchestrator",
+      "date": "2026-04-26T01:29:40.501Z",
+      "note": "resolved by DC.08: fold rule kept unified across all four ops; per-op test isolation in T-Fold-1..T-Fold-5"
+    }
+  ],
+  "R010.1.AC.01": [
+    {
+      "id": "v68da9ttffdsljudwicj6w5b",
+      "claimId": "R010.1.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R010 Verification Actor Default and Strictness Configuration.md",
+      "date": "2026-04-26T01:40:48.461Z",
+      "note": "inline"
+    }
+  ],
+  "R010.2.AC.01": [
+    {
+      "id": "nre4ofewno4lux7p1sql0caz",
+      "claimId": "R010.2.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R010 Verification Actor Default and Strictness Configuration.md",
+      "date": "2026-04-26T01:40:48.461Z",
+      "note": "inline"
+    }
+  ],
+  "R010.2.AC.03": [
+    {
+      "id": "q7g36lm0und4igalhv9w9v4g",
+      "claimId": "R010.2.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R010 Verification Actor Default and Strictness Configuration.md",
+      "date": "2026-04-26T01:40:48.461Z",
+      "note": "inline"
+    }
+  ],
+  "R010.2.AC.04": [
+    {
+      "id": "jajeju9d77xat1qj3fjhn1r9",
+      "claimId": "R010.2.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R010 Verification Actor Default and Strictness Configuration.md",
+      "date": "2026-04-26T01:40:48.461Z",
+      "note": "inline"
+    }
+  ],
+  "R010.2.AC.05": [
+    {
+      "id": "gfwy2j3t67sunvgd5b9zrudt",
+      "claimId": "R010.2.AC.05",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R010 Verification Actor Default and Strictness Configuration.md",
+      "date": "2026-04-26T01:40:48.461Z",
+      "note": "inline"
     }
   ]
 }

@@ -6,8 +6,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
-import type { VerificationStore } from '../../../claims/index.js';
-import { formatIndexSummary } from '../../formatters/claim-formatter.js';
+import { formatIndexSummary, groupVerifiedEvents } from '../../formatters/claim-formatter.js';
 import { formatClaimTree } from '../../formatters/claim-formatter.js';
 
 export const indexCommand = new Command('index')
@@ -24,8 +23,10 @@ export const indexCommand = new Command('index')
         async (context) => {
           const data = await ensureIndex(context.projectManager);
 
-          // @implements {R005.§5.AC.01} Load verification store for verified/unverified counts
-          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
+          // @implements {R005.§5.AC.01} Load verification events for verified/unverified counts
+          // @implements {DD014.§3.DC.54} index-command reads via metadataStorage
+          const verifiedEventList = await context.projectManager.metadataStorage!.query({ key: 'verified' });
+          const verifiedEvents = groupVerifiedEvents(verifiedEventList);
 
           if (options.json) {
             // Serialize maps for JSON output
@@ -41,7 +42,7 @@ export const indexCommand = new Command('index')
             return;
           }
 
-          console.log(formatIndexSummary(data, verificationStore));
+          console.log(formatIndexSummary(data, verifiedEvents));
 
           if (options.tree) {
             console.log('');

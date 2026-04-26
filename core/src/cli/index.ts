@@ -37,6 +37,8 @@ import { lintCommand } from './commands/claims/lint-command.js';
 import { verifyCommand } from './commands/claims/verify-command.js';
 import { staleCommand } from './commands/claims/stale-command.js';
 import { threadCommand } from './commands/claims/thread-command.js';
+// @implements {DD014.§3.DC.24} `meta` subcommand group registered at top level
+import { metaCommand } from './commands/claims/meta/index.js';
 
 // Remaining top-level commands
 import { typesCommand } from './commands/types/index.js';
@@ -92,6 +94,7 @@ program.addCommand(lintCommand);
 program.addCommand(verifyCommand);
 program.addCommand(staleCommand);
 program.addCommand(threadCommand);
+program.addCommand(metaCommand);
 
 // Backward-compatible hidden aliases {DD006.§3.DC.05}, {DD006.§3.DC.06}, {DD006.§3.DC.07}
 // These intercept old-style `scepter ctx <cmd>`, `scepter claims <cmd>`, `scepter notes <cmd>`

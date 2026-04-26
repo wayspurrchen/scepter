@@ -115,7 +115,8 @@ describe('Storage Protocol Boundary', () => {
     });
   });
 
-  describe('Verification consumer migration (DC.26)', () => {
+  // @validates {DD014.§3.DC.54} Consumers migrated from verificationStorage to metadataStorage
+  describe('Metadata consumer migration (DD014)', () => {
     const consumerFiles = [
       'src/cli/commands/claims/verify-command.ts',
       'src/cli/commands/claims/stale-command.ts',
@@ -128,26 +129,27 @@ describe('Storage Protocol Boundary', () => {
     ];
 
     for (const file of consumerFiles) {
-      it(`${path.basename(file)} should not call loadVerificationStore directly`, async () => {
+      it(`${path.basename(file)} should not reference legacy verificationStorage`, async () => {
         const filePath = path.resolve(__dirname, '../..', file);
         const content = await fs.readFile(filePath, 'utf-8');
 
-        // Active code should not contain loadVerificationStore calls
         const lines = content.split('\n');
-        const activeLoadCalls = lines.filter(line => {
+        const legacyRefs = lines.filter(line => {
           const trimmed = line.trim();
           if (trimmed.startsWith('//') || trimmed.startsWith('*')) return false;
-          return trimmed.includes('loadVerificationStore(') && !trimmed.includes('import');
+          return trimmed.includes('verificationStorage') ||
+            trimmed.includes('loadVerificationStore') ||
+            trimmed.includes('getLatestVerification');
         });
 
-        expect(activeLoadCalls).toEqual([]);
+        expect(legacyRefs).toEqual([]);
       });
 
-      it(`${path.basename(file)} should use verificationStorage`, async () => {
+      it(`${path.basename(file)} should use metadataStorage`, async () => {
         const filePath = path.resolve(__dirname, '../..', file);
         const content = await fs.readFile(filePath, 'utf-8');
 
-        expect(content).toContain('verificationStorage');
+        expect(content).toContain('metadataStorage');
       });
     }
   });

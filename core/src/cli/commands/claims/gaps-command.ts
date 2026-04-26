@@ -20,11 +20,13 @@
  */
 
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
-import { findPartialCoverageGaps, getLatestVerification } from '../../../claims/index.js';
-import type { PartialCoverageOptions, VerificationStore } from '../../../claims/index.js';
-import { formatTraceabilityMatrix } from '../../formatters/claim-formatter.js';
+import { findPartialCoverageGaps } from '../../../claims/index.js';
+import type { PartialCoverageOptions } from '../../../claims/index.js';
+import { parseMetadataFilters, applyMetadataFilters, collectStrings } from '../../../claims/index.js';
+import { formatTraceabilityMatrix, groupVerifiedEvents } from '../../formatters/claim-formatter.js';
 import type { TraceDisplayOptions } from '../../formatters/claim-formatter.js';
 
 export const gapsCommand = new Command('gaps')
@@ -42,6 +44,10 @@ export const gapsCommand = new Command('gaps')
   .option('--json', 'Output as JSON')
   .option('--width <chars>', 'Max characters for claim title column (default: 70)', parseInt)
   .option('--full', 'Show full claim titles without truncation')
+  // @implements {DD014.§3.DC.55} Metadata filters: --where, --has-key, --missing-key
+  .option('--where <pair>', 'Filter to claims where KEY=VALUE in folded metadata (repeatable)', collectStrings, [])
+  .option('--has-key <key>', 'Filter to claims with at least one value for KEY (repeatable)', collectStrings, [])
+  .option('--missing-key <key>', 'Filter to claims with no value for KEY (repeatable)', collectStrings, [])
   .action(async (options: {
     importance?: number;
     sort?: string;
@@ -55,6 +61,9 @@ export const gapsCommand = new Command('gaps')
     json?: boolean;
     width?: number;
     full?: boolean;
+    where?: string[];
+    hasKey?: string[];
+    missingKey?: string[];
     projectDir?: string;
   }) => {
     try {
@@ -88,11 +97,30 @@ export const gapsCommand = new Command('gaps')
           let matrix = findPartialCoverageGaps(data, gapOptions);
 
           // @implements {R005.§1.AC.02} Filter by minimum importance
+          // @implements {DD014.§3.DC.57} --importance preserved unchanged at user-facing level
           if (options.importance !== undefined) {
             matrix.rows = matrix.rows.filter((row) =>
               row.importance !== undefined && row.importance >= options.importance!,
             );
           }
+
+          // @implements {DD014.§3.DC.55} Parse and validate --where / --has-key / --missing-key
+          const filterParse = parseMetadataFilters({
+            where: options.where,
+            hasKey: options.hasKey,
+            missingKey: options.missingKey,
+          });
+          if (!filterParse.ok) {
+            console.error(chalk.red(filterParse.error));
+            process.exit(1);
+          }
+          // @implements {DD014.§3.DC.56} AND-compose metadata filters with the existing flag set
+          matrix.rows = await applyMetadataFilters(
+            matrix.rows,
+            (row) => row.claimId,
+            context.projectManager.metadataStorage!,
+            filterParse,
+          );
 
           // @implements {R005.§1.AC.04} Sort rows by importance descending
           if (options.sort === 'importance') {
@@ -104,12 +132,15 @@ export const gapsCommand = new Command('gaps')
           }
 
           // @implements {DD005.§DC.12} JSON output with trace-matrix-style data
+          // @implements {DD014.§3.DC.53} gaps-command reads via metadataStorage
           if (options.json) {
-            const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
+            const verifiedEventList = await context.projectManager.metadataStorage!.query({ key: 'verified' });
+            const verifiedEvents = groupVerifiedEvents(verifiedEventList);
             const serializable = {
               ...matrix,
               rows: matrix.rows.map((row) => {
-                const latestVerification = getLatestVerification(verificationStore, row.claimId);
+                const events = verifiedEvents.get(row.claimId) ?? [];
+                const latestVerification = events.length > 0 ? events[events.length - 1] : undefined;
                 return {
                   ...row,
                   projections: Object.fromEntries(row.projections),
@@ -134,8 +165,10 @@ export const gapsCommand = new Command('gaps')
           if (options.width !== undefined) displayOpts.titleWidth = options.width;
           if (options.full) displayOpts.full = true;
 
-          const verificationStore: VerificationStore = await context.projectManager.verificationStorage!.load();
-          console.log(formatTraceabilityMatrix(matrix, displayOpts, verificationStore));
+          // @implements {DD014.§3.DC.53}
+          const verifiedEventList = await context.projectManager.metadataStorage!.query({ key: 'verified' });
+          const verifiedEvents = groupVerifiedEvents(verifiedEventList);
+          console.log(formatTraceabilityMatrix(matrix, displayOpts, verifiedEvents));
         },
       );
     } catch (error) {
