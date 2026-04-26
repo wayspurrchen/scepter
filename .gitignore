@@ -8,6 +8,7 @@ tmp/
 
 # Build output
 /dist
+/core/dist
 
 # Local settings
 .claude/
