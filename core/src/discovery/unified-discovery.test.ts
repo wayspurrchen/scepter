@@ -315,7 +315,7 @@ describe('UnifiedDiscovery', () => {
     it('should support file watching', async () => {
       const mockWatcher = {
         on: vi.fn().mockReturnThis(),
-        close: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
       };
 
       vi.mocked(chokidar.watch).mockReturnValue(mockWatcher as any);
@@ -350,7 +350,7 @@ describe('UnifiedDiscovery', () => {
           }
           return mockWatcher; // Return this for chaining
         }),
-        close: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
       };
 
       vi.mocked(chokidar.watch).mockReturnValue(mockWatcher as any);

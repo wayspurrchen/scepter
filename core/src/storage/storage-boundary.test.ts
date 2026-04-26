@@ -21,7 +21,7 @@ import {
 describe('Storage Protocol Boundary', () => {
   describe('NoteManager fs import removal (DC.25)', () => {
     it('should not import fs, fs-extra, or fs/promises', async () => {
-      const noteManagerPath = path.join(process.cwd(), 'core', 'src', 'notes', 'note-manager.ts');
+      const noteManagerPath = path.resolve(__dirname, '../notes/note-manager.ts');
       const content = await fs.readFile(noteManagerPath, 'utf-8');
 
       // Check active (non-commented) import lines
@@ -107,7 +107,7 @@ describe('Storage Protocol Boundary', () => {
 
   describe('BaseCommand factory path', () => {
     it('should import createFilesystemProject, not ProjectManager constructor', async () => {
-      const baseCommandPath = path.join(process.cwd(), 'core', 'src', 'cli', 'commands', 'base-command.ts');
+      const baseCommandPath = path.resolve(__dirname, '../cli/commands/base-command.ts');
       const content = await fs.readFile(baseCommandPath, 'utf-8');
 
       expect(content).toContain('createFilesystemProject');
@@ -129,7 +129,7 @@ describe('Storage Protocol Boundary', () => {
 
     for (const file of consumerFiles) {
       it(`${path.basename(file)} should not call loadVerificationStore directly`, async () => {
-        const filePath = path.join(process.cwd(), 'core', file);
+        const filePath = path.resolve(__dirname, '../..', file);
         const content = await fs.readFile(filePath, 'utf-8');
 
         // Active code should not contain loadVerificationStore calls
@@ -144,7 +144,7 @@ describe('Storage Protocol Boundary', () => {
       });
 
       it(`${path.basename(file)} should use verificationStorage`, async () => {
-        const filePath = path.join(process.cwd(), 'core', file);
+        const filePath = path.resolve(__dirname, '../..', file);
         const content = await fs.readFile(filePath, 'utf-8');
 
         expect(content).toContain('verificationStorage');

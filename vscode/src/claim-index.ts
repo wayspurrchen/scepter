@@ -437,6 +437,19 @@ export class ClaimIndexCache {
         return;
       }
 
+      // Force the underlying caches to re-read from disk. Without this,
+      // getAllNotes() returns the in-memory index built at activation time
+      // and "Refresh claim index" appears to do nothing for files added or
+      // changed since startup.
+      await this.projectManager.noteManager.rescan();
+      await this.projectManager.noteFileManager.buildIndex();
+      if (this.projectManager.sourceScanner) {
+        await this.projectManager.sourceScanner.refresh();
+        this.projectManager.referenceManager.setSourceIndex(
+          this.projectManager.sourceScanner.getIndex(),
+        );
+      }
+
       // Get all notes and build NoteWithContent array
       const allNotes = await this.projectManager.noteManager.getAllNotes();
       const notesWithContent: NoteWithContent[] = [];
