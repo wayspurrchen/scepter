@@ -127,6 +127,73 @@ describe('common-filters', () => {
       expect(query.createdAfter?.toString()).toBe('Invalid Date');
     });
 
+    describe('timestampPrecision: date snapping', () => {
+      it('should snap sub-day "after" cutoffs to start of UTC day', () => {
+        // Notes stored at date precision parse to UTC midnight on load, so a
+        // sub-day "after" cutoff must snap to UTC start-of-day or today's
+        // notes get filtered out.
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const expectedDay = tenMinutesAgo.toISOString().split('T')[0];
+
+        const query = optionsToNoteQuery(
+          { createdAfter: '10 minutes ago' },
+          { timestampPrecision: 'date' },
+        );
+
+        expect(query.createdAfter?.toISOString()).toBe(`${expectedDay}T00:00:00.000Z`);
+      });
+
+      it('should snap sub-day "before" cutoffs to end of UTC day', () => {
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const expectedDay = tenMinutesAgo.toISOString().split('T')[0];
+
+        const query = optionsToNoteQuery(
+          { createdBefore: '10 minutes ago' },
+          { timestampPrecision: 'date' },
+        );
+
+        expect(query.createdBefore?.toISOString()).toBe(`${expectedDay}T23:59:59.999Z`);
+      });
+
+      it('should snap modifiedAfter/modifiedBefore the same way', () => {
+        const query = optionsToNoteQuery(
+          {
+            modifiedAfter: '2024-06-15T14:30:00Z',
+            modifiedBefore: '2024-06-20T08:15:00Z',
+          },
+          { timestampPrecision: 'date' },
+        );
+
+        expect(query.modifiedAfter?.toISOString()).toBe('2024-06-15T00:00:00.000Z');
+        expect(query.modifiedBefore?.toISOString()).toBe('2024-06-20T23:59:59.999Z');
+      });
+
+      it('should leave cutoffs untouched when precision is datetime', () => {
+        const query = optionsToNoteQuery(
+          { createdAfter: '2024-06-15T14:30:00Z' },
+          { timestampPrecision: 'datetime' },
+        );
+
+        expect(query.createdAfter?.toISOString()).toBe('2024-06-15T14:30:00.000Z');
+      });
+
+      it('should default to no snapping when precision is not provided', () => {
+        const query = optionsToNoteQuery({ createdAfter: '2024-06-15T14:30:00Z' });
+
+        expect(query.createdAfter?.toISOString()).toBe('2024-06-15T14:30:00.000Z');
+      });
+
+      it('should not crash on invalid dates when snapping', () => {
+        const query = optionsToNoteQuery(
+          { createdAfter: 'utter-nonsense' },
+          { timestampPrecision: 'date' },
+        );
+
+        expect(query.createdAfter).toBeInstanceOf(Date);
+        expect(query.createdAfter?.toString()).toBe('Invalid Date');
+      });
+    });
+
     it('should handle all pagination options', () => {
       const query = optionsToNoteQuery({
         limit: 10,

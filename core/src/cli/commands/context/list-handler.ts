@@ -45,8 +45,11 @@ export async function listNotes(options: ListOptions, context: CommandContext): 
     throw new Error('Note manager not initialized');
   }
 
-  // Convert options to query
-  const query = optionsToNoteQuery(options);
+  // Convert options to query — pass timestamp precision so sub-day cutoffs
+  // ("10 minutes ago") snap to UTC day boundaries when notes store dates only.
+  const query = optionsToNoteQuery(options, {
+    timestampPrecision: projectManager.configManager.getConfig().timestampPrecision,
+  });
 
   // Add content filter if specified
   if (options.contains) {

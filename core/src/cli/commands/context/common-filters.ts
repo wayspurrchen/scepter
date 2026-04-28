@@ -13,6 +13,31 @@ function parseNaturalDate(dateStr: string): Date | undefined {
 }
 
 /**
+ * Snap a date cutoff to a UTC day boundary when notes are stored at date
+ * precision. Notes written with `timestampPrecision: "date"` are reloaded as
+ * UTC midnight (e.g. `2026-04-27T00:00:00Z`), so a sub-day cutoff like
+ * "10 minutes ago" would otherwise filter out every note created today. We
+ * snap "after" cutoffs to the start of the cutoff's UTC day and "before"
+ * cutoffs to the end, matching the granularity actually stored.
+ */
+function snapCutoffForPrecision(date: Date, precision: 'date' | 'datetime' | undefined, edge: 'start' | 'end'): Date {
+  if (precision !== 'date' || isNaN(date.getTime())) return date;
+  const isoDay = date.toISOString().split('T')[0];
+  const startOfDay = new Date(isoDay);
+  if (edge === 'start') return startOfDay;
+  return new Date(startOfDay.getTime() + 86_400_000 - 1);
+}
+
+function resolveCutoff(
+  raw: string,
+  edge: 'start' | 'end',
+  precision: 'date' | 'datetime' | undefined,
+): Date {
+  const parsed = parseNaturalDate(raw) ?? new Date(raw);
+  return snapCutoffForPrecision(parsed, precision, edge);
+}
+
+/**
  * Parse comma-separated values from CLI arguments
  * Handles both space-separated and comma-separated formats
  * Examples: ["R", "T"] or ["R,T"] or ["R,T", "D"]
@@ -125,11 +150,24 @@ export function addCommonFilterOptions(command: Command): Command {
   );
 }
 
+export interface OptionsToNoteQueryConfig {
+  /**
+   * Storage precision for note timestamps. When 'date', sub-day cutoffs like
+   * "10 minutes ago" are snapped to UTC day boundaries so today's notes
+   * (which are stamped at UTC midnight) still match.
+   */
+  timestampPrecision?: 'date' | 'datetime';
+}
+
 /**
  * Convert CLI options to NoteQuery
  */
-export function optionsToNoteQuery(options: CommonFilterOptions): NoteQuery {
+export function optionsToNoteQuery(
+  options: CommonFilterOptions,
+  config: OptionsToNoteQueryConfig = {},
+): NoteQuery {
   const query: NoteQuery = {};
+  const precision = config.timestampPrecision;
 
   // Type filters - handle comma-separated values
   // Handle both --types and --type (alias)
@@ -152,37 +190,16 @@ export function optionsToNoteQuery(options: CommonFilterOptions): NoteQuery {
 
   // Date filters
   if (options.createdAfter) {
-    const parsed = parseNaturalDate(options.createdAfter);
-    if (parsed) {
-      query.createdAfter = parsed;
-    } else {
-      // Fallback to direct date parsing
-      query.createdAfter = new Date(options.createdAfter);
-    }
+    query.createdAfter = resolveCutoff(options.createdAfter, 'start', precision);
   }
   if (options.createdBefore) {
-    const parsed = parseNaturalDate(options.createdBefore);
-    if (parsed) {
-      query.createdBefore = parsed;
-    } else {
-      query.createdBefore = new Date(options.createdBefore);
-    }
+    query.createdBefore = resolveCutoff(options.createdBefore, 'end', precision);
   }
   if (options.modifiedAfter) {
-    const parsed = parseNaturalDate(options.modifiedAfter);
-    if (parsed) {
-      query.modifiedAfter = parsed;
-    } else {
-      query.modifiedAfter = new Date(options.modifiedAfter);
-    }
+    query.modifiedAfter = resolveCutoff(options.modifiedAfter, 'start', precision);
   }
   if (options.modifiedBefore) {
-    const parsed = parseNaturalDate(options.modifiedBefore);
-    if (parsed) {
-      query.modifiedBefore = parsed;
-    } else {
-      query.modifiedBefore = new Date(options.modifiedBefore);
-    }
+    query.modifiedBefore = resolveCutoff(options.modifiedBefore, 'end', precision);
   }
 
   // Reference filters
