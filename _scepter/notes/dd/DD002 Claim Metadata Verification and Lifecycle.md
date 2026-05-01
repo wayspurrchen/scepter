@@ -78,7 +78,7 @@ All 29 ACs covered. No deferrals.
 ### Parser Layer
 
 - **`core/src/parsers/claim/claim-parser.ts`** — `parseMetadataSuffix()` at L96-108 produces `{ id: string, metadata: string[] }`. Filter regex: `/^[A-Za-z0-9]+$/`. `ClaimAddress.metadata` is `string[]`. `parseClaimAddress()` calls `parseMetadataSuffix()` as first step.
-- **`core/src/parsers/claim/claim-tree.ts`** — `ClaimNode.metadata` is `string[]`. `ClaimTreeError.type` has four values: `duplicate`, `non-monotonic`, `ambiguous`, `forbidden-form`.
+- **`core/src/parsers/claim/claim-tree.ts`** — `ClaimNode.metadata` is `string[]`. `ClaimTreeError.type` retains the union including `duplicate` and `ambiguous`, but as of 2026-04-30 those error variants are reserved (no current code path emits them — the parser silently dedups same-note repeats and the validator no longer raises ambiguity at definition time). Active variants: `forbidden-form`, `non-monotonic`, plus the index- and lint-level types (`unresolved-reference`, `multiple-lifecycle`, `invalid-supersession-target`, `reference-to-removed`, `unresolvable-derivation-target`).
 - **`core/src/parsers/claim/index.ts`** — Re-exports from both parser modules.
 
 ### Index Layer

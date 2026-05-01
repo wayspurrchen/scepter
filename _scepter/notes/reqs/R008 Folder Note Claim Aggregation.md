@@ -60,11 +60,11 @@ Claims from all files within a folder note MUST be indexed under the parent note
 
 §2.AC.01:4 The claim index MUST use aggregated content when building the index, so that claims defined in any companion file within a folder note are indexed under the parent note's ID.
 
-§2.AC.02:4 The linter (`scepter claims lint`) MUST use aggregated content, so that structural validation (duplicate IDs, monotonicity, forbidden forms) spans all files within a folder note.
+§2.AC.02:4 The linter (`scepter claims lint`) MUST use aggregated content, so that structural validation (monotonicity, forbidden forms, unresolved references) spans all files within a folder note. (Refined 2026-04-30: see {R004.§4.AC.03} — same-note ID repeats are tolerated silently rather than reported as duplicates. This applies equally to repeats across companion files of a folder note, since aggregation makes the folder a single logical note.)
 
-§2.AC.03 Section IDs MUST be unique across all files in a folder note. If two companion files both define `§3`, the existing duplicate section detection MUST flag this as an error.
+§2.AC.03 Sub-files of a folder note share a single ID namespace via aggregation. If two companion files both define `§3`, the parser keeps the first occurrence in alphabetical-filename order and silently drops the second. (Refined 2026-04-30: original wording required a duplicate error; the new tolerance rule applies uniformly to same-note repeats whether they live in one file or across companion files of a folder note. Authors who need both sections to appear must rename one.)
 
-§2.AC.04 Claim IDs within a section MUST be unique across all files in a folder note. If two files both define `§2.AC.01`, the existing duplicate claim detection MUST flag this as an error.
+§2.AC.04 Claim IDs within a folder note share a single namespace via aggregation. If two companion files both define `§2.AC.01`, the parser keeps the first occurrence in alphabetical-filename order and silently drops the second. (Refined 2026-04-30: same rationale as §2.AC.03 above.)
 
 §2.AC.05 The traceability matrix (`scepter claims trace`) MUST reflect claims from all companion files, since it is built from the claim index which uses aggregated content.
 

@@ -219,7 +219,7 @@
     "compile": "tsc -p ./",
     "watch": "node esbuild.mjs --watch",
     "package": "node esbuild.mjs --production",
-    "vsix": "npx @vscode/vsce package --no-dependencies",
+    "vsix": "npx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license",
     "lint": "eslint src"
   },
   "dependencies": {

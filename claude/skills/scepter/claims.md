@@ -161,7 +161,7 @@ Reference forms, from most to least explicit:
 
 | Rule | Valid | Invalid |
 |------|-------|---------|
-| Dot is mandatory | `AC.01` | `AC01` (rejected by linter) |
+| Dot is mandatory | `AC.01` | `AC01` at line-leading position with 2+ letter prefix (e.g. `AC01 The parser MUST...`) is rejected by the linter. Single-letter labels like `B10`, `H1`, `T1` and mid-text occurrences are not flagged — they're not claim attempts |
 | No hyphens | `AC.01` | `AC-01` (collides with JIRA) |
 | Letter prefix required | `§3.AC.01` | `§3.01` (that's a section path) |
 | Prefix is alphabetic-only | `AC.01`, `SEC.03` | `PH1.01` (rejected by linter — overlaps note-ID namespace) |
@@ -169,18 +169,22 @@ Reference forms, from most to least explicit:
 | § is for sections only | `§3.AC.01`, `§1.2` | `§AC.01` (§ on a claim prefix, not a section number) |
 | Monotonic, never recycled | Sequential numbering | Reusing deleted IDs |
 
+**Same-file repeats are tolerated.** Restating a claim ID later in the same note — in a TOC, summary table, or appendix — is normal authoring and does not produce a duplicate error. The first occurrence is the canonical definition; subsequent occurrences are treated as prose and dropped from the index. The trade-off is that an actual accidental copy-paste duplicate is silently swallowed; if you intend two distinct claims, give them distinct IDs.
+
+**Bare-id ambiguity is not flagged at definition time.** Using `§1.AC.01` and `§2.AC.01` in the same note is normal — that's the payoff of using sections. The "ambiguity" of the bare suffix `AC.01` matters only when an actual reference fails to resolve unambiguously, and it's surfaced there if it does.
+
 ### Folder Notes and Claims
 
 Folder-based notes (`R001 Title/R001.md` with companion `.md` files) are treated as a single logical document for claim purposes. All companion markdown files are aggregated with the main file — the claim index, linter, tracer, and gap detection operate on the unified content.
 
 **What this means in practice:**
 - Claims in companion files (e.g., `R001 Title/details.md`) are indexed under the parent note's ID. A claim `§2.AC.01` in `details.md` becomes `R001.§2.AC.01`.
-- Section IDs and claim IDs must be unique across ALL files in the folder. If two sub-files both define `§3`, the linter reports a duplicate section error.
+- Sub-files share a single ID namespace. If two sub-files both define `§3`, the parser keeps the first occurrence (in alphabetical-filename order) and silently drops the second — same rule as same-file repeats. If you want both sections to appear, rename one.
 - Companion files are included in alphabetical order by filename. Authors control logical order by naming files accordingly (e.g., `01-core.md`, `02-extensions.md`).
 - Frontmatter is stripped from companion files — only the main file's frontmatter is authoritative.
 - Sub-files are NOT independently referenceable. `{R001}` references the folder note as a whole. There is no syntax for `{R001/details.md}`.
 
-**When authoring claims in a folder note:** Distribute sections across sub-files as needed, but maintain globally unique section numbering. Run `scepter claims lint NOTEID` to verify there are no collisions.
+**When authoring claims in a folder note:** Distribute sections across sub-files as needed, but maintain globally unique section numbering. The parser will silently dedup colliding IDs, so if you intended two sections you'll see only one in the index — run `scepter claims lint NOTEID` and inspect the section count to confirm no unintended collapses.
 
 ### Metadata Suffix
 

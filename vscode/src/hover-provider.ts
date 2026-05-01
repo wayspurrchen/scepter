@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ClaimIndexCache, ClaimIndexEntry, NoteInfo } from './claim-index';
+import { ClaimIndexCache, ClaimIndexEntry, NoteInfo, SectionEntry } from './claim-index';
 import { matchAtPosition, noteIdFromPath } from './patterns';
 
 export class ClaimHoverProvider implements vscode.HoverProvider {
@@ -52,10 +52,10 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
 
     // --- Section reference ---
     if (match.kind === 'section') {
-      return new vscode.Hover(
-        new vscode.MarkdownString(`*Section §${match.normalizedId}*`),
-        range
-      );
+      const sectionEntry = this.index.lookupSection(match.normalizedId, contextNoteId ?? undefined);
+      if (sectionEntry) {
+        return new vscode.Hover(await this.buildSectionHover(sectionEntry), range);
+      }
     }
 
     // --- Fallback: reference recognized but not in index ---
@@ -125,6 +125,33 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
           `- *...and ${incoming.length - 5} more (use Trace Claim)*\n`
         );
       }
+    }
+
+    return md;
+  }
+
+  private async buildSectionHover(entry: SectionEntry): Promise<vscode.MarkdownString> {
+    const md = new vscode.MarkdownString();
+    md.isTrusted = true;
+    md.supportHtml = true;
+
+    const noteInfo = this.index.lookupNote(entry.noteId);
+    const noteTitle = noteInfo?.noteTitle ?? entry.noteId;
+
+    md.appendMarkdown(`**${entry.fqid}** — *§${entry.sectionId}*\n\n`);
+    md.appendMarkdown(`*${entry.noteType || 'Section'}* — ${noteTitle}\n\n`);
+    md.appendMarkdown(`### ${entry.heading}\n\n`);
+
+    const absPath = this.index.resolveFilePath(entry.noteFilePath);
+    const uri = vscode.Uri.file(absPath);
+    const openCmd = `command:vscode.open?${encodeURIComponent(JSON.stringify([uri, { selection: { startLineNumber: entry.line, startColumn: 1 } }]))}`;
+    md.appendMarkdown(`[${entry.noteFilePath}:${entry.line}](${openCmd})\n\n`);
+
+    const sectionText = await this.index.readSectionContent(entry, 200);
+    if (sectionText) {
+      md.appendMarkdown(`---\n\n`);
+      md.appendCodeblock(sectionText.trim(), 'markdown');
+      md.appendMarkdown(`\n`);
     }
 
     return md;

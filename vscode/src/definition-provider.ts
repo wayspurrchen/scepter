@@ -42,6 +42,18 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
       }
     }
 
+    // Section-level — go to the section heading
+    if (match.kind === 'section') {
+      const sectionEntry = this.index.lookupSection(match.normalizedId, contextNoteId ?? undefined);
+      if (sectionEntry?.noteFilePath) {
+        const absPath = this.index.resolveFilePath(sectionEntry.noteFilePath);
+        return new vscode.Location(
+          vscode.Uri.file(absPath),
+          new vscode.Position(Math.max(0, sectionEntry.line - 1), 0)
+        );
+      }
+    }
+
     return null;
   }
 }

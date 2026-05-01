@@ -87,7 +87,24 @@ export class DecorationProvider {
         const range = new vscode.Range(i, match.start, i, match.end);
 
         if (match.kind === 'section') {
-          sections.push({ range });
+          // Resolve qualified ({R005.§1}) and bare (§2 with file context)
+          // section refs against the index. Unknown sections fall through
+          // to the same wavy-underline treatment as unknown claims so the
+          // user can tell them apart from valid-but-bare formatting.
+          const sectionEntry = this.index.lookupSection(
+            match.normalizedId,
+            contextNoteId ?? undefined,
+          );
+          if (sectionEntry) {
+            sections.push({ range });
+          } else {
+            unresolvedList.push({
+              range,
+              hoverMessage: new vscode.MarkdownString(
+                `*SCEpter section* \`§${match.normalizedId}\` — not found in index`
+              ),
+            });
+          }
           continue;
         }
 

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 // @implements {DD012.§DC.04} Import domain types from core barrel instead of duplicating
-import type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, SourceReference, TraceabilityMatrix, ConfidenceAuditResult } from 'scepter';
+import type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, ClaimTreeError, ClaimNode, SourceReference, TraceabilityMatrix, ConfidenceAuditResult } from 'scepter';
 // @implements {DD012.§DC.07} ProjectManager as composition root
 // @implements {DD012.§DC.08} ClaimIndex.build from core
 // @implements {DD012.§DC.10} Note content reading via core
@@ -16,7 +16,25 @@ import {
   auditConfidence,
 } from 'scepter';
 
-export type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, SourceReference, TraceabilityMatrix, ConfidenceAuditResult };
+export type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, ClaimTreeError, ClaimNode, SourceReference, TraceabilityMatrix, ConfidenceAuditResult };
+
+/**
+ * A section heading in a note, with enough metadata to render hovers,
+ * navigate goto-definition, and decorate inline references.
+ *
+ * `fqid` is `{noteId}.{sectionPath.join('.')}` — e.g. `R005.1`, `DD036.2.3`.
+ */
+export interface SectionEntry {
+  fqid: string;
+  noteId: string;
+  sectionId: string;
+  sectionPath: number[];
+  heading: string;
+  line: number;
+  endLine: number;
+  noteFilePath: string;
+  noteType: string;
+}
 
 // @implements {DD013.§DC.07} View-oriented accessor interfaces
 export interface SectionWithClaims {
@@ -49,6 +67,28 @@ export interface NoteInfo {
   /** Full title extracted from file name, e.g. "Claim Index Search" */
   noteTitle: string;
   claimCount: number;
+}
+
+/**
+ * Walk a tree of ClaimNodes and invoke the visitor for every section. The
+ * parser already encodes a section's full path in `node.id` (`## §3.1 Foo`
+ * produces `id = "3.1"` regardless of whether it nests under `## §3` or sits
+ * at the top), so we use `node.id` directly rather than rebuilding from
+ * ancestor ids.
+ */
+function collectSections(
+  nodes: ClaimNode[],
+  visit: (node: ClaimNode, path: number[]) => void,
+): void {
+  for (const node of nodes) {
+    if (node.type === 'section') {
+      const path = node.id.split('.').map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+      if (path.length > 0) visit(node, path);
+    }
+    if (node.children?.length) {
+      collectSections(node.children, visit);
+    }
+  }
 }
 
 /**
@@ -100,6 +140,10 @@ export class ClaimIndexCache {
   private entries = new Map<string, ClaimIndexEntry>();
   private crossRefs: ClaimCrossReference[] = [];
   private noteMap = new Map<string, NoteInfo>();
+  /** Section headings, keyed by fqid (`R005.1`, `DD036.2.3`, …). */
+  private sections = new Map<string, SectionEntry>();
+  /** Validation errors from the last build, used to drive VS Code diagnostics. */
+  private latestErrors: ClaimTreeError[] = [];
   /** Reverse index: bare claim suffix (e.g. "DC.01") → fully qualified IDs */
   private suffixIndex = new Map<string, string[]>();
   projectDir: string;
@@ -208,13 +252,29 @@ export class ClaimIndexCache {
     return bare[0];
   }
 
-  /** Check if an ID resolves to a claim, note, or bare claim. */
+  /** Check if an ID resolves to a claim, note, section, or bare claim. */
   isKnown(id: string, contextNoteId?: string): boolean {
     if (this.entries.has(id)) return true;
     if (this.noteMap.has(id)) return true;
+    if (this.sections.has(id)) return true;
     if (contextNoteId && this.entries.has(`${contextNoteId}.${id}`)) return true;
+    if (contextNoteId && this.sections.has(`${contextNoteId}.${id}`)) return true;
     if (this.suffixIndex.has(id)) return true;
     return false;
+  }
+
+  /**
+   * Resolve a section reference by its normalized id. Accepts:
+   *   - Fully-qualified: `R005.1`, `DD036.2.3`
+   *   - Bare in current note: `1`, `2.3` (with contextNoteId)
+   */
+  lookupSection(id: string, contextNoteId?: string): SectionEntry | undefined {
+    const direct = this.sections.get(id);
+    if (direct) return direct;
+    if (contextNoteId) {
+      return this.sections.get(`${contextNoteId}.${id}`);
+    }
+    return undefined;
   }
 
   /** Find all entries whose fullyQualified starts with a prefix. */
@@ -289,9 +349,37 @@ export class ClaimIndexCache {
     }
   }
 
+  /**
+   * Read a section's content from line to endLine (inclusive). Falls back to
+   * a fixed window when endLine is missing or matches line (one-line stub).
+   */
+  async readSectionContent(entry: SectionEntry, maxLines = 200): Promise<string | null> {
+    try {
+      let content: string | null = null;
+      if (this.projectManager) {
+        content = await this.projectManager.noteFileManager.getAggregatedContents(entry.noteId);
+      }
+      if (content === null) {
+        content = await fs.promises.readFile(this.resolveFilePath(entry.noteFilePath), 'utf-8');
+      }
+      const lines = content.split('\n');
+      const startIdx = Math.max(0, entry.line - 1);
+      const stubEnd = entry.endLine && entry.endLine > entry.line ? entry.endLine : startIdx + maxLines;
+      const endIdx = Math.min(lines.length, Math.min(stubEnd, startIdx + maxLines));
+      return lines.slice(startIdx, endIdx).join('\n');
+    } catch {
+      return null;
+    }
+  }
+
   /** All note IDs in the index. */
   getAllNoteIds(): string[] {
     return [...this.noteMap.keys()];
+  }
+
+  /** Validation errors from the most recent build. */
+  getErrors(): readonly ClaimTreeError[] {
+    return this.latestErrors;
   }
 
   /** All claim entries in the index. */
@@ -489,6 +577,34 @@ export class ClaimIndexCache {
       this.entries = data.entries;
       this.crossRefs = data.crossRefs ?? [];
 
+      // Build section index from per-note trees so qualified section
+       // references like {R005.§1} resolve to a heading + line + content.
+      this.sections = new Map();
+      const noteTypes = data.noteTypes ?? new Map();
+      const noteFilePaths = new Map<string, string>();
+      for (const note of allNotes) {
+        if (note.filePath) noteFilePaths.set(note.id, note.filePath);
+      }
+      for (const [noteId, roots] of data.trees) {
+        const noteType = noteTypes.get(noteId) ?? '';
+        const noteFilePath = noteFilePaths.get(noteId) ?? '';
+        collectSections(roots, (node, path) => {
+          const sectionId = path.join('.');
+          const fqid = `${noteId}.${sectionId}`;
+          this.sections.set(fqid, {
+            fqid,
+            noteId,
+            sectionId,
+            sectionPath: [...path],
+            heading: node.heading,
+            line: node.line,
+            endLine: node.endLine,
+            noteFilePath,
+            noteType,
+          });
+        });
+      }
+
       // Build suffix index (bare claim ID → FQIDs)
       this.suffixIndex = new Map();
       for (const [fqid, entry] of this.entries) {
@@ -551,9 +667,10 @@ export class ClaimIndexCache {
         `[ClaimIndex] Loaded ${this.entries.size} claims across ${this.noteMap.size} notes, ${this.crossRefs.length} cross-refs, ${this.suffixIndex.size} bare suffixes`
       );
 
-      if (data.errors?.length) {
+      this.latestErrors = data.errors ?? [];
+      if (this.latestErrors.length) {
         this.outputChannel.appendLine(
-          `[ClaimIndex] ${data.errors.length} parse errors (use CLI for details)`
+          `[ClaimIndex] ${this.latestErrors.length} parse errors surfaced as diagnostics`
         );
       }
 
@@ -821,6 +938,8 @@ export class ClaimIndexCache {
     this.entries = new Map();
     this.crossRefs = [];
     this.noteMap = new Map();
+    this.sections = new Map();
+    this.latestErrors = [];
     this.suffixIndex = new Map();
     this.knownShortcodes = new Set();
     this.noteExcerptCache = new Map();

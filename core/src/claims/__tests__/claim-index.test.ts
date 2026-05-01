@@ -226,7 +226,10 @@ describe('ClaimIndex', () => {
       // but that's expected from validateClaimTree — not our index logic
     });
 
-    it('should report duplicate fully qualified IDs', () => {
+    it('should silently dedup repeated claim IDs in the same note (no error, first occurrence wins)', () => {
+      // Same-file repeats are tolerated as TOC/restatement prose. The
+      // parser drops the second occurrence so the index never sees a
+      // duplicate. The first occurrence is the canonical entry.
       const dupeNote: NoteWithContent = {
         id: 'R006',
         type: 'Requirement',
@@ -234,16 +237,19 @@ describe('ClaimIndex', () => {
         content: [
           '### §1 Section',
           '',
-          '§1.AC.01 First claim.',
+          '§1.AC.01 First claim at line 3.',
           '',
-          '§1.AC.01 Duplicate claim.',
+          '§1.AC.01 Restatement at line 5.',
         ].join('\n'),
       };
 
-      index.build([dupeNote]);
+      const data = index.build([dupeNote]);
       const errors = index.getErrors();
       const dupeErrors = errors.filter((e) => e.type === 'duplicate');
-      expect(dupeErrors.length).toBeGreaterThanOrEqual(1);
+      expect(dupeErrors).toHaveLength(0);
+      const entry = data.entries.get('R006.1.AC.01');
+      expect(entry).toBeDefined();
+      expect(entry!.line).toBe(3);
     });
   });
 

@@ -127,11 +127,15 @@ function stripInlineFormatting(text: string): string {
 }
 
 /**
- * Detect forbidden form within text.
- * Matches uppercase letters immediately followed by 2-3 digits with no dot separator.
- * Must be preceded by section symbol, whitespace, or start of string, and NOT followed by a dot.
+ * Detect a forbidden no-dot claim form (`AC01` etc.) at the start of a
+ * heading or paragraph. The rule is intentionally narrow: anchored at line
+ * start, and requires two or more letters in the prefix. This excludes
+ * single-letter labels like `B10`, `H1`, `T1` that authors use as section
+ * codes or control identifiers — those are not claim attempts. The canonical
+ * typo it does catch is `AC01 The parser MUST...` where the author meant
+ * `AC.01`.
  */
-const FORBIDDEN_IN_TEXT_RE = /(?:^|§|\s)([A-Z]+)(\d{2,3}[a-z]?)(?!\.\d)(?![A-Za-z])/;
+const FORBIDDEN_IN_TEXT_RE = /^([A-Z]{2,})(\d{2,3}[a-z]?)(?!\.\d)(?![A-Za-z])/;
 
 /**
  * Detect alphanumeric claim prefix attempts (forbidden — collides with note ID namespace).
@@ -270,7 +274,8 @@ export function buildClaimTree(content: string): ClaimTreeResult {
         checkMultiSegmentPrefix(strippedCell, lineNum, errors);
       }
       if (strippedCell.length > 0 && CLAIM_ID_RE.test(strippedCell)) {
-        checkForbiddenForm(strippedCell, lineNum, errors);
+        // No checkForbiddenForm here — CLAIM_ID_RE already requires a dot,
+        // so the no-dot typo this rule catches is unreachable in this branch.
         const claimNode = tryParseClaimText(strippedCell, currentHeadingLevel + 1, lineNum);
         if (claimNode) {
           // Use the full row content (all cells joined) as the heading
@@ -290,9 +295,8 @@ export function buildClaimTree(content: string): ClaimTreeResult {
     //  or bold-wrapped claims like "**AC.01** The parser MUST...")
     const strippedLine = stripInlineFormatting(trimmedLine);
     if (strippedLine.length > 0 && LINE_CLAIM_RE.test(strippedLine)) {
-      // Check for forbidden forms first
-      checkForbiddenForm(strippedLine, lineNum, errors);
-
+      // No checkForbiddenForm here — LINE_CLAIM_RE already requires a dot,
+      // so the no-dot typo this rule catches is unreachable in this branch.
       const claimNode = tryParseClaimText(strippedLine, currentHeadingLevel + 1, lineNum);
       if (claimNode) {
         // Use the original trimmed line as the heading for display
@@ -348,7 +352,14 @@ export function buildClaimTree(content: string): ClaimTreeResult {
     current.node.endLine = endLine;
   }
 
-  // Third pass: build parent-child relationships based on heading level
+  // Third pass: build parent-child relationships based on heading level.
+  // Repeated claim or section IDs in the same note are tolerated silently:
+  // the first occurrence is the canonical definition, and subsequent
+  // occurrences are dropped from the tree. This matches the common authoring
+  // pattern where a TOC, summary, or appendix at the bottom of a long spec
+  // restates claim IDs that were defined earlier — those restatements are
+  // prose, not redefinitions, and they should not appear in the index, the
+  // monotonicity check, or the duplicate report.
   const stack: Array<{ node: ClaimNode; level: number }> = [];
 
   for (const { node, headingLevel } of structuralNodes) {
@@ -357,15 +368,10 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       stack.pop();
     }
 
-    if (stack.length > 0) {
-      stack[stack.length - 1].node.children.push(node);
-    } else {
-      roots.push(node);
-    }
-
-    // Qualify bare claim IDs with ancestor section path.
-    // A bare claim like "AC.01" inside §2 becomes "2.AC.01".
-    // Claims that already have an inline section prefix (e.g., "§1.AC.01" → id "1.AC.01")
+    // Qualify bare claim IDs with ancestor section path BEFORE the duplicate
+    // check, so the dedup key is the fully-section-qualified id.
+    // A bare claim like "AC.01" inside §2 becomes "2.AC.01". Claims that
+    // already have an inline section prefix (e.g., "§1.AC.01" → id "1.AC.01")
     // are left unchanged.
     if (node.type === 'claim' && !/^\d/.test(node.id)) {
       const sectionPath: number[] = [];
@@ -380,35 +386,25 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       }
     }
 
+    // Skip entirely if this id is already registered. Don't push to tree,
+    // don't push onto stack, don't emit any error.
+    const isRepeat = node.type === 'claim'
+      ? claims.has(node.id)
+      : sections.has(node.id);
+    if (isRepeat) continue;
+
+    if (stack.length > 0) {
+      stack[stack.length - 1].node.children.push(node);
+    } else {
+      roots.push(node);
+    }
+
     stack.push({ node, level: headingLevel });
 
-    // Register in the appropriate map
     if (node.type === 'claim') {
-      if (claims.has(node.id)) {
-        const existing = claims.get(node.id)!;
-        errors.push({
-          type: 'duplicate',
-          claimId: node.id,
-          line: node.line,
-          message: `Duplicate claim ID "${node.id}" found at line ${node.line} (first defined at line ${existing.line}).`,
-          conflictingLines: [existing.line, node.line],
-        });
-      } else {
-        claims.set(node.id, node);
-      }
+      claims.set(node.id, node);
     } else {
-      if (sections.has(node.id)) {
-        const existing = sections.get(node.id)!;
-        errors.push({
-          type: 'duplicate',
-          claimId: node.id,
-          line: node.line,
-          message: `Duplicate section ID "${node.id}" found at line ${node.line} (first defined at line ${existing.line}).`,
-          conflictingLines: [existing.line, node.line],
-        });
-      } else {
-        sections.set(node.id, node);
-      }
+      sections.set(node.id, node);
     }
   }
 
@@ -430,30 +426,12 @@ export function validateClaimTree(tree: ClaimTreeResult): ClaimTreeError[] {
   // Check for non-monotonic numbering within each section
   checkMonotonicity(tree.roots, errors);
 
-  // Check for ambiguous claim IDs across sections
-  const claimsByBareId = new Map<string, ClaimNode[]>();
-  for (const [, node] of tree.claims) {
-    const bareId = buildBareClaimId(node);
-    if (!claimsByBareId.has(bareId)) {
-      claimsByBareId.set(bareId, []);
-    }
-    claimsByBareId.get(bareId)!.push(node);
-  }
-
-  for (const [bareId, nodes] of claimsByBareId) {
-    if (nodes.length > 1) {
-      const uniqueIds = new Set(nodes.map((n) => n.id));
-      if (uniqueIds.size > 1) {
-        errors.push({
-          type: 'ambiguous',
-          claimId: bareId,
-          line: nodes[0].line,
-          message: `Ambiguous bare claim ID "${bareId}" — found in multiple sections: ${nodes.map((n) => `"${n.id}" (line ${n.line})`).join(', ')}.`,
-          conflictingLines: nodes.map((n) => n.line),
-        });
-      }
-    }
-  }
+  // No eager bare-id ambiguity check. The bare form `AC.01` is only
+  // ambiguous if someone references it without a section prefix; the mere
+  // existence of `1.AC.01` and `2.AC.01` in the same note is the normal
+  // payoff of using sections. Reference-time resolution surfaces the
+  // ambiguity if it ever matters; flagging definitions here was noise on
+  // every multi-section spec.
 
   return errors;
 }
@@ -538,7 +516,9 @@ function trySectionText(text: string, level: number, lineNum: number): ClaimNode
 }
 
 /**
- * Check for forbidden forms in text and add errors if found.
+ * Check for the line-leading forbidden no-dot form (`AC01`) and emit an
+ * error. Only fires when the regex matches — anchored at start, 2+ letter
+ * prefix — so single-letter labels like `B10` are not flagged.
  */
 function checkForbiddenForm(text: string, lineNum: number, errors: ClaimTreeError[]): void {
   const forbiddenMatch = text.match(FORBIDDEN_IN_TEXT_RE);
@@ -548,13 +528,8 @@ function checkForbiddenForm(text: string, lineNum: number, errors: ClaimTreeErro
   const num = forbiddenMatch[2];
   const candidate = `${prefix}${num}`;
 
-  // Make sure this isn't a valid note ID (e.g., REQ004)
+  // Skip valid note IDs (e.g., REQ004) — those are 3-5 digits, not 2-3.
   if (/^[A-Z]{1,5}\d{3,5}$/.test(candidate)) return;
-
-  // Check that the text doesn't also contain the valid form PREFIX.NN
-  // which would mean the forbidden match is a false positive
-  const validClaimInText = text.match(new RegExp(`${prefix}\\.\\d{2,3}`));
-  if (validClaimInText) return;
 
   errors.push({
     type: 'forbidden-form',
@@ -650,15 +625,6 @@ function checkMultiSegmentPrefix(text: string, lineNum: number, errors: ClaimTre
         `(b) flatten to a single namespacing prefix: "${first}.${num}${subLetter}" or "${second}.${num}${subLetter}".`,
     });
   }
-}
-
-/**
- * Build a bare claim ID (PREFIX.NN without section prefix) for ambiguity checking.
- */
-function buildBareClaimId(node: ClaimNode): string {
-  const numStr = String(node.claimNumber).padStart(2, '0');
-  const subLetter = node.id.match(/[a-z]$/)?.[0] || '';
-  return `${node.claimPrefix}.${numStr}${subLetter}`;
 }
 
 /**

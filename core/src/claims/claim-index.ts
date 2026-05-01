@@ -308,16 +308,11 @@ export class ClaimIndex {
           noteFilePath: note.filePath,
         };
 
-        if (this.data.entries.has(fullyQualified)) {
-          this.data.errors.push({
-            type: 'duplicate',
-            claimId: fullyQualified,
-            line: node.line,
-            message: `Duplicate fully qualified claim "${fullyQualified}" in note ${note.id} at line ${node.line}.`,
-            noteId: note.id,
-            noteFilePath: note.filePath,
-          });
-        } else {
+        // Same-note repeats are dropped by the parser (`buildClaimTree`
+        // dedups on first occurrence). Cross-note FQID collisions can only
+        // happen if two notes share an ID, which is guarded elsewhere — so
+        // unconditionally take the first entry seen and ignore later ones.
+        if (!this.data.entries.has(fullyQualified)) {
           this.data.entries.set(fullyQualified, entry);
         }
       }

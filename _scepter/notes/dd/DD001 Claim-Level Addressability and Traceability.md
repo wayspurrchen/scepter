@@ -63,7 +63,7 @@ status: draft
 
 ### Open Question Resolutions
 
-**OQ.01 — AC Numbering Scope:** R004's default assumption is correct: per-document uniqueness is RECOMMENDED but per-section uniqueness is tolerated. The linter warns on ambiguous bare `PREFIX.NN` references. Resolution: the parser stores claims with their section context; the linter detects ambiguity. No enforcement at creation time.
+**OQ.01 — AC Numbering Scope:** R004's default assumption is correct: per-document uniqueness is RECOMMENDED but per-section uniqueness is tolerated. (Refined 2026-04-30 per {R004.§1.AC.04}: the linter does not pre-flag definition-time ambiguity. Bare-suffix collisions across sections (`§1.AC.01` and `§2.AC.01` in the same note) are normal and not reported. Ambiguity is surfaced only when an actual bare reference fails to resolve to a single qualified ID.)
 
 **OQ.02 — Verification Event Storage:** R004's default assumption is adopted: `_scepter/verification.json` stores verification events as a lightweight derived data store. The index rebuilds claim structure from documents; verification dates persist separately because they are not inferable from document content. This is the one exception to "compute, don't maintain" — it stores human judgments, not document structure.
 
@@ -183,11 +183,13 @@ Spec: R004.§1.AC.01, R004.§1.AC.02, R004.§1.AC.03
 - ADD: `interface ClaimTreeResult` — `{ roots: ClaimNode[], claims: Map<string, ClaimNode>, sections: Map<number, ClaimNode>, errors: ClaimTreeError[] }`
   Spec: R004.§3.AC.03, R004.§4.AC.03
 
-- ADD: `interface ClaimTreeError` — `{ type: 'duplicate' | 'non-monotonic' | 'ambiguous' | 'forbidden-form', claimId: string, line: number, message: string, conflictingLines?: number[] }`
+- ADD: `interface ClaimTreeError` — `{ type: 'duplicate' | 'non-monotonic' | 'ambiguous' | 'forbidden-form' | 'unresolved-reference' | 'multiple-lifecycle' | 'invalid-supersession-target' | 'reference-to-removed' | 'unresolvable-derivation-target', claimId: string, line: number, message: string, conflictingLines?: number[] }`
   Spec: R004.§1.AC.04, R004.§1.AC.05, R004.§1.AC.06, R004.§4.AC.03
+  (Refined 2026-04-30: `duplicate` and `ambiguous` are retained in the union but are no longer emitted by any code path — same-note repeats are silently deduped by the parser and bare-id ambiguity is not flagged at definition time. The active parser-level variants are `forbidden-form` and `non-monotonic`.)
 
-- ADD: `function validateClaimTree(tree: ClaimTreeResult): ClaimTreeError[]` — Checks for duplicates, non-monotonic numbering, and forbidden forms within a single document.
-  Spec: R004.§1.AC.04, R004.§1.AC.05, R004.§1.AC.06
+- ADD: `function validateClaimTree(tree: ClaimTreeResult): ClaimTreeError[]` — Checks for non-monotonic numbering and forbidden forms within a single document.
+  Spec: R004.§1.AC.05, R004.§1.AC.06
+  (Refined 2026-04-30: original spec listed duplicate/ambiguity checks; both removed in favor of silent dedup and reference-time ambiguity per refined R004 ACs.)
 
 ### NEW: `core/src/parsers/claim/index.ts`
 
@@ -405,7 +407,7 @@ claims/trace-handler.ts
 3. **Tree Construction:** For each note, `buildClaimTree(content)` parses markdown headings into a tree of `ClaimNode` objects. Section headings (those starting with `§`) become interior nodes; claim headings become leaves. Bare-number headings (date headings, numbered lists) are ignored.
 4. **Reference Extraction:** `parseClaimReferences(content, { knownShortcodes, currentDocumentId })` scans for claim-level references within each document
 5. **Cross-Reference Assembly:** Each extracted reference is resolved to a `ClaimCrossReference` linking source claim to target claim
-6. **Validation:** `validateClaimTree()` checks for duplicates, non-monotonic numbering, forbidden forms
+6. **Validation:** `validateClaimTree()` checks for non-monotonic numbering and forbidden forms. (Same-note ID repeats are deduped during tree construction in step 3, not reported as errors here.)
 7. **Delivery:** `ClaimIndexData` is stored on `ClaimIndex` instance, queryable by all downstream consumers
 
 ### Flow 2: Traceability Query
@@ -553,7 +555,7 @@ claims/trace-handler.ts
 | R004.§1.AC.01 | `buildClaimTree()` extracts section IDs from markdown headings starting with `§` (required prefix) | `claim-tree.ts` | 1 |
 | R004.§1.AC.02 | `buildClaimTree()` extracts claim IDs from letter-prefix-dot-number headings | `claim-tree.ts` | 1 |
 | R004.§1.AC.03 | `parseClaimAddress()` resolves fully qualified, partial, and bare claims | `claim-parser.ts` | 1 |
-| R004.§1.AC.04 | `validateClaimTree()` rejects ambiguous short-form references | `claim-tree.ts` | 1 |
+| R004.§1.AC.04 | Reference-time ambiguity detection only; no definition-time check | `claim-index.ts` resolution path | 1 |
 | R004.§1.AC.05 | `validateClaimTree()` checks monotonic numbering | `claim-tree.ts` | 1 |
 | R004.§1.AC.06 | `parseClaimAddress()` rejects forbidden `PREFIX + digits` form | `claim-parser.ts` | 1 |
 | R004.§2.AC.01 | `parseClaimReferences()` with braceless mode + shortcode validation | `claim-parser.ts`, `note-parser.ts` | 6 |
@@ -567,7 +569,7 @@ claims/trace-handler.ts
 | R004.§3.AC.04 | No structured format required — parser operates on standard headings only | `claim-tree.ts` | 1 |
 | R004.§4.AC.01 | `ClaimIndex.build()` scans all notes and source code | `claim-index.ts` | 3 |
 | R004.§4.AC.02 | `ClaimIndexData` is fully derivable from document content | `claim-index.ts` | 3 |
-| R004.§4.AC.03 | `ClaimIndex.getErrors()` reports duplicates, non-monotonic, broken refs | `claim-index.ts` | 3 |
+| R004.§4.AC.03 | `ClaimIndex.getErrors()` reports non-monotonic and broken refs; same-note ID repeats are silently deduped during tree construction (no error) | `claim-index.ts`, `claim-tree.ts` | 3 |
 | R004.§4.AC.04 | Phase 2 cross-ref scanner skips references with no `claimPrefix` (section-only refs) | `claim-index.ts` | 3 |
 | R004.§4.AC.05 | `resolveClaimAddress()` fuzzy matching requires `[A-Z]+\.\d{2,3}` pattern in raw string | `claim-index.ts` | 3 |
 | R004.§5.AC.01 | `scepter claims trace` + `buildTraceabilityMatrix()` | `trace-handler.ts`, `traceability.ts` | 4, 5 |
@@ -585,7 +587,7 @@ claims/trace-handler.ts
 |-----------|-------|---------------------|
 | Unit | `parseClaimAddress()` — all valid reference forms from R004 table, invalid forms, edge cases | §1.AC.01-AC.06, §2.AC.03, §2.AC.04 |
 | Unit | `buildClaimTree()` — heading hierarchy, section/claim distinction, content boundaries | §3.AC.01-AC.04 |
-| Unit | `validateClaimTree()` — duplicate detection, monotonic check, forbidden forms, ambiguity | §1.AC.04, §1.AC.05, §1.AC.06, §4.AC.03 |
+| Unit | `validateClaimTree()` — monotonic check, forbidden forms (line-leading, 2+ letter prefix); same-note repeats silently deduped; no definition-time ambiguity | §1.AC.05, §1.AC.06, §4.AC.03 |
 | Unit | `parseClaimReferences()` — braced and braceless reference extraction from markdown | §2.AC.01, §2.AC.02, §2.AC.05 |
 | Unit | `parseMetadataSuffix()` — colon metadata extraction and stripping | §2.AC.04, §8.AC.03 |
 | Unit | `normalizeSectionSymbol()` — `§` stripping produces identical canonical forms | §2.AC.03 |

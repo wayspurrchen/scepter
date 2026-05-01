@@ -156,11 +156,11 @@ A claim ID has exactly one letter-prefix segment. Two letter segments before the
 
 §1.AC.03 The parser MUST resolve fully qualified paths (`NOTE.N.PREFIX.NN`), partial paths (`N.PREFIX.NN`, `NOTE.PREFIX.NN`), and bare claims (`PREFIX.NN`) using scope rules.
 
-§1.AC.04 The parser MUST reject ambiguous short-form references and report the ambiguity with the conflicting definitions.
+§1.AC.04 Ambiguous bare references (e.g. `AC.01` when multiple sections define `AC.01`) MUST be detected and reported AT REFERENCE-RESOLUTION TIME, not at definition time. Defining `§1.AC.01` and `§2.AC.01` in the same note is normal — that's the payoff of using sections — and MUST NOT be flagged as ambiguous on its own. Ambiguity is a property of unresolved references, not of the definition graph; only an actual bare reference that cannot resolve to a single qualified ID is reported. (Refined 2026-04-30: prior wording flagged definition-time bare-suffix collisions, which produced linter noise on every multi-section spec without ever catching a real reference-resolution failure.)
 
 §1.AC.05 Claim IDs within a document MUST be monotonically increasing and MUST NOT be recycled after deletion.
 
-§1.AC.06 The form `PREFIX` + digits without separating dot (e.g., `AC01`) MUST be rejected as invalid syntax.
+§1.AC.06 The form `PREFIX` + digits without separating dot (e.g., `AC01`) MUST be rejected when it appears at the start of heading or paragraph text AND the prefix is two or more letters. Single-letter labels like `B10`, `H1`, `T1` and mid-text occurrences MUST NOT be flagged — those are common section/topic codes (control identifiers, version markers, region codes) and are not claim-definition attempts. (Refined 2026-04-30: prior wording was unscoped and produced linter noise on every spec that used letter+number identifiers in prose. The narrowed rule still catches the canonical typo `AC01 The parser MUST...` at line-leading position, which is the only place an author would write a no-dot claim.)
 
 §1.AC.07:5 The claim prefix MUST be alphabetic-only (`[A-Z]+`). Alphanumeric prefixes (e.g., `PH1.01`, `PRD2.05`, `WO3.01`) are FORBIDDEN because the prefix-with-digits form overlaps the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and creates ambiguity between bare note references and claim references. The linter MUST emit a `forbidden-form` error on alphanumeric prefix attempts with a diagnostic that explains the rule and suggests the alphabetic-only portion of the prefix as a replacement (e.g., for `PH1.01`, suggest `PH.01`).
 
@@ -217,7 +217,7 @@ The index MUST be rebuildable from source documents at any time. It MUST NOT req
 
 §4.AC.02 The index MUST be derivable entirely from document and source file content — no separate registry or metadata store is required.
 
-§4.AC.03 The index MUST detect and report: duplicate claim IDs within a document, non-monotonic numbering, and broken cross-references.
+§4.AC.03 The index MUST detect and report non-monotonic numbering and broken cross-references. Same-note ID repeats (a claim or section ID restated later in the same note) MUST be tolerated silently: the first occurrence is the canonical entry, subsequent occurrences are dropped from the tree and the index, and no duplicate error is emitted. (Refined 2026-04-30: the original "detect duplicates within a document" requirement was incompatible with the common authoring pattern of restating claim IDs in TOCs, summaries, and appendices at the bottom of long specs. The trade-off is that genuine accidental duplicates are silently swallowed; the assumption is that authors rarely intend two distinct claims with the same ID, and the noise cost of strict detection outweighed the rare-typo benefit.)
 
 §4.AC.04 The cross-reference scanner MUST NOT create cross-references from section-only references (parsed addresses with a section path but no claim prefix). References like `§10`, `§3.1`, `§14.5.1` are structural navigation markers within documents and MUST NOT resolve to claim entries whose fully qualified IDs happen to end with the same numeric suffix.
 
@@ -245,7 +245,7 @@ LLMs write content freely in documents. The CLI repairs drift after each editing
 
 §6.AC.01 `scepter scaffold spec NOTE_ID --sections N` MUST create a document skeleton with numbered section headings and placeholder claim entries.
 
-§6.AC.02 `scepter lint NOTE_ID` MUST detect: broken ID nesting, missing IDs on headings, duplicate IDs, non-monotonic numbering, orphaned references, and forbidden forms (e.g., `AC01`).
+§6.AC.02 `scepter lint NOTE_ID` MUST detect: broken ID nesting, non-monotonic numbering, orphaned references, and forbidden forms (line-leading `AC01`-style typos with 2+ letter prefix, alphanumeric prefixes like `PH1.01`, multi-letter-segment prefixes like `FOO.AC.01`). It MUST NOT detect same-note ID repeats as duplicates (per {R004.§4.AC.03}) and MUST NOT pre-flag bare-suffix collisions across sections as ambiguous (per {R004.§1.AC.04}). (Refined 2026-04-30 to align with the refined ACs above.)
 
 [Removed — 2026-03-09] §6.AC.03 Removed. Headings without IDs are allowed — they simply aren't addressable. The fix command does not force IDs onto headings.
 

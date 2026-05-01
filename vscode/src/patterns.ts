@@ -138,16 +138,20 @@ export function findAllMatches(
 
     const { addr, start, claimEnd, fullEnd } = rg;
 
-    // Kind classification
+    // Kind classification.
+    // Order matters: a section path with a note id is a section reference,
+    // not a note reference, even though noteId is set. Without this branch,
+    // {R005.§1} would resolve as note "R005.1" (not in index) and render as
+    // unknown despite the section being well-defined.
     let kind: ClaimMatch['kind'];
     if (addr.claimPrefix && (addr.noteId || addr.sectionPath?.length)) {
       kind = 'claim';
     } else if (addr.claimPrefix) {
       kind = 'bare-claim';
-    } else if (addr.noteId) {
-      kind = 'note';
     } else if (addr.sectionPath?.length) {
       kind = 'section';
+    } else if (addr.noteId) {
+      kind = 'note';
     } else {
       kind = 'claim';
     }

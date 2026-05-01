@@ -239,7 +239,7 @@ scepter claims lint R004
 
 `gaps` reports claims present upstream but absent downstream — these are your coverage gaps.
 
-`lint` catches structural issues: duplicate IDs, non-monotonic numbering, forbidden forms like `AC01`.
+`lint` catches structural issues: non-monotonic numbering, forbidden forms (line-leading `AC01`-style typos, alphanumeric prefixes like `PH1.01`, multi-letter-segment prefixes like `FOO.AC.01`), unresolved references, and lifecycle/derivation problems. Same-note repeats and bare-id ambiguity are tolerated by design.
 
 ### Interpreting Trace Output for Validation
 

@@ -181,7 +181,20 @@ function buildDataAttrs(
       attrs.push(`title="${esc(normalizedId)} — not in index"`);
     }
   } else if (kind === 'section') {
-    attrs.push(`title="Section §${esc(normalizedId)}"`);
+    const sectionEntry = index.lookupSection(normalizedId, contextNoteId ?? undefined);
+    if (sectionEntry) {
+      const noteInfo = index.lookupNote(sectionEntry.noteId);
+      const noteTitle = noteInfo?.noteTitle ?? sectionEntry.noteId;
+      attrs.push(`data-section-fqid="${esc(sectionEntry.fqid)}"`);
+      attrs.push(`data-section-heading="${esc(sectionEntry.heading)}"`);
+      attrs.push(`data-section-line="${sectionEntry.line}"`);
+      attrs.push(`data-note-type="${esc(sectionEntry.noteType)}"`);
+      attrs.push(`data-note-title="${esc(noteTitle)}"`);
+      attrs.push(`data-note-file="${esc(sectionEntry.noteFilePath)}"`);
+      attrs.push(`title="${esc(sectionEntry.fqid)} — ${esc(sectionEntry.heading)}"`);
+    } else {
+      attrs.push(`title="Section §${esc(normalizedId)} — not in index"`);
+    }
   }
 
   return attrs.join(' ');
@@ -229,6 +242,11 @@ function buildLinkTarget(
     const noteInfo = index.lookupNote(normalizedId);
     if (noteInfo?.noteFilePath) {
       return toRelativeHref(noteInfo.noteFilePath);
+    }
+  } else if (kind === 'section') {
+    const sectionEntry = index.lookupSection(normalizedId, contextNoteId ?? undefined);
+    if (sectionEntry?.noteFilePath) {
+      return toRelativeHref(sectionEntry.noteFilePath, sectionEntry.line);
     }
   }
 

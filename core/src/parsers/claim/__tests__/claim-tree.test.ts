@@ -306,34 +306,40 @@ describe('Claim Tree', () => {
     });
   });
 
-  describe('validateClaimTree — duplicate detection', () => {
-    it('should detect duplicate claim IDs', () => {
+  describe('buildClaimTree — same-file repeats are tolerated', () => {
+    // Restating a claim ID later in the same note (e.g. in a TOC, summary,
+    // or appendix) is a normal authoring pattern, not a redefinition. The
+    // parser keeps the first occurrence as the canonical entry and silently
+    // drops subsequent occurrences. No duplicate error is emitted.
+    it('should silently drop repeated claim IDs', () => {
       const content = [
         '### §1 Section',
         '',
-        '§1.AC.01 First occurrence.',
+        '§1.AC.01 First occurrence at line 3.',
         '',
-        '§1.AC.01 Duplicate occurrence.',
+        '§1.AC.01 Restatement in a TOC at line 5.',
       ].join('\n');
 
       const result = buildClaimTree(content);
       const errors = validateClaimTree(result);
       const duplicateErrors = errors.filter((e) => e.type === 'duplicate');
-      expect(duplicateErrors.length).toBeGreaterThanOrEqual(1);
-      expect(duplicateErrors[0].claimId).toBe('1.AC.01');
+      expect(duplicateErrors).toHaveLength(0);
+      expect(result.claims.size).toBe(1);
+      expect(result.claims.get('1.AC.01')!.line).toBe(3);
     });
 
-    it('should detect duplicate section IDs', () => {
+    it('should silently drop repeated section IDs', () => {
       const content = [
         '### §1 First',
         '',
-        '### §1 Duplicate',
+        '### §1 Restatement',
       ].join('\n');
 
       const result = buildClaimTree(content);
       const errors = validateClaimTree(result);
       const duplicateErrors = errors.filter((e) => e.type === 'duplicate');
-      expect(duplicateErrors.length).toBeGreaterThanOrEqual(1);
+      expect(duplicateErrors).toHaveLength(0);
+      expect(result.sections.size).toBe(1);
     });
   });
 
@@ -456,6 +462,39 @@ describe('Claim Tree', () => {
       const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
       expect(forbiddenErrors.length).toBeGreaterThanOrEqual(1);
       expect(forbiddenErrors[0].claimId).toBe('AC01');
+    });
+
+    // Section/topic labels with a single-letter prefix (e.g. `B10`, `H1`,
+    // `T1`) are common in specs and are not claim attempts. The forbidden-
+    // form rule requires 2+ letters, so these should not fire.
+    it('should NOT flag single-letter labels like B10 as forbidden form', () => {
+      const content = [
+        '## §1 Section',
+        '',
+        '#### B10: Community & Sharing',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors).toHaveLength(0);
+    });
+
+    // The forbidden-form rule is anchored at the start of heading/paragraph
+    // text. Mid-text occurrences of letter+digits are not flagged.
+    it('should NOT flag B10 mid-heading or mid-paragraph', () => {
+      const content = [
+        '## §1 Section',
+        '',
+        '### Stage B10 Parser',
+        '',
+        'See B10 in the appendix for details.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const errors = validateClaimTree(result);
+      const forbiddenErrors = errors.filter((e) => e.type === 'forbidden-form');
+      expect(forbiddenErrors).toHaveLength(0);
     });
   });
 
@@ -771,8 +810,12 @@ describe('Claim Tree', () => {
     });
   });
 
-  describe('validateClaimTree — ambiguity detection', () => {
-    it('should detect ambiguous bare claim IDs across sections', () => {
+  describe('validateClaimTree — bare-id ambiguity is not flagged at definition time', () => {
+    // Section-qualified claims that share a bare suffix (`§1.AC.01`,
+    // `§2.AC.01`) are the normal payoff of using sections — they are not
+    // ambiguous. Ambiguity is a reference-resolution concern; the lint
+    // doesn't pre-flag definitions for hypothetical bare references.
+    it('should NOT raise ambiguous errors for matching bare suffixes across sections', () => {
       const content = [
         '## §1 First Section',
         '',
@@ -786,8 +829,7 @@ describe('Claim Tree', () => {
       const result = buildClaimTree(content);
       const errors = validateClaimTree(result);
       const ambiguousErrors = errors.filter((e) => e.type === 'ambiguous');
-      expect(ambiguousErrors.length).toBeGreaterThanOrEqual(1);
-      expect(ambiguousErrors[0].claimId).toBe('AC.01');
+      expect(ambiguousErrors).toHaveLength(0);
     });
   });
 

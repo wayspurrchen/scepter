@@ -7,6 +7,7 @@ import type { ClaimIndexEntry } from './claim-index';
 import { ClaimHoverProvider } from './hover-provider';
 import { ClaimDefinitionProvider } from './definition-provider';
 import { DecorationProvider } from './decoration-provider';
+import { DiagnosticsProvider } from './diagnostics-provider';
 import { registerTraceCommand } from './trace-provider';
 // @implements {DD013.§DC.20} View provider imports
 import { NotesTreeProvider, type NoteTreeItem } from './views/notes-tree-provider';
@@ -70,6 +71,25 @@ async function discoverProjects(outputChannel: vscode.OutputChannel): Promise<Di
   return projects;
 }
 
+/**
+ * Among the discovered projects, return the one whose `projectDir` is the
+ * longest ancestor of `filePath`. Returns undefined when no project contains
+ * the file.
+ */
+function pickProjectForPath(
+  projects: DiscoveredProject[],
+  filePath: string,
+): DiscoveredProject | undefined {
+  let best: DiscoveredProject | undefined;
+  for (const p of projects) {
+    const dir = p.projectDir.endsWith(path.sep) ? p.projectDir : p.projectDir + path.sep;
+    if (filePath.startsWith(dir) && (!best || p.projectDir.length > best.projectDir.length)) {
+      best = p;
+    }
+  }
+  return best;
+}
+
 // @implements {DD012.§DC.06} Async activation to await findProjectRoot
 export async function activate(context: vscode.ExtensionContext): Promise<{ extendMarkdownIt?: (md: any) => any }> {
   const outputChannel = vscode.window.createOutputChannel('SCEpter Claims');
@@ -84,9 +104,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     return {};
   }
 
-  // Multi-project state
+  // Multi-project state. When the workspace contains more than one SCEpter
+  // project, pick the one that owns the file currently in focus rather than
+  // defaulting to whichever project was discovered first
   const isMultiProject = projects.length > 1;
-  let activeProject = projects[0];
+  const initialEditorPath = vscode.window.activeTextEditor?.document.uri.fsPath;
+  const initialProjectByEditor = initialEditorPath
+    ? pickProjectForPath(projects, initialEditorPath)
+    : undefined;
+  let activeProject = initialProjectByEditor ?? projects[0];
   vscode.commands.executeCommand('setContext', 'scepter.multipleProjects', isMultiProject);
 
   outputChannel.appendLine(`Active project: ${activeProject.name} (${activeProject.projectDir})`);
@@ -111,6 +137,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
   // Register decoration provider — visual underlines for references
   const decorationProvider = new DecorationProvider(index);
   decorationProvider.activate(context);
+
+  // Surface ClaimIndex validation errors as VS Code diagnostics so the
+  // Problems panel and editor squiggles light up on forbidden forms,
+  // duplicates, unresolved references, etc.
+  const diagnosticsProvider = new DiagnosticsProvider(index);
+  diagnosticsProvider.activate(context);
 
   // Register commands
   registerTraceCommand(context, index, outputChannel);
@@ -193,10 +225,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     }),
   );
 
+  let switchInFlight: Promise<void> | null = null;
+  async function maybeAutoSwitchProject(filePath: string | undefined): Promise<void> {
+    if (!filePath || !isMultiProject) return;
+    const owning = pickProjectForPath(projects, filePath);
+    if (!owning || owning.projectDir === activeProject.projectDir) return;
+
+    // Coalesce rapid switches (e.g. tab cycling) by chaining onto the in-flight promise.
+    const target = owning;
+    const run = (switchInFlight ?? Promise.resolve()).then(async () => {
+      if (target.projectDir === activeProject.projectDir) return;
+      activeProject = target;
+      updateNotesViewTitle();
+      vscode.commands.executeCommand('setContext', 'scepter.indexReady', false);
+      await index.switchProject(activeProject.projectDir);
+      vscode.commands.executeCommand('setContext', 'scepter.indexReady', true);
+      outputChannel.appendLine(
+        `Auto-switched to project: ${activeProject.name} — ${index.size} claims, ${index.noteCount} notes`
+      );
+    });
+    switchInFlight = run.catch(() => undefined);
+    return run;
+  }
+
   // @implements {DD013.§DC.22} Active editor tracking for context-sensitive views
   // Only update when a note is detected — when focus moves to a non-note
   // (markdown preview, traceability panel, terminal, etc.), retain the last note's data.
   function updateActiveNote(editor: vscode.TextEditor | undefined): void {
+    if (editor) {
+      void maybeAutoSwitchProject(editor.document.uri.fsPath);
+    }
     const noteId = editor ? noteIdFromPath(editor.document.uri.fsPath) : null;
     if (noteId) {
       claimsProvider.setActiveNote(noteId);
@@ -215,6 +273,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument(doc => {
       if (doc.languageId === 'markdown') {
+        void maybeAutoSwitchProject(doc.uri.fsPath);
         const noteId = noteIdFromPath(doc.uri.fsPath);
         if (noteId) {
           claimsProvider.setActiveNote(noteId);
