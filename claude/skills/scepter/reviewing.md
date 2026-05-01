@@ -173,6 +173,19 @@ scepter claims search "lock" --note S020
 
 This is especially valuable during Step 4 (Cross-Requirement Interactions) — search for the domain terms of the feature you're reviewing to discover claims in other notes that might interact with it.
 
+## Marking Findings for Orchestrator Routing
+
+Tag each finding in your final report as `MECHANICAL` or `HUMAN_JUDGMENT` so the orchestrator can route the followup correctly (per SKILL.md NON-NEGOTIABLE RULE 11). The orchestrator auto-dispatches `sce-producer` for MECHANICAL findings and surfaces HUMAN_JUDGMENT findings to the user.
+
+| Tag | Meaning | Examples |
+|-----|---------|----------|
+| **MECHANICAL** | Fix is determined by the finding itself; no judgment between equally-valid alternatives | Typo. Missing or stale citation (`{S001.X.AC.NN}` after a canonicalization). Stub `@implements` that should be `@see` per claims.md. Unbalanced bidirectional ref. Misordered AC numbers. Format misalignment with an established precedent. |
+| **HUMAN_JUDGMENT** | Fix requires choosing between alternatives, changing scope, or framing the issue | Scope expansion or contraction. "This belongs as a Q-note vs DEF vs amendment." Two equally-valid wording choices. Spec-clarification questions that affect downstream work. AC binding decomposition. Whether a flagged passage is a defect, a deferral, or a future capability. |
+
+**Untagged findings default to HUMAN_JUDGMENT.** When in doubt, leave untagged or explicitly tag HUMAN_JUDGMENT — the orchestrator surfaces ambiguous findings to the user, which is the conservative default.
+
+For MECHANICAL findings, recommend a specific producer prompt where you can — it shortens routing latency and makes the orchestrator's job mechanical.
+
 ## Common Misses
 
 | Miss | Why it happens | How to catch it |

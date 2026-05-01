@@ -217,7 +217,9 @@ A reviewer who passes silent divergence shares responsibility for the protocol v
 
 ## The Tag-Along: Linker
 
-The `sce-linker` runs as a **background task after each dialogue phase completes**. It does not participate in any pair. No agent needs to interact with it, wait for it, or send it messages.
+When using the team protocol, the orchestrator MUST dispatch `sce-linker` as a **background task after each dialogue phase completes**. It does not participate in any pair. No agent needs to interact with it, wait for it, or send it messages.
+
+**This section scopes the rule to team-dispatched work.** The universal linker-after-work discipline — which applies to every dispatch path, not just team protocol — lives in `scepter/SKILL.md` § NON-NEGOTIABLE RULES (LINKER AFTER WORK). The team protocol is one place the universal rule fires; direct sce-producer dispatches, implement-review sessions, and manual implementations all fire the same rule.
 
 **After planning phase completes:**
 - Linker processes plan artifacts: connects new plan notes to existing requirements, decisions, questions
@@ -376,7 +378,11 @@ The orchestrator does NOT implement or review. It coordinates. But coordination 
 
 If independent verification reveals problems, do NOT present the agent's verdict to the user. Present the actual state: "The agent reported PASS, but `tsc --noEmit` shows 5 errors" or "The agent excluded Neo4j from the test matrix despite the spec requiring it."
 
+5. **Classify reviewer findings before routing** (per SKILL.md NON-NEGOTIABLE RULE 11). Mechanical findings (typos, stale citations, format alignment) auto-dispatch to `sce-producer` for fix; human-judgment findings (scope, framing, alternatives) surface to user. The reviewer is asked to tag findings `MECHANICAL` or `HUMAN_JUDGMENT` (see `reviewing.md` § Marking Findings for Orchestrator Routing); untagged findings default to HUMAN_JUDGMENT.
+
 The cost of this verification is minutes. The cost of relaying a false PASS is a user who trusts a broken implementation.
+
+**When independent verification CONFIRMS the agent's verdict, just relay the result.** Do not narrativize the protocol working as designed. Do not explain why the discipline matters. Do not reflect on what was caught vs. what could have slipped. The user wrote the protocol — they know it works. Save the tokens for the next real decision.
 
 ## Agent Skill Loading
 

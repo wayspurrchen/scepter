@@ -112,9 +112,9 @@ Stop when all explicit requirements are met.
 - Add SCEpter references (see below)
 
 **After writing code:**
-- Run tests if available
-- Verify type checking
-- Confirm no breakage
+- **Run the project's verification gate before reporting work complete.** Most TS/JS projects expose this as `npm run verify` (typically `lint && typecheck`); other ecosystems use `make check`, `cargo clippy && cargo check`, or similar. Find it by reading `package.json` `scripts`, the README, or `CONTRIBUTING.md`. The gate must include at minimum lint and type checking. If it fails, fix the errors — do not report "ready for review" with red verification, and do not paper over real type errors with `as unknown as` or `// @ts-ignore`.
+- Run the test suite. If the project has multiple test commands (unit / integration / slow), run the one matching your scope. Do not skip tests because they're slow.
+- Confirm no existing functionality is broken
 
 ### Impact Analysis: Structural Property Changes (CRITICAL)
 
@@ -319,6 +319,22 @@ Safe transitions: `pending` → `in_progress` → `blocked` → `in_progress` �
 
 User-only transitions: → `completed`, → `done`, → `approved`
 
+### Artifact Authoring Status (Producers)
+
+When authoring a SCEpter artifact note (Requirement, Specification, TestSpec, DetailedDesign, Architecture) for the first time, leave the frontmatter `status` at the project's pending-equivalent default — typically `pending`, `proposed`, or `draft`; check `scepter config` for the project's allowed statuses. **Producers MUST NOT set `status: accepted` (or any post-review status) at initial authoring** — the trace matrix would then assert a review-pass that has not happened, and the artifact's `§Status Log` (when it exists) would contradict the frontmatter.
+
+The status flip to `accepted` is an **orchestrator action after the reviewer returns APPROVED**. The orchestrator updates frontmatter and adds a Status Log entry:
+
+```yaml
+status: accepted  # post-review flip
+```
+
+```markdown
+- YYYY-MM-DD: Reviewer pass APPROVED; status pending → accepted.
+```
+
+If a producer set `accepted` prematurely and the review subsequently passed, the orchestrator MAY leave the status alone (no ceremonial walk-back to `pending`) but MUST add the explicit Status Log entry so the artifact's lifecycle is honestly recorded. Going forward, the producer should not author with the post-review status set.
+
 ### Progress Notes
 
 Always date with exact `date` command output:
@@ -345,6 +361,7 @@ Always date with exact `date` command output:
 
 ### After Implementation
 - [ ] All requirements met
+- [ ] Project verification gate green (`npm run verify` or equivalent — lint + typecheck both pass)
 - [ ] Tests passing
 - [ ] No existing functionality broken
 - [ ] Follow-up tasks documented
