@@ -278,8 +278,14 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
 
   /**
    * Return an HTML snippet for the line containing a reference. The
-   * surrounding text is dimmed; the target FQID (if findable in the line
-   * via the same matcher decoration uses) is bolded.
+   * surrounding text is dimmed; the target FQID (if locatable via the
+   * same matcher the decoration layer uses) is bolded.
+   *
+   * Long-line behavior: if the hit lives past the head budget, the
+   * snippet shows the start of the line (so the reader keeps the
+   * leading-context like "see also" or "derives from"), an ellipsis,
+   * then a window centered on the hit. Without this, a citation that
+   * appears 300 chars into a list-item line was completely cut off.
    */
   private buildReferenceSnippet(
     noteLines: string[] | null | undefined,
@@ -293,21 +299,49 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     if (raw.length === 0) {
       return `<span style="opacity:0.6"><i>(empty line)</i></span>`;
     }
-    // Use findAllMatches to locate where the citation lives in the line.
+
     const matches = findAllMatches(raw, true, this.index.knownShortcodes);
     const hit = matches.find((m) => m.normalizedId === targetFqid);
-    const truncated = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
 
-    if (!hit || hit.start >= truncated.length) {
+    // Tunable budgets — head shows leading context, window holds the hit.
+    const HEAD = 80;
+    const WINDOW_BEFORE = 50;
+    const WINDOW_AFTER = 70;
+    const SIMPLE_CAP = 200;
+
+    // No locatable hit: fall back to head-only truncation. The reader
+    // doesn't lose anything by not seeing a bolded span.
+    if (!hit) {
+      const truncated = raw.length > SIMPLE_CAP ? raw.slice(0, SIMPLE_CAP) + '…' : raw;
       return `<span style="opacity:0.6">${escapeMarkdown(truncated)}</span>`;
     }
-    const before = truncated.slice(0, hit.start);
-    const matched = truncated.slice(hit.start, Math.min(hit.end, truncated.length));
-    const after = truncated.slice(Math.min(hit.end, truncated.length));
+
+    // Hit is in the head budget: show start-of-line through hit-with-trail.
+    if (hit.start < HEAD) {
+      const tailEnd = Math.min(raw.length, Math.max(SIMPLE_CAP, hit.end + WINDOW_AFTER));
+      const before = raw.slice(0, hit.start);
+      const matched = raw.slice(hit.start, Math.min(hit.end, tailEnd));
+      const after = raw.slice(Math.min(hit.end, tailEnd), tailEnd);
+      const ellipsis = tailEnd < raw.length ? '…' : '';
+      return (
+        `<span style="opacity:0.6">${escapeMarkdown(before)}</span>` +
+        `<b>${escapeMarkdown(matched)}</b>` +
+        `<span style="opacity:0.6">${escapeMarkdown(after)}${ellipsis}</span>`
+      );
+    }
+
+    // Hit is past the head budget: head + ellipsis + windowed-around-hit.
+    const head = raw.slice(0, HEAD);
+    const winStart = Math.max(HEAD, hit.start - WINDOW_BEFORE);
+    const winEnd = Math.min(raw.length, hit.end + WINDOW_AFTER);
+    const beforeHit = raw.slice(winStart, hit.start);
+    const matched = raw.slice(hit.start, Math.min(hit.end, winEnd));
+    const afterHit = raw.slice(Math.min(hit.end, winEnd), winEnd);
+    const trailEllipsis = winEnd < raw.length ? '…' : '';
     return (
-      `<span style="opacity:0.6">${escapeMarkdown(before)}</span>` +
+      `<span style="opacity:0.6">${escapeMarkdown(head)} … ${escapeMarkdown(beforeHit)}</span>` +
       `<b>${escapeMarkdown(matched)}</b>` +
-      `<span style="opacity:0.6">${escapeMarkdown(after)}</span>`
+      `<span style="opacity:0.6">${escapeMarkdown(afterHit)}${trailEllipsis}</span>`
     );
   }
 
