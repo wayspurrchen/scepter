@@ -138,6 +138,10 @@
       {
         "command": "scepter.openCrossProject",
         "title": "SCEpter: Open Cross-Project Reference"
+      },
+      {
+        "command": "scepter.previewOpenAt",
+        "title": "SCEpter: Open File at Line (preview internal)"
       }
     ],
     "menus": {

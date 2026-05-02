@@ -387,6 +387,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
         editor.selection = new vscode.Selection(pos, pos);
       }
     }),
+    /**
+     * `scepter.previewOpenAt(filePath, line)` — click-target for refs panel
+     * links emitted by the markdown-it plugin (markdown-plugin.ts). The
+     * preview's CSP allows `command:` URIs in `<a>` tags only when wired
+     * to a registered command; passing a `vscode.Uri` argument through
+     * `command:vscode.open?` works in trusted hovers but is unreliable
+     * across all preview hosts. This thin wrapper takes plain string args
+     * so the URI encoding stays simple.
+     */
+    vscode.commands.registerCommand('scepter.previewOpenAt', async (filePath: string, line?: number) => {
+      if (!filePath) return;
+      try {
+        const uri = vscode.Uri.file(filePath);
+        const doc = await vscode.workspace.openTextDocument(uri);
+        const editor = await vscode.window.showTextDocument(doc, { preview: false });
+        if (line && line > 0) {
+          const pos = new vscode.Position(Math.max(0, line - 1), 0);
+          editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+          editor.selection = new vscode.Selection(pos, pos);
+        }
+      } catch (err) {
+        vscode.window.showWarningMessage(
+          `SCEpter: Failed to open ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }),
     vscode.commands.registerCommand('scepter.openFullMatrix', () => {
       traceabilityProvider.openFullPanel();
     }),
@@ -507,6 +533,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
       () => { /* no preview open — ignore */ }
     );
   }, 500);
+
+  // Refresh any open markdown preview whenever the claim index updates so
+  // tooltips, refs panels, and crossref-count badges reflect the latest
+  // data. Debounced because Phase A + Phase B + excerpt-cache fire
+  // `onDidRefresh` three times per index rebuild and we don't want to
+  // trash the preview repeatedly.
+  let previewRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  index.onDidRefresh(() => {
+    if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+    previewRefreshTimer = setTimeout(() => {
+      vscode.commands.executeCommand('markdown.preview.refresh').then(
+        undefined,
+        () => { /* no preview open — ignore */ }
+      );
+    }, 750);
+  });
 
   // Return the markdown-it plugin for the preview pane.
   return {
