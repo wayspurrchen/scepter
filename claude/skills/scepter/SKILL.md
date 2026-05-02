@@ -185,7 +185,9 @@ class AuthService { ... }
 
 **Reference types:** `@implements`, `@depends-on`, `@addresses`, `@validates`, `@see`, plain `{ID}`.
 
-**Claim-level references** use dot notation: `{R012.§1.AC.15}`. Compact syntax for multiples: `{R012.§1.AC.11,.AC.29,.AC.30}`. Range syntax is supported: `{R012.§1.AC.01-30}`. The dot between prefix and number is mandatory — `AC01` and `AC-01` are both invalid. See `claims.md` in this skill directory for the full syntax, rules, and examples.
+**Claim-level references** use dot notation: `{R012.§1.AC.15}`. Compact syntax for multiples: `{R012.§1.AC.11,.AC.29,.AC.30}`. Range syntax is supported: `{R012.§1.AC.01-30}`. The dot between prefix and number is mandatory — `AC01` and `AC-01` are both invalid. References that begin with a kebab-case alias (`vendor-lib/R005.§1.AC.01`) are cross-project citations that resolve against a peer SCEpter project; see `claims.md` "Cross-Project References" for the rules. See `claims.md` in this skill directory for the full syntax, rules, and examples.
+
+**Cross-project annotations:** `@implements` and `@see` MAY use alias-prefixed targets to cite a peer project's claim — but `derives=` and `superseded=` MUST NOT (linter errors `cross-project-derives` and `cross-project-superseded`). The derivation graph is per-project; lifecycle authority is per-project.
 
 **In tests:** `test('S002.§1.AC.01: eq matches identical values', () => { ... });`
 
@@ -229,6 +231,11 @@ scepter show D001 -r --depth 2                    # With reference chain (2 leve
 scepter show "D*"                                 # Glob: all decisions
 scepter show "T00[1-9]"                           # Range: T001-T009
 scepter show --source-file src/auth/service.ts    # What notes does this file reference?
+
+# Cross-project: an alias-prefixed argument shows a peer project's note
+# with a clearly visible peer-source header. Aliases are declared in the
+# local project's scepter.config.json under projectAliases.
+scepter show vendor-lib/R042                      # Peer project's R042
 ```
 
 ### Context Gathering
@@ -238,6 +245,11 @@ scepter gather T001 --depth 1                     # Direct references only
 scepter gather T001 --depth 2                     # Two levels deep
 scepter gather D001 --refs-only                   # Just reference structure
 scepter gather T001 --max-notes 20                # Limit context size
+
+# Cross-project references encountered in the gathered note's content
+# are listed as one-line stubs (alias + peer note ID, "not loaded")
+# in a "Cross-project citations" footer. Peer content is NOT loaded
+# by default; the local project's aggregate counts exclude peers.
 ```
 
 ### Searching

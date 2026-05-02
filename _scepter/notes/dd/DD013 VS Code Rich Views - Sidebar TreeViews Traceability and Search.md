@@ -11,6 +11,7 @@ status: draft
 **Research:** `docs/202604021930 VS Code Extension Rich Views Research and UI Proposal.md`
 **Date:** 2026-04-02
 **Scope:** Implementation blueprint for seven sidebar views in the SCEpter VS Code extension: Activity Bar container, Notes Explorer, Active Note Claims, References, Traceability Matrix, Source Confidence, and Claim Search. All views consume from the existing `ClaimIndexCache`; no separate `ProjectManager` instances.
+**Downstream constraint:** {R011.§4.AC.09} requires the sidebar tree views and traceability webview specified here to remain peer-project-isolated when alias-prefixed references are introduced — peer notes MUST NOT appear as top-level Notes Explorer entries or as rows in the local trace matrix. {DD015} Phase 12 implements this constraint without restructuring the views.
 
 ---
 

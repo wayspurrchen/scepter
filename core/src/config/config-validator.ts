@@ -16,7 +16,25 @@ import type {
   AllowedStatusesConfig,
   ClaimConfig,
   SCEpterConfig,
+  ProjectAliasValue,
 } from '../types/config';
+
+/**
+ * Regex for valid alias names — kebab-case, starts with a letter, ends
+ * with a letter or digit, no leading or trailing hyphens, minimum length
+ * 2. Per DD015 DC.01.
+ *
+ * @implements {R011.§1.AC.04} alias name character set (positive grammar)
+ * @implements {DD015.§1.DC.01} kebab-case regex `^[a-z][a-z0-9-]*[a-z0-9]$`
+ */
+export const ALIAS_NAME_REGEX = /^[a-z][a-z0-9-]*[a-z0-9]$/;
+
+/**
+ * Regex matching SCEpter note ID prefixes. Alias names must NOT match
+ * this shape to avoid collision with the note-ID grammar from
+ * R004/R011.§1.AC.04.
+ */
+const NOTE_ID_REGEX = /^[A-Z]{1,5}\d{3,5}$/;
 
 export interface ValidationError {
   field: string;
@@ -221,6 +239,57 @@ const validateUniqueFolders = (items: Record<string, { folder?: string }>) => {
 // Helper to validate identifiers
 const isValidIdentifier = (key: string) => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(key);
 
+/**
+ * Schema for a project alias name. Enforces R011.§1.AC.04's minimum
+ * constraints (no match against note-ID regex, no `/`) and DD015 DC.01's
+ * positive grammar (kebab-case, no leading/trailing hyphens, min length 2).
+ *
+ * @implements {R011.§1.AC.04} alias name constraints
+ */
+export const aliasNameSchema = z
+  .string()
+  .min(2, 'Alias name must be at least 2 characters')
+  .regex(ALIAS_NAME_REGEX, 'Alias name must be lowercase kebab-case (e.g., vendor-lib): start with a letter, end with letter or digit, no leading/trailing hyphens')
+  .refine(
+    (name) => !NOTE_ID_REGEX.test(name),
+    { message: 'Alias name must not match the note-ID pattern [A-Z]{1,5}\\d{3,5}' },
+  )
+  .refine(
+    (name) => !name.includes('/'),
+    { message: 'Alias name must not contain `/` (the cross-project separator)' },
+  );
+
+/**
+ * Schema for the object form of a project alias target.
+ *
+ * @implements {R011.§1.AC.01} alias target object shape
+ * @implements {R011.§1.AC.02} object form for future extension
+ */
+export const ProjectAliasTargetSchema = z.object({
+  path: z.string().min(1, 'Alias target path cannot be empty'),
+  description: z.string().optional(),
+});
+
+/**
+ * Schema for a single alias value: either a shorthand string path or the
+ * object form.
+ *
+ * @implements {R011.§1.AC.02} string-or-object alias value
+ */
+export const ProjectAliasValueSchema = z.union([
+  z.string().min(1, 'Alias target path cannot be empty'),
+  ProjectAliasTargetSchema,
+]);
+
+/**
+ * Schema for the top-level `projectAliases` map. The Zod record helper
+ * does not invoke the key schema's validators on this version, so key-
+ * shape validation runs as a separate cross-field check below.
+ *
+ * @implements {R011.§1.AC.01} projectAliases map
+ */
+export const ProjectAliasesSchema = z.record(z.string(), ProjectAliasValueSchema);
+
 // Main Config Schema (basic structure validation)
 const SCEpterConfigBaseSchema = z.object({
   noteTypes: z
@@ -254,6 +323,10 @@ const SCEpterConfigBaseSchema = z.object({
       autoInsert: z.boolean().optional().default(true),
     }).optional(),
   }).optional(),
+  // Cross-project alias configuration. Key-shape validation runs as a
+  // cross-field check (see validateProjectAliases).
+  // @implements {R011.§1.AC.01} projectAliases map
+  projectAliases: ProjectAliasesSchema.optional(),
 });
 
 /**
@@ -342,6 +415,54 @@ function validateStatusSetsReferences(config: z.infer<typeof SCEpterConfigBaseSc
   return errors;
 }
 
+/**
+ * Validate alias-name shapes and detect collisions with note-type
+ * shortcodes.
+ *
+ * @implements {R011.§1.AC.04} alias name constraints
+ * @implements {R011.§1.AC.05} alias name must not collide with shortcode prefix
+ */
+function validateProjectAliases(config: z.infer<typeof SCEpterConfigBaseSchema>): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const aliases = config.projectAliases;
+  if (!aliases) return errors;
+
+  // Per-alias name validation. We re-run the schema since z.record skips
+  // key validators on this Zod version.
+  for (const aliasName of Object.keys(aliases)) {
+    const result = aliasNameSchema.safeParse(aliasName);
+    if (!result.success) {
+      for (const issue of result.error.errors) {
+        errors.push({
+          field: `projectAliases.${aliasName}`,
+          message: issue.message,
+          severity: 'error',
+        });
+      }
+    }
+  }
+
+  // Shortcode collision check: each alias name's uppercase form must not
+  // match any note-type shortcode (case-insensitive comparison since
+  // shortcodes are normalized to upper).
+  const shortcodes = new Set<string>();
+  for (const noteType of Object.values(config.noteTypes)) {
+    shortcodes.add(noteType.shortcode.toUpperCase());
+  }
+
+  for (const aliasName of Object.keys(aliases)) {
+    if (shortcodes.has(aliasName.toUpperCase())) {
+      errors.push({
+        field: `projectAliases.${aliasName}`,
+        message: `Alias name '${aliasName}' collides with a note-type shortcode. Choose a different alias name to avoid ambiguity with local note IDs.`,
+        severity: 'error',
+      });
+    }
+  }
+
+  return errors;
+}
+
 // Main Config Schema with cross-reference validation
 export const SCEpterConfigSchema = SCEpterConfigBaseSchema;
 
@@ -369,6 +490,7 @@ export class ConfigValidator {
     // At this point we know config is valid per the base schema
     const typedConfig = config as z.infer<typeof SCEpterConfigBaseSchema>;
     errors.push(...validateStatusSetsReferences(typedConfig));
+    errors.push(...validateProjectAliases(typedConfig));
 
     return errors;
   }

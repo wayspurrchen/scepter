@@ -1,13 +1,67 @@
 import { EventEmitter } from 'events';
-import type { SCEpterConfig, NoteTypeConfig } from '../types/config';
+import type { SCEpterConfig, NoteTypeConfig, ProjectAliasValue } from '../types/config';
 import { ConfigValidator, ConfigValidationError, SCEpterConfigSchema } from './config-validator';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
+
+/**
+ * Reason an alias target could not be resolved.
+ *
+ * @implements {R011.§1.AC.06} unresolved-alias error taxonomy
+ * @implements {R011.§2.AC.05} distinct, actionable errors
+ */
+export type AliasUnresolvedReason =
+  | 'path-not-found'
+  | 'not-a-directory'
+  | 'not-a-scepter-project';
+
+/**
+ * Resolution status for a single alias.
+ *
+ * @implements {R011.§1.AC.06} resolved/unresolved status
+ */
+export type AliasResolution =
+  | { resolved: true; aliasName: string; configPath: string; resolvedPath: string; description?: string }
+  | { resolved: false; aliasName: string; configPath: string; resolvedPath: string; reason: AliasUnresolvedReason; message: string };
+
+/** Normalize an alias value (string-or-object) to its target path and optional description. */
+function normalizeAliasValue(value: ProjectAliasValue): { path: string; description?: string } {
+  if (typeof value === 'string') return { path: value };
+  return { path: value.path, description: value.description };
+}
+
+/**
+ * Resolve a raw alias path against the directory containing the config
+ * file that declared it. Supports `~` expansion (`~`, `~/foo`),
+ * absolute paths, and relative paths. Exported for unit tests.
+ *
+ * @implements {R011.§1.AC.03} relative/absolute/tilde path support
+ */
+export function resolveAliasPathInternal(rawPath: string, configFilePath: string): string {
+  const expanded = rawPath === '~'
+    ? os.homedir()
+    : rawPath.startsWith('~/')
+      ? path.join(os.homedir(), rawPath.slice(2))
+      : rawPath;
+  if (path.isAbsolute(expanded)) {
+    return path.resolve(expanded);
+  }
+  return path.resolve(path.dirname(configFilePath), expanded);
+}
 
 export class ConfigManager extends EventEmitter {
   private config?: SCEpterConfig;
   private validator: ConfigValidator;
+  /** Absolute path of the config file last loaded from disk, or `null`
+   * if config was supplied via `setConfig`. Used to resolve relative
+   * alias paths per R011.§1.AC.03. */
+  private loadedConfigPath: string | null = null;
+  /** Cached alias resolution map. Per R011.§2.AC.06 / DD015 DC.04 the
+   * resolution is eager at load time and cached for the CLI invocation
+   * lifetime. */
+  private aliasResolutions: Map<string, AliasResolution> = new Map();
 
   constructor(private projectPath: string) {
     super();
@@ -31,6 +85,11 @@ export class ConfigManager extends EventEmitter {
         const userConfig = JSON.parse(content);
         // Validate and return
         const validated = this.validateAndLoad(userConfig);
+        this.loadedConfigPath = path.resolve(configPath);
+        // Eager alias-target validation per R011.§1.AC.06 / DD015 DC.04.
+        // Failures emit warnings via the event channel; references through
+        // unresolved aliases produce errors at the reference site.
+        await this.validateAliases();
         return validated;
       } catch (error: any) {
         // Only continue to next path if file doesn't exist
@@ -104,6 +163,166 @@ export class ConfigManager extends EventEmitter {
     return this.config;
   }
 
+  /**
+   * Absolute path of the directory containing the loaded config file.
+   * Returns `null` if the config was supplied programmatically rather
+   * than read from disk. Used to resolve relative alias paths.
+   *
+   * @implements {R011.§1.AC.03} alias paths resolved relative to the
+   *   declaring config file's location
+   */
+  getConfigBaseDir(): string | null {
+    if (!this.loadedConfigPath) return null;
+    return path.dirname(this.loadedConfigPath);
+  }
+
+  /**
+   * Record the absolute path of the file from which config was loaded.
+   * Callers that bypass `loadConfigFromFilesystem` (e.g., the
+   * filesystem-project factory, which routes through
+   * FilesystemConfigStorage) MUST call this so subsequent
+   * `validateAliases()` calls can resolve relative alias paths against
+   * the correct base directory.
+   */
+  setLoadedConfigPath(absolutePath: string): void {
+    this.loadedConfigPath = path.resolve(absolutePath);
+  }
+
+  /**
+   * Resolve a single alias value to an absolute filesystem path.
+   * Supports tilde expansion, relative paths (anchored at the config
+   * file's directory), and absolute paths.
+   *
+   * @implements {R011.§1.AC.03} relative/absolute/tilde path support
+   */
+  resolveAliasPath(value: ProjectAliasValue, configFilePath: string): string {
+    const { path: rawPath } = normalizeAliasValue(value);
+    return resolveAliasPathInternal(rawPath, configFilePath);
+  }
+
+  /**
+   * Validate that each declared alias points at a directory containing
+   * a valid SCEpter project. Populates the in-memory resolution cache;
+   * unresolved targets become `{resolved: false, ...}` entries. Per
+   * R011.§1.AC.06 unresolved targets produce warnings (emitted via the
+   * `alias:warning` event), not hard errors.
+   *
+   * @implements {R011.§1.AC.06} eager validation with warnings
+   * @implements {R011.§2.AC.06} cached for the CLI invocation lifetime
+   * @implements {DD015.§1.DC.04} eager validation at load (rejects lazy)
+   */
+  async validateAliases(): Promise<AliasResolution[]> {
+    this.aliasResolutions.clear();
+
+    if (!this.config) return [];
+    const aliases = this.config.projectAliases;
+    if (!aliases) return [];
+
+    // Aliases need a base directory to resolve relative paths against.
+    // If config was loaded from disk we use its directory; if config was
+    // supplied via setConfig() we fall back to the project path so
+    // tests/programmatic callers still get sensible behavior.
+    const configFilePath = this.loadedConfigPath ?? path.join(this.projectPath, 'scepter.config.json');
+
+    const out: AliasResolution[] = [];
+    for (const [aliasName, value] of Object.entries(aliases)) {
+      const resolvedPath = this.resolveAliasPath(value, configFilePath);
+      const description = typeof value === 'string' ? undefined : value.description;
+      const resolution = await this.checkAliasTarget(aliasName, configFilePath, resolvedPath, description);
+      this.aliasResolutions.set(aliasName, resolution);
+      out.push(resolution);
+      if (!resolution.resolved) {
+        this.emit('alias:warning', resolution);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Resolution status for a previously-validated alias, or `null` if
+   * the alias was not declared. Callers should distinguish "not
+   * declared" (return null) from "declared but unresolved" (return
+   * `{resolved: false, ...}`) so the resolver can produce the correct
+   * error taxonomy from R011.§2.AC.05.
+   *
+   * @implements {R011.§1.AC.06} resolved/unresolved query
+   */
+  getAliasResolution(aliasName: string): AliasResolution | null {
+    return this.aliasResolutions.get(aliasName) ?? null;
+  }
+
+  /**
+   * All cached alias resolutions in declaration order.
+   *
+   * @implements {R011.§1.AC.06} resolution map
+   */
+  getAllAliasResolutions(): AliasResolution[] {
+    return Array.from(this.aliasResolutions.values());
+  }
+
+  /**
+   * Check that a resolved alias path exists and contains a valid
+   * SCEpter project (a `scepter.config.json` at the root or under
+   * `_scepter/`). Returns a resolution record either way.
+   */
+  private async checkAliasTarget(
+    aliasName: string,
+    configPath: string,
+    resolvedPath: string,
+    description: string | undefined,
+  ): Promise<AliasResolution> {
+    let stat: Awaited<ReturnType<typeof fs.stat>>;
+    try {
+      stat = await fs.stat(resolvedPath);
+    } catch {
+      return {
+        resolved: false,
+        aliasName,
+        configPath,
+        resolvedPath,
+        reason: 'path-not-found',
+        message: `Alias '${aliasName}' target path does not exist: ${resolvedPath}`,
+      };
+    }
+    if (!stat.isDirectory()) {
+      return {
+        resolved: false,
+        aliasName,
+        configPath,
+        resolvedPath,
+        reason: 'not-a-directory',
+        message: `Alias '${aliasName}' target is not a directory: ${resolvedPath}`,
+      };
+    }
+    const candidates = [
+      path.join(resolvedPath, 'scepter.config.json'),
+      path.join(resolvedPath, '_scepter', 'scepter.config.json'),
+    ];
+    for (const candidate of candidates) {
+      try {
+        const candidateStat = await fs.stat(candidate);
+        if (candidateStat.isFile()) {
+          return {
+            resolved: true,
+            aliasName,
+            configPath,
+            resolvedPath,
+            description,
+          };
+        }
+      } catch {
+        // try next
+      }
+    }
+    return {
+      resolved: false,
+      aliasName,
+      configPath,
+      resolvedPath,
+      reason: 'not-a-scepter-project',
+      message: `Alias '${aliasName}' target is not a SCEpter project (no scepter.config.json found at root or under _scepter/): ${resolvedPath}`,
+    };
+  }
 
   async addNoteType(name: string, config: NoteTypeConfig): Promise<void> {
     const current = this.getConfig();
@@ -162,7 +381,19 @@ export class ConfigManager extends EventEmitter {
     await fs.rename(tempPath, configPath);
   }
 
+  /**
+   * Reload config from disk. Captures the prior alias resolution map
+   * before reload, then after the reload completes emits an
+   * `aliases:changed` event with `{prev, next}` so subscribers (e.g.,
+   * `ProjectManager` driving `peerResolver.invalidateChanged`) can
+   * invalidate stale peer-cache entries while preserving §2.AC.06's
+   * caching invariant for unchanged aliases.
+   *
+   * @implements {R011.§4.AC.12} alias-changed signal on reload
+   */
   async reloadConfig(): Promise<void> {
+    // Capture prior alias resolution map before the reload clears it.
+    const prevAliases = new Map(this.aliasResolutions);
     // Clear cached config to force reload from disk
     const loaded = await this.loadConfigFromFilesystem();
     if (loaded) {
@@ -170,6 +401,8 @@ export class ConfigManager extends EventEmitter {
     } else {
       throw new Error('No configuration file found to reload');
     }
+    const nextAliases = new Map(this.aliasResolutions);
+    this.emit('aliases:changed', { prev: prevAliases, next: nextAliases });
   }
 
   async updateNoteType(typeName: string, updates: Partial<NoteTypeConfig>): Promise<void> {

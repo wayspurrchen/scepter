@@ -86,6 +86,44 @@ function highlightWithData(
       result += escapeHtml(text.slice(cursor, match.start));
     }
 
+    // Cross-project routing — route alias-prefixed matches to a distinct
+    // CSS class (`scepter-cross-project`) and a click-target that
+    // dispatches the `scepter.openCrossProject` command. The peer file
+    // path is not known at render time (resolution is async), so the
+    // command handler in extension.ts resolves and opens at click time.
+    // The data attributes stay on the element so the tooltip/webview
+    // script can also dispatch via postMessage if `command:` URIs are
+    // blocked by the host.
+    // @implements {R011.§4.AC.08} markdown preview marks cross-project distinctly + click-target
+    // @implements {DD015.§1.DC.07} class names match decoration-provider purple hue (visual cohesion editor↔preview)
+    if (match.aliasPrefix) {
+      const aliasEntry = index.getAlias(match.aliasPrefix);
+      const cssClass = aliasEntry?.resolved
+        ? 'scepter-cross-project scepter-cross-project-resolved'
+        : 'scepter-cross-project scepter-cross-project-unresolved';
+      const escaped = escapeHtml(match.raw);
+      const escAttr = (s: string) => s.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      const titleSuffix = aliasEntry?.resolved
+        ? `peer at ${aliasEntry.resolvedPath}`
+        : aliasEntry
+          ? `unresolved (${aliasEntry.unresolvedReason ?? 'unknown'})`
+          : 'alias not declared';
+      // Build a command: URI for click dispatch. Args are JSON-encoded
+      // [aliasName, normalizedId] so the handler can call
+      // claimIndex.resolveCrossProject(aliasName, address) at click time.
+      const cmdArgs = encodeURIComponent(JSON.stringify([match.aliasPrefix, match.normalizedId]));
+      const href = `command:scepter.openCrossProject?${cmdArgs}`;
+      const dataAttrs = `data-scepter-alias="${escAttr(match.aliasPrefix)}" data-scepter-id="${escAttr(match.normalizedId)}"`;
+      const tooltip = `title="Cross-project: ${escAttr(match.aliasPrefix)}/${escAttr(match.normalizedId)} — ${escAttr(titleSuffix)}"`;
+      // Wrap in <a> so the markdown preview's click handler dispatches.
+      // If `command:` URIs are blocked by the preview host, the link
+      // renders but the click is a no-op; the visual styling and
+      // hover/decoration paths still convey the citation.
+      result += `<a href="${href}" class="scepter-ref ${cssClass}" ${dataAttrs} ${tooltip}>${escaped}</a>`;
+      cursor = match.end;
+      continue;
+    }
+
     const cssClass = CSS_MAP[match.kind];
     const dataAttrs = buildDataAttrs(match.normalizedId, match.kind, index, contextNoteId);
     const linkTarget = buildLinkTarget(match.normalizedId, match.kind, index, currentDocDir, contextNoteId);

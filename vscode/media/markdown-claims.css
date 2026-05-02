@@ -38,6 +38,41 @@ a.scepter-ref:hover {
   color: inherit;
 }
 
+/* Cross-project (alias-prefixed) references.
+ * Distinct purple hue from local teal so a reader can tell at a glance
+ * which references resolve in the current project vs a peer.
+ * Resolved (peer is reachable) → dotted underline.
+ * Unresolved (alias undeclared, peer absent, target missing) → wavy.
+ * Mirrors the in-editor decoration types in
+ * vscode/src/decoration-provider.ts (crossProjectResolvedDecoration /
+ * crossProjectUnresolvedDecoration), so editor and preview agree.
+ *
+ * @implements {R011.§4.AC.05} cross-project decorations distinct from local
+ * @implements {R011.§4.AC.08} markdown preview marks cross-project distinctly
+ */
+.scepter-cross-project {
+  color: #C586C0;
+}
+
+.scepter-cross-project-resolved {
+  text-decoration: underline dotted;
+}
+
+.scepter-cross-project-unresolved {
+  text-decoration: underline wavy;
+}
+
+/* Light-theme adjustment — the purple #C586C0 reads OK on light
+ * backgrounds but gets cleaner contrast with a slightly darker shade. */
+.vscode-light .scepter-cross-project {
+  color: #8a3a8a;
+}
+
+/* High-contrast theme — keep the hue distinguishable from local. */
+.vscode-high-contrast .scepter-cross-project {
+  color: #ff7eff;
+}
+
 /* Dark theme adjustments — the default colors work well for dark themes.
    For light themes, use a darker teal. */
 .vscode-light .scepter-claim,

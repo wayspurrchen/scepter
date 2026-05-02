@@ -2898,5 +2898,125 @@
       "date": "2026-04-26T18:48:27.951Z",
       "note": "inline"
     }
+  ],
+  "DD015.1.DC.01": [
+    {
+      "id": "ynrvmx50lek07doebbdsky1o",
+      "claimId": "DD015.1.DC.01",
+      "key": "derives",
+      "value": "R011.OQ.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD015 Cross-Project Reference Resolution - Implementation Across Core VS Code an.md",
+      "date": "2026-05-01T02:35:26.075Z",
+      "note": "inline"
+    }
+  ],
+  "DD015.1.DC.02": [
+    {
+      "id": "xsm0mjyh1yo1anw1pwae2a8a",
+      "claimId": "DD015.1.DC.02",
+      "key": "derives",
+      "value": "R011.OQ.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD015 Cross-Project Reference Resolution - Implementation Across Core VS Code an.md",
+      "date": "2026-05-01T02:35:26.075Z",
+      "note": "inline"
+    }
+  ],
+  "DD015.1.DC.03": [
+    {
+      "id": "fqzf7jzaj5msdplh7wi352kn",
+      "claimId": "DD015.1.DC.03",
+      "key": "derives",
+      "value": "R011.OQ.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD015 Cross-Project Reference Resolution - Implementation Across Core VS Code an.md",
+      "date": "2026-05-01T02:35:26.075Z",
+      "note": "inline"
+    }
+  ],
+  "DD015.1.DC.04": [
+    {
+      "id": "nv8geo4v2hyjeo6nvn69kor9",
+      "claimId": "DD015.1.DC.04",
+      "key": "derives",
+      "value": "R011.OQ.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD015 Cross-Project Reference Resolution - Implementation Across Core VS Code an.md",
+      "date": "2026-05-01T02:35:26.075Z",
+      "note": "inline"
+    }
+  ],
+  "S001.4.AC.01": [
+    {
+      "id": "hhcyflpbidg3phoc3zggff30",
+      "claimId": "S001.4.AC.01",
+      "key": "derives",
+      "value": "R011.§5.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S001 Skill Files as Documented Artifacts.md",
+      "date": "2026-05-01T02:51:50.242Z",
+      "note": "inline"
+    }
+  ],
+  "S001.4.AC.02": [
+    {
+      "id": "xe9k32e5e0ts8r1vhtemyz4o",
+      "claimId": "S001.4.AC.02",
+      "key": "derives",
+      "value": "R011.§5.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S001 Skill Files as Documented Artifacts.md",
+      "date": "2026-05-01T02:51:50.242Z",
+      "note": "inline"
+    }
+  ],
+  "S001.4.AC.03": [
+    {
+      "id": "s3cfgm9y7r71xlx2s7ws94pl",
+      "claimId": "S001.4.AC.03",
+      "key": "derives",
+      "value": "R011.§5.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S001 Skill Files as Documented Artifacts.md",
+      "date": "2026-05-01T02:51:50.242Z",
+      "note": "inline"
+    }
+  ],
+  "S001.4.AC.04": [
+    {
+      "id": "ox7uv23izhsc95mhhvwi9csk",
+      "claimId": "S001.4.AC.04",
+      "key": "derives",
+      "value": "R011.§5.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S001 Skill Files as Documented Artifacts.md",
+      "date": "2026-05-01T02:51:50.242Z",
+      "note": "inline"
+    }
+  ],
+  "S001.4.AC.05": [
+    {
+      "id": "mf9556mud0ww9sujz8y9lrdw",
+      "claimId": "S001.4.AC.05",
+      "key": "derives",
+      "value": "R011.§5.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S001 Skill Files as Documented Artifacts.md",
+      "date": "2026-05-01T02:51:50.242Z",
+      "note": "inline"
+    }
+  ],
+  "S001.4.AC.06": [
+    {
+      "id": "rwhotkpgwqeyj7i3oz32y251",
+      "claimId": "S001.4.AC.06",
+      "key": "derives",
+      "value": "R011.§5.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S001 Skill Files as Documented Artifacts.md",
+      "date": "2026-05-01T02:51:50.242Z",
+      "note": "inline"
+    }
   ]
 }

@@ -150,8 +150,15 @@ Reference forms, from most to least explicit:
 | `NOTE.PREFIX.NN` | Claim unique within note | `R004.AC.01` |
 | `§N.PREFIX.NN` | Within same document | `§3.AC.01` |
 | `PREFIX.NN` | Within same section, unambiguous | `AC.01` |
+| `<alias>/<reference>` | Cross-project citation (any local form, prefixed) | `vendor-lib/R005.§1.AC.01` |
 
 **Always use fully qualified form in code and cross-document references.** The `§` symbol is optional emphasis — `R004.§3.AC.01` and `R004.3.AC.01` parse identically.
+
+References that begin with a kebab-case alias (`vendor-lib/`, `team-platform/`, etc.) are **cross-project citations** — they resolve against a peer SCEpter project named in the local config's `projectAliases` map. Cross-project references are read-only display pointers; the peer's claims do NOT enter the local index, derivation graph, gap report, or trace matrix. See "Cross-Project References" below for when to use them and the rules that apply.
+
+Examples in both contexts:
+- Braced (in note prose): `{vendor-lib/R005.§1.AC.01}`
+- Code annotation: `@implements {vendor-lib/R005.§1.AC.01}`
 
 ### Range References
 
@@ -168,10 +175,39 @@ Reference forms, from most to least explicit:
 | One letter-prefix segment | `AC.01`, `§1.AC.01` | `FOO.AC.01`, `BAR.AC.01` (rejected by linter — see "Spec authoring with many entities" below) |
 | § is for sections only | `§3.AC.01`, `§1.2` | `§AC.01` (§ on a claim prefix, not a section number) |
 | Monotonic, never recycled | Sequential numbering | Reusing deleted IDs |
+| Cross-project `derives=` rejected | Local derives target only | `derives=vendor-lib/R005.§1.AC.01` (linter error `cross-project-derives` — per-project derivation invariant; reconsideration permitted via future requirement) |
+| Cross-project `superseded=` permanently rejected | Local supersession target only | `superseded=vendor-lib/R005.§1.AC.01` (linter error `cross-project-superseded` — local project lacks authority over peer lifecycle; this boundary is permanent) |
+| Transitive aliases not supported | Single alias prefix | `a/b/R001` (linter error — alias prefixes don't chain) |
 
 **Same-file repeats are tolerated.** Restating a claim ID later in the same note — in a TOC, summary table, or appendix — is normal authoring and does not produce a duplicate error. The first occurrence is the canonical definition; subsequent occurrences are treated as prose and dropped from the index. The trade-off is that an actual accidental copy-paste duplicate is silently swallowed; if you intend two distinct claims, give them distinct IDs.
 
 **Bare-id ambiguity is not flagged at definition time.** Using `§1.AC.01` and `§2.AC.01` in the same note is normal — that's the payoff of using sections. The "ambiguity" of the bare suffix `AC.01` matters only when an actual reference fails to resolve unambiguously, and it's surfaced there if it does.
+
+### Cross-Project References
+
+A reference may begin with a kebab-case alias (`vendor-lib/R005.§1.AC.01`). The alias is declared in the local project's `scepter.config.json` under `projectAliases` and resolves to a peer SCEpter project's filesystem path. References through that alias are looked up in the peer project's index for display and never become part of the local project's reference graph.
+
+**When to use the alias-prefixed form:**
+- Citing a peer project's note or claim for display, where copying the content locally would lose traceability when the peer changes.
+- Vendoring a library and pointing at its specifications without fabricating local IDs.
+- Federated repositories where related projects audit each other.
+
+**When NOT to use it (mandatory):**
+- **`derives=<alias>/<id>` is rejected** — the derivation graph is per-project. The linter emits a `cross-project-derives` error citing the per-project derivation invariant. **Reconsideration is permitted** if a real downstream-deriving-from-upstream use case (e.g., a consumer's spec genuinely deriving from a vendored library's claim) motivates a future requirement that relaxes this rule together with the derivation invariant. Until then, the rule stands.
+- **`superseded=<alias>/<id>` is rejected — permanently.** Supersession asserts that the target is the *authoritative replacement for* the asserting claim. The local project has no authority to make lifecycle assertions on a peer project's claims; the peer is unaware of, and unaffected by, what the local project records about it. Allowing this would let a local note unilaterally annotate a peer's claim as a "supersession target" the peer never opted into. The linter emits a `cross-project-superseded` error. This boundary is permanent and SHOULD NOT be revisited without first establishing a federation contract that gives peer projects opt-in awareness of incoming supersession claims.
+
+**Citation, not federation.** Cross-project references are read-only display pointers, not federation. Peer claims do NOT enter:
+- The local project's claim index
+- The derivation graph (no `derives=` resolution against peers)
+- The metadata store
+- The gap report (an absent peer reference is not a local gap; an alias-prefixed reference does not constitute peer coverage)
+- The trace matrix (peer trace data stays peer-side)
+
+The peer's data flows out at display time when the local CLI dereferences a citation; the local data never flows into the peer.
+
+**Discovery:** The local CLI commands `scepter show vendor-lib/R042` and `scepter claims trace <local-note>` (which renders alias citations in a "Cross-project citations" footer) are the read paths. `scepter gather` lists alias-prefixed references encountered as one-line stubs without loading peer content. `scepter claims lint` validates that the alias is declared, the peer resolves, and the peer note/claim exists.
+
+**Aliases are local to a project.** An alias name in project A's config maps a name to a path; the same alias name in project B's config may point elsewhere. There is no shared registry; aliases are not version-pinned by this requirement; and transitive aliasing (`a/b/R001`) is not supported.
 
 ### Folder Notes and Claims
 
@@ -511,11 +547,11 @@ scepter claims stale --importance 4          # Filter by importance
 
 ### How Traceability Works Mechanically
 
-The trace matrix is built from two data sources. Understanding what it measures is essential — if you don't know how coverage is detected, you'll add annotations that appear correct but are invisible to the system.
+The trace matrix is built from two data sources, both **scoped to the local project**. Cross-project (alias-prefixed) references are tracked separately and never enter the local matrix — the peer's data flows OUT only at display time, the local data does not flow in. Understanding what the matrix measures is essential: if you don't know how coverage is detected, you'll add annotations that appear correct but are invisible to the system.
 
-**Source projection** (the "Source" column): Populated from `@implements` and `@validates` annotations in source code files (`.ts`, `.js`, `.py`, etc.). The scanner reads comments, finds `@implements {R004.§1.AC.01}`, and creates a cross-reference from `source:filename.ts` to `R004.1.AC.01`. The claim ID in the annotation MUST match a claim that exists in the index — if R004 doesn't have parseable claims, the annotation is silently orphaned.
+**Source projection** (the "Source" column): Populated from `@implements` and `@validates` annotations in source code files (`.ts`, `.js`, `.py`, etc.). The scanner reads comments, finds `@implements {R004.§1.AC.01}`, and creates a cross-reference from `source:filename.ts` to `R004.1.AC.01`. The claim ID in the annotation MUST match a claim that exists in **the local project's** index — if R004 doesn't have parseable claims (or doesn't exist locally — note the contrast with cross-project), the annotation is silently orphaned. Annotations against alias-prefixed targets (`@implements {vendor-lib/R005.§1.AC.01}`) become cross-project citations, not Source-projection coverage.
 
-**Note projections** (all other columns): Populated from `{NOTE.§N.AC.NN}` braced references in note markdown files. When S015.md contains the text `{R034.§1.AC.01}`, the index creates a cross-reference from S015 to R034.1.AC.01. This makes S015 appear in R034's trace matrix as a "Spec" column entry.
+**Note projections** (all other columns): Populated from `{NOTE.§N.AC.NN}` braced references in note markdown files **of the local project**. When S015.md contains the text `{R034.§1.AC.01}`, the local index creates a cross-reference from S015 to R034.1.AC.01. This makes S015 appear in R034's trace matrix as a "Spec" column entry. References to peers (`{vendor-lib/R042.§1.AC.01}`) appear in trace output's "Cross-project citations" footer, not as projection columns.
 
 **What makes a claim exist in the index**: The claim MUST be defined in parseable format — either a markdown heading starting with a claim pattern, or a `§`-prefixed paragraph line. Checkboxes (`- [ ] AC-1: ...`), bold-only text (`**AC.01** ...`), and other inline formats are NOT parsed. If you run `scepter claims trace NOTEID` and see "No claims found", the note's format is wrong.
 
@@ -556,3 +592,7 @@ The verification steps (1, 2, 5) are not optional — they're how you confirm th
 | `:priority` or `:important` | Use bare digit `:4` |
 | `**DC.01** \`derives=...\`` (bold + code span) | `DC.01:derives=...` (colon-suffix) |
 | Claims at same heading level as sections | Use `§`-prefixed paragraphs or one level deeper |
+| `derives=vendor-lib/R005.§1.AC.01` (cross-project derivation) | Local derives target only. Linter emits `cross-project-derives`. Reconsideration permitted only via a future requirement that relaxes both the per-project derivation invariant and this rule together |
+| `superseded=vendor-lib/R005.§1.AC.01` (cross-project supersession) | Local supersession target only. Linter emits `cross-project-superseded`. This boundary is permanent — local lacks authority over peer lifecycle |
+| `a/b/R001` (transitive alias) | Single alias prefix only. Aliases don't chain — if you need to reach project C through project B, declare C in your local `projectAliases` directly |
+| Hovering an unfamiliar `<lowercase>/<noteId>` reference and assuming it's local | It's a cross-project citation. Check `scepter.config.json` `projectAliases` to see where it points. |

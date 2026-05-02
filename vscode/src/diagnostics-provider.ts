@@ -10,6 +10,16 @@ import type { ClaimIndexCache, ClaimTreeError } from './claim-index';
  * monotonicity gaps, ambiguity — are Warnings so they stay visible without
  * blocking workflows.
  */
+/**
+ * Severity per ClaimTreeError.type.
+ *
+ * Cross-project errors (alias-unknown, peer-unresolved, peer-target-not-found,
+ * cross-project-derives, cross-project-superseded) are Errors per
+ * R011.§4.AC.06.
+ *
+ * @implements {R011.§4.AC.06} cross-project diagnostic severities
+ * @implements {DD015.§1.DC.09} severity routing for `cross-project-derives` / `cross-project-superseded`
+ */
 const SEVERITY_BY_TYPE: Record<ClaimTreeError['type'], vscode.DiagnosticSeverity> = {
   'forbidden-form': vscode.DiagnosticSeverity.Error,
   'duplicate': vscode.DiagnosticSeverity.Error,
@@ -17,6 +27,11 @@ const SEVERITY_BY_TYPE: Record<ClaimTreeError['type'], vscode.DiagnosticSeverity
   'unresolvable-derivation-target': vscode.DiagnosticSeverity.Error,
   'reference-to-removed': vscode.DiagnosticSeverity.Error,
   'multiple-lifecycle': vscode.DiagnosticSeverity.Error,
+  'cross-project-derives': vscode.DiagnosticSeverity.Error,
+  'cross-project-superseded': vscode.DiagnosticSeverity.Error,
+  'alias-unknown': vscode.DiagnosticSeverity.Error,
+  'peer-unresolved': vscode.DiagnosticSeverity.Warning,
+  'peer-target-not-found': vscode.DiagnosticSeverity.Warning,
   'non-monotonic': vscode.DiagnosticSeverity.Warning,
   'ambiguous': vscode.DiagnosticSeverity.Warning,
   'unresolved-reference': vscode.DiagnosticSeverity.Warning,

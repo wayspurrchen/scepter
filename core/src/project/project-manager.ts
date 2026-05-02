@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { ConfigManager } from '../config/config-manager';
+import type { AliasResolution } from '../config/config-manager';
 import { NoteManager } from '../notes/note-manager';
 import { ReferenceManager } from '../references/reference-manager';
 import { NoteFileManager } from '../notes/note-file-manager';
@@ -10,6 +11,7 @@ import { TaskDispatcher } from '../tasks/task-dispatcher';
 import { SourceCodeScanner } from '../scanners/source-code-scanner';
 import { StatusValidator } from '../statuses/status-validator.js';
 import { ClaimIndex } from '../claims/claim-index.js';
+import { PeerProjectResolver, type PeerProjectFactory } from './peer-project-resolver';
 import type { SCEpterConfig } from '../types/config';
 import type { SimpleLLMFunction } from '../llm/types';
 import type {
@@ -40,6 +42,11 @@ export interface ProjectManagerDependencies {
   taskDispatcher?: TaskDispatcher;
   sourceScanner?: SourceCodeScanner;
   llmFunction?: SimpleLLMFunction;
+  /** Factory for instantiating peer-project ProjectManagers. Used by
+   * PeerProjectResolver to resolve `<alias>/...` references. Defaults
+   * to `createFilesystemProject` (the same factory the local project
+   * uses). Tests inject a stub. */
+  peerProjectFactory?: PeerProjectFactory;
   // Storage interfaces (new — injected by createFilesystemProject)
   noteStorage?: NoteStorage;
   configStorage?: ConfigStorage;
@@ -78,6 +85,12 @@ export class ProjectManager extends EventEmitter {
   public sourceScanner?: SourceCodeScanner;
   public statusValidator!: StatusValidator;
   public readonly claimIndex: ClaimIndex;
+
+  /** Cross-project alias resolver. Lazily instantiated on first
+   * access via `peerResolver` getter so unrelated code paths don't
+   * pay the construction cost. */
+  private _peerResolver?: PeerProjectResolver;
+  private readonly peerProjectFactory?: PeerProjectFactory;
 
   // Storage interfaces (injected by factory, undefined in legacy construction path)
   public readonly noteStorage?: NoteStorage;
@@ -142,6 +155,45 @@ export class ProjectManager extends EventEmitter {
 
     // Claim index — built on-demand, not during initialization
     this.claimIndex = new ClaimIndex();
+
+    // Peer-project factory for cross-project alias resolution. Stored
+    // for lazy use by `peerResolver`.
+    this.peerProjectFactory = deps.peerProjectFactory;
+
+    // Wire alias-changed events from configManager.reloadConfig() to
+    // the peer cache. Fires for the lifetime of this ProjectManager,
+    // independent of `watchConfigChanges()`. Only does work when the
+    // peerResolver has been lazily constructed; if it hasn't, the
+    // cache is empty and there is nothing to invalidate.
+    // @implements {R011.§4.AC.12} alias-changed → peer-cache invalidation
+    this.configManager.on('aliases:changed', (payload: { prev: Map<string, AliasResolution>; next: Map<string, AliasResolution> }) => {
+      if (this._peerResolver) {
+        this._peerResolver.invalidateChanged(payload.prev, payload.next);
+      }
+    });
+  }
+
+  /**
+   * Lazy accessor for the cross-project alias resolver. Constructed on
+   * first access. Default factory is `createFilesystemProject`, but
+   * callers may inject a stub via the `peerProjectFactory` dep.
+   *
+   * @implements {R011.§2.AC.05} cross-project resolver entry point
+   * @implements {R011.§2.AC.06} per-CLI-invocation peer cache (resolver instance lifetime)
+   */
+  get peerResolver(): PeerProjectResolver {
+    if (!this._peerResolver) {
+      const factory: PeerProjectFactory = this.peerProjectFactory ?? (async (peerPath: string) => {
+        // Lazy import to avoid pulling the filesystem factory into every
+        // ProjectManager construction path. The dynamic import keeps the
+        // baseline startup cost identical for projects that don't
+        // exercise cross-project references.
+        const { createFilesystemProject } = await import('../storage/filesystem/create-filesystem-project');
+        return createFilesystemProject(peerPath);
+      });
+      this._peerResolver = new PeerProjectResolver(this.configManager, factory);
+    }
+    return this._peerResolver;
   }
 
   /**

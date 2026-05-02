@@ -26,6 +26,28 @@ import type { SCEpterConfig } from '../../types/config';
 import type { SimpleLLMFunction } from '../../llm/types';
 
 /**
+ * Discover which config file path a project actually loads from.
+ * Mirrors `FilesystemConfigStorage.load()`'s lookup order.
+ *
+ * @implements {R011.§1.AC.03} alias paths anchored at the declaring config file
+ */
+async function resolveConfigPath(projectPath: string): Promise<string | null> {
+  const candidates = [
+    path.join(projectPath, 'scepter.config.json'),
+    path.join(projectPath, '_scepter', 'scepter.config.json'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+  return null;
+}
+
+/**
  * Bootstrap filesystem directories: ensure _scepter/, note dirs, type dirs exist.
  * Extracted from ProjectManager.initialize() — all filesystem setup lives here.
  */
@@ -151,13 +173,26 @@ export async function createFilesystemProject(
   const rawConfig = await configStorage.load();
   if (!rawConfig) {
     // Fall back to trying ConfigManager's own filesystem loader
-    // (which may handle additional config paths or formats)
+    // (which may handle additional config paths or formats; this path
+    // also runs alias validation, since loadConfigFromFilesystem records
+    // the loaded config path).
     const loaded = await configManager.loadConfigFromFilesystem();
     if (!loaded) {
       throw new Error('No configuration file found. Please run `scepter init` first.');
     }
   } else {
     configManager.validateAndLoad(rawConfig);
+    // Record the path the storage adapter loaded from, then run alias
+    // validation. Without this, projectAliases declared in the config
+    // would parse but the resolution cache would stay empty, and
+    // every cross-project reference would surface as "alias-unknown".
+    // @implements {R011.§1.AC.03} alias path resolution requires the loaded config path
+    // @implements {R011.§1.AC.06} eager alias validation
+    const configPath = await resolveConfigPath(projectPath);
+    if (configPath) {
+      configManager.setLoadedConfigPath(configPath);
+      await configManager.validateAliases();
+    }
   }
 
   const config = configManager.getConfig();

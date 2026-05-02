@@ -3,6 +3,26 @@ import * as esbuild from 'esbuild';
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
+// Emits begin/end lines on every build cycle so the VS Code task
+// problem-matcher (tasks.json) can transition state correctly across
+// rebuilds. Without these, esbuild's watch is silent on incremental
+// builds and the preLaunchTask hangs on subsequent F5s.
+const watchLogger = {
+  name: 'watch-logger',
+  setup(build) {
+    build.onStart(() => {
+      console.log('[esbuild] build started');
+    });
+    build.onEnd((result) => {
+      if (result.errors.length > 0) {
+        console.error(`[esbuild] build failed: ${result.errors.length} error(s)`);
+      } else {
+        console.log('[esbuild] build finished');
+      }
+    });
+  },
+};
+
 /** @type {import('esbuild').BuildOptions} */
 const buildOptions = {
   entryPoints: ['src/extension.ts'],
@@ -14,10 +34,8 @@ const buildOptions = {
   target: 'node18',
   sourcemap: true,
   minify: false,
-  // The scepter barrel re-exports LLM/CLI code the extension never uses.
-  // Mark those heavy deps external so they don't bloat the bundle.
-  // They're never called at runtime in the extension, so missing is fine.
   alias: {},
+  plugins: watch ? [watchLogger] : [],
 };
 
 if (watch) {

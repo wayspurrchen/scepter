@@ -418,6 +418,19 @@ export const traceCommand = new Command('trace')
           if (bareRefs.length > 0) {
             console.log(formatNoteSourceReferences(bareRefs, context.projectPath, !!options.verbose));
           }
+
+          // @implements {R011.§3.AC.03} cross-project citations rendered in footer
+          // Cross-project (alias-prefixed) references are NOT merged into the
+          // local matrix. They appear in a separate footer so the user can
+          // see what peer-project citations exist without polluting the
+          // projection coverage view.
+          const crossProjectRefs = data.crossProjectRefs.filter((r) => r.fromNoteId === id);
+          if (crossProjectRefs.length > 0) {
+            console.log('\n' + chalk.bold('Cross-project citations:'));
+            for (const ref of crossProjectRefs) {
+              console.log(`  ${chalk.cyan(ref.aliasPrefix)}/${ref.address.raw.slice(ref.aliasPrefix.length + 1)}  (line ${ref.line})`);
+            }
+          }
         },
       );
     } catch (error) {

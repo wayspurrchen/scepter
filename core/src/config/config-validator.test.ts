@@ -175,4 +175,137 @@ describe('ConfigValidator', () => {
       expect(errors.length).toBeGreaterThan(0);
     });
   });
+
+  /**
+   * @validates {R011.§1.AC.01} projectAliases configuration field
+   * @validates {R011.§1.AC.02} string-or-object alias value
+   * @validates {R011.§1.AC.04} alias name constraints
+   * @validates {R011.§1.AC.05} shortcode collision detection
+   */
+  describe('projectAliases (R011)', () => {
+    const baseConfig: SCEpterConfig = {
+      noteTypes: {
+        Requirement: { folder: 'reqs', shortcode: 'R' },
+      },
+    };
+
+    it('accepts a kebab-case alias name with shorthand string path', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { 'vendor-lib': '../vendor-lib' },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts a kebab-case alias name with object form', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: {
+          'vendor-lib': { path: '../vendor-lib', description: 'Upstream library' },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects uppercase alias names (note-ID-like)', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { Vendor: '../vendor' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.field === 'projectAliases.Vendor')).toBe(true);
+    });
+
+    it('rejects alias names with leading hyphen', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { '-vendor': '../vendor' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects alias names with trailing hyphen', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { 'vendor-': '../vendor' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects single-character alias names', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { v: '../vendor' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects alias names matching the note-ID regex', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { R042: '../vendor' },
+      };
+      // R042 fails the lowercase-start rule first, but it would also fail
+      // the note-ID-collision check. Either rejection is acceptable.
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects alias names containing slash', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { 'vend/or': '../vendor' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects alias names that collide (case-insensitive) with a note-type shortcode', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Requirement: { folder: 'reqs', shortcode: 'R' },
+        },
+        projectAliases: { r: '../vendor' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.message.includes('collides'))).toBe(true);
+    });
+
+    it('rejects alias targets with empty string path', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { 'vendor-lib': '' },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects alias target object with missing path', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: { 'vendor-lib': { description: 'no path' } },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('accepts multiple aliases together', () => {
+      const config = {
+        ...baseConfig,
+        projectAliases: {
+          'vendor-lib': '../vendor-lib',
+          'team-platform': { path: '~/projects/team-platform' },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+  });
 });

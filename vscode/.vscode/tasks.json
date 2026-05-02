@@ -9,8 +9,8 @@
         "fileLocation": "absolute",
         "background": {
           "activeOnStart": true,
-          "beginsPattern": ".",
-          "endsPattern": "\\[esbuild\\] watching for changes\\.\\.\\."
+          "beginsPattern": "\\[esbuild\\] build started",
+          "endsPattern": "\\[esbuild\\] (build finished|build failed|watching for changes\\.\\.\\.)"
         },
         "pattern": {
           "regexp": "^✘ \\[ERROR\\] (.+)$",

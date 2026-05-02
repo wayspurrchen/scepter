@@ -44,6 +44,16 @@ export interface ShowResult {
 }
 
 /**
+ * Detect whether an ID begins with a cross-project alias prefix
+ * (`<alias>/`). Mirrors `ALIAS_PREFIX_RE` in claim-parser.ts.
+ *
+ * @implements {R011.§3.AC.01} alias-prefixed argument routing in show
+ */
+function looksLikeCrossProjectId(id: string): boolean {
+  return /^[a-z][a-z0-9-]*[a-z0-9]\//.test(id);
+}
+
+/**
  * Show notes by their IDs
  */
 export async function showNotes(
@@ -58,12 +68,34 @@ export async function showNotes(
     throw new Error('Note manager not initialized');
   }
 
+  // @implements {R011.§3.AC.01} cross-project show with peer-source header
+  // Cross-project IDs (alias-prefixed) are routed to the peer resolver
+  // and rendered with a clearly visible peer header before any local
+  // processing.
+  const crossProjectIds: string[] = [];
+  const localIds: string[] = [];
+  for (const id of ids) {
+    if (looksLikeCrossProjectId(id)) {
+      crossProjectIds.push(id);
+    } else {
+      localIds.push(id);
+    }
+  }
+
+  let crossProjectOutput = '';
+  if (crossProjectIds.length > 0) {
+    crossProjectOutput = await resolveAndDisplayCrossProjectIds(crossProjectIds, projectManager);
+    if (localIds.length === 0) {
+      return { notes: [], notFound: [], output: crossProjectOutput };
+    }
+  }
+
   // @implements {DD008.§1.DC.03} Detect claim addresses before note lookup.
   // A claim address contains '.' and has a claim prefix pattern (e.g., DD007.1.DC.01).
   // Separate claim IDs from regular note IDs for different processing paths.
   const claimIds: string[] = [];
   const noteIds: string[] = [];
-  for (const id of ids) {
+  for (const id of localIds) {
     if (looksLikeClaimAddress(id)) {
       claimIds.push(id);
     } else {
@@ -75,20 +107,29 @@ export async function showNotes(
   if (claimIds.length > 0) {
     const claimOutput = await resolveAndDisplayClaims(claimIds, options, context);
     if (claimOutput !== null) {
-      // If we had ONLY claim IDs, return the claim output directly
+      // If we had ONLY claim IDs, return the claim output (prepended with any cross-project output)
       if (noteIds.length === 0) {
-        return { notes: [], notFound: [], output: claimOutput };
+        const combined = [crossProjectOutput, claimOutput].filter(Boolean).join('\n\n');
+        return { notes: [], notFound: [], output: combined };
       }
-      // Mixed: prepend claim output, continue with note IDs below
+      // Mixed: prepend cross-project + claim output, continue with note IDs below
       const noteResult = await showNotesCore(noteIds, options, context);
-      const combinedOutput = claimOutput + '\n\n' + noteResult.output;
+      const combinedOutput = [crossProjectOutput, claimOutput, noteResult.output].filter(Boolean).join('\n\n');
       return { notes: noteResult.notes, notFound: noteResult.notFound, output: combinedOutput };
     }
   }
 
-  // Fall through: process note IDs (or all IDs if none were claims)
-  const idsToProcess = claimIds.length > 0 ? noteIds : ids;
-  return showNotesCore(idsToProcess, options, context);
+  // Fall through: process note IDs (or all local IDs if none were claims)
+  const idsToProcess = claimIds.length > 0 ? noteIds : localIds;
+  const localResult = await showNotesCore(idsToProcess, options, context);
+  if (crossProjectOutput) {
+    return {
+      notes: localResult.notes,
+      notFound: localResult.notFound,
+      output: [crossProjectOutput, localResult.output].filter(Boolean).join('\n\n'),
+    };
+  }
+  return localResult;
 }
 
 /**
@@ -241,6 +282,59 @@ async function resolveAndDisplayClaims(
  * Core note display logic, extracted from showNotes to allow claim IDs to be
  * processed separately.
  */
+/**
+ * Resolve cross-project (alias-prefixed) IDs against the peer resolver
+ * and render each with a distinct header indicating the source alias
+ * and resolved peer path. Per R011.§3.AC.01, the displayed peer note
+ * MUST NOT be confusable with a local note — we prepend a horizontal
+ * rule and a labeled banner to make the source unmistakable.
+ *
+ * @implements {R011.§3.AC.01} show with peer-source header
+ */
+async function resolveAndDisplayCrossProjectIds(
+  ids: string[],
+  projectManager: ProjectManager,
+): Promise<string> {
+  const blocks: string[] = [];
+  for (const fullId of ids) {
+    const slash = fullId.indexOf('/');
+    if (slash === -1) {
+      blocks.push(chalk.red(`Malformed cross-project ID: ${fullId}`));
+      continue;
+    }
+    const aliasName = fullId.slice(0, slash);
+    const remainder = fullId.slice(slash + 1);
+
+    // We only support alias/<noteId> here; alias/<note>.<section>.<claim>
+    // would require routing through the claim-display path. Document the
+    // simple-case-only behavior by returning a clear message for now.
+    // The remainder must be a bare note ID for this dispatch.
+    if (!/^[A-Z]{1,5}\d{3,5}$/.test(remainder)) {
+      blocks.push(
+        chalk.yellow(
+          `Cross-project show currently supports bare note IDs only (got '${fullId}'). For claims use the claim-trace path.`,
+        ),
+      );
+      continue;
+    }
+
+    const lookup = await projectManager.peerResolver.lookupNote(aliasName, remainder);
+    if (!lookup.ok) {
+      blocks.push(chalk.red(`${fullId}: ${lookup.message}`));
+      continue;
+    }
+
+    // Render with peer-source header.
+    const header = chalk.bold(
+      `From peer project: ${chalk.cyan(lookup.peer.aliasName)} (${lookup.peer.resolvedPath})`,
+    );
+    const rule = chalk.dim('─'.repeat(60));
+    const formatted = formatNote(lookup.note, { showContent: true });
+    blocks.push(`${header}\n${rule}\n${formatted}`);
+  }
+  return blocks.join('\n\n');
+}
+
 async function showNotesCore(
   ids: string[],
   options: ShowOptions,

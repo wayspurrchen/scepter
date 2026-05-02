@@ -19,6 +19,7 @@ import type { ClaimTreeError } from '../../../parsers/claim/index.js';
 import { isLifecycleTag, isDerivationTag } from '../../../claims/index.js';
 import type { ClaimIndex } from '../../../claims/index.js';
 import { formatLintResults, formatClaimTree as formatClaimTreeDisplay } from '../../formatters/claim-formatter.js';
+import type { ProjectManager } from '../../../project/project-manager.js';
 
 export const lintCommand = new Command('lint')
   .description('Validate claim structure in a note')
@@ -69,6 +70,13 @@ export const lintCommand = new Command('lint')
           const claimIndex = context.projectManager.claimIndex;
           const derivationErrors = validateDerivationLinks(noteId, indexData, claimIndex);
 
+          // @implements {R011.§3.AC.06} Validate alias-prefixed references in this note
+          const aliasReferenceErrors = await validateAliasReferences(
+            noteId,
+            indexData,
+            context.projectManager,
+          );
+
           // Merge errors, deduplicating by line + type
           const allErrors = [...treeErrors];
           const seen = new Set(treeErrors.map((e) => `${e.line}:${e.type}`));
@@ -88,6 +96,13 @@ export const lintCommand = new Command('lint')
           }
           for (const err of derivationErrors) {
             const key = `${err.line}:${err.type}`;
+            if (!seen.has(key)) {
+              allErrors.push(err);
+              seen.add(key);
+            }
+          }
+          for (const err of aliasReferenceErrors) {
+            const key = `${err.line}:${err.type}:${err.claimId}`;
             if (!seen.has(key)) {
               allErrors.push(err);
               seen.add(key);
@@ -340,6 +355,92 @@ export function validateDerivationLinks(
           claimId: fullyQualified,
           line: entry.line,
           message: `Claim "${fullyQualified}" has ${derivatives.length} derivatives but only ${covered} have Source coverage. Missing: ${uncovered.join(', ')}.`,
+        });
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validate alias-prefixed references in a local note.
+ *
+ * For each cross-project reference found in `noteId`'s content, the
+ * resolver is consulted to confirm that the alias is declared, the
+ * peer project resolves, and the peer note (and claim, if specified)
+ * exists. Failures produce typed errors:
+ *
+ * - `alias-unknown` — the alias prefix is not in `projectAliases`
+ * - `peer-unresolved` — the peer project path doesn't resolve
+ * - `peer-target-not-found` — the peer note or claim is missing
+ *
+ * @implements {R011.§3.AC.06} lint validates alias-prefixed references
+ */
+/** @internal Exported for testing */
+export async function validateAliasReferences(
+  noteId: string,
+  indexData: import('../../../claims/index.js').ClaimIndexData,
+  projectManager: ProjectManager,
+): Promise<ClaimTreeError[]> {
+  const errors: ClaimTreeError[] = [];
+
+  const refs = indexData.crossProjectRefs.filter((r) => r.fromNoteId === noteId);
+  if (refs.length === 0) return errors;
+
+  const resolver = projectManager.peerResolver;
+
+  for (const ref of refs) {
+    const aliasName = ref.aliasPrefix;
+    const addr = ref.address;
+
+    // First, check the alias is declared and the peer resolves. We do
+    // not call lookupNote/lookupClaim if the alias is unknown or
+    // unresolved — those would produce the same diagnostic via the
+    // resolver's error path, but the explicit branch keeps the message
+    // surface aligned with R011.§3.AC.06's three categories.
+    const peerResult = await resolver.resolve(aliasName);
+    if (!peerResult.ok) {
+      const type =
+        peerResult.reason === 'alias-unknown'
+          ? 'alias-unknown'
+          : peerResult.reason === 'peer-unresolved'
+            ? 'peer-unresolved'
+            : 'peer-unresolved';
+      errors.push({
+        type,
+        claimId: addr.raw,
+        line: ref.line,
+        message: peerResult.message,
+        noteId,
+        noteFilePath: ref.filePath,
+      });
+      continue;
+    }
+
+    // Alias resolved. Now confirm the peer note (and claim if any) exists.
+    if (addr.claimPrefix !== undefined && addr.claimNumber !== undefined) {
+      const claimResult = await resolver.lookupClaim(addr);
+      if (!claimResult.ok) {
+        errors.push({
+          type: 'peer-target-not-found',
+          claimId: addr.raw,
+          line: ref.line,
+          message: claimResult.message,
+          noteId,
+          noteFilePath: ref.filePath,
+        });
+      }
+    } else if (addr.noteId) {
+      const noteResult = await resolver.lookupNote(aliasName, addr.noteId);
+      if (!noteResult.ok) {
+        errors.push({
+          type: 'peer-target-not-found',
+          claimId: addr.raw,
+          line: ref.line,
+          message: noteResult.message,
+          noteId,
+          noteFilePath: ref.filePath,
         });
       }
     }

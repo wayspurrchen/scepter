@@ -713,4 +713,166 @@ describe('Claim Parser', () => {
       expect(refs[4].address.raw).toBe('SEC.005');
     });
   });
+
+  /**
+   * @validates {R011.§2.AC.01} alias-prefixed reference syntax
+   * @validates {R011.§2.AC.02} alias prefix valid in braced and code-annotation contexts
+   * @validates {R011.§2.AC.07} transitive alias rejection
+   */
+  describe('cross-project alias prefix (R011)', () => {
+    describe('parseClaimAddress', () => {
+      it('parses bare note ID with alias: vendor-lib/R042', () => {
+        const addr = parseClaimAddress('vendor-lib/R042');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBe('vendor-lib');
+        expect(addr!.noteId).toBe('R042');
+        expect(addr!.sectionPath).toBeUndefined();
+        expect(addr!.claimPrefix).toBeUndefined();
+      });
+
+      it('parses note + section with alias: vendor-lib/R005.§1', () => {
+        const addr = parseClaimAddress('vendor-lib/R005.§1');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBe('vendor-lib');
+        expect(addr!.noteId).toBe('R005');
+        expect(addr!.sectionPath).toEqual([1]);
+      });
+
+      it('parses note + section + claim with alias: vendor-lib/R005.§1.AC.01', () => {
+        const addr = parseClaimAddress('vendor-lib/R005.§1.AC.01');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBe('vendor-lib');
+        expect(addr!.noteId).toBe('R005');
+        expect(addr!.sectionPath).toEqual([1]);
+        expect(addr!.claimPrefix).toBe('AC');
+        expect(addr!.claimNumber).toBe(1);
+      });
+
+      it('parses note + claim with alias: vendor-lib/R042.AC.03', () => {
+        const addr = parseClaimAddress('vendor-lib/R042.AC.03');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBe('vendor-lib');
+        expect(addr!.noteId).toBe('R042');
+        expect(addr!.claimPrefix).toBe('AC');
+        expect(addr!.claimNumber).toBe(3);
+      });
+
+      it('preserves metadata suffix on alias-prefixed reference', () => {
+        const addr = parseClaimAddress('vendor-lib/R005.§1.AC.01:4:closed');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBe('vendor-lib');
+        expect(addr!.metadata).toEqual(['4', 'closed']);
+      });
+
+      it('preserves the original raw string verbatim', () => {
+        const addr = parseClaimAddress('vendor-lib/R005.§1.AC.01');
+        expect(addr!.raw).toBe('vendor-lib/R005.§1.AC.01');
+      });
+
+      it('parses single-digit alias-suffixed names too: a1/R042', () => {
+        const addr = parseClaimAddress('a1/R042');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBe('a1');
+      });
+
+      it('rejects transitive alias: a/b/R001 returns null', () => {
+        const addr = parseClaimAddress('a/b/R001');
+        expect(addr).toBeNull();
+      });
+
+      it('rejects transitive alias even when the inner ref is well-formed: a/b/R005.§1.AC.01', () => {
+        const addr = parseClaimAddress('a/b/R005.§1.AC.01');
+        expect(addr).toBeNull();
+      });
+
+      it('does not strip alias prefix when first segment looks like a note ID prefix uppercase', () => {
+        // R005.§1.AC.01 has no leading lowercase alias-shape; it must
+        // parse as a local reference.
+        const addr = parseClaimAddress('R005.§1.AC.01');
+        expect(addr).not.toBeNull();
+        expect(addr!.aliasPrefix).toBeUndefined();
+        expect(addr!.noteId).toBe('R005');
+      });
+
+      it('does not match an alias prefix that ends with a hyphen', () => {
+        // The ALIAS_PREFIX_RE requires ≥2 chars and forbids trailing hyphens.
+        // `vendor-/R042` has a trailing hyphen → no alias prefix → tries to
+        // parse the whole thing as a local ref, which fails.
+        const addr = parseClaimAddress('vendor-/R042');
+        expect(addr).toBeNull();
+      });
+
+      it('does not match an alias prefix that starts with a digit', () => {
+        // `1vendor/R042` → first char must be a letter → not an alias prefix
+        const addr = parseClaimAddress('1vendor/R042');
+        expect(addr).toBeNull();
+      });
+
+      it('does not match an alias prefix with uppercase letters', () => {
+        // Alias names are lowercase only.
+        const addr = parseClaimAddress('Vendor/R042');
+        expect(addr).toBeNull();
+      });
+    });
+
+    describe('parseClaimReferences (braced context)', () => {
+      it('finds an alias-prefixed reference inside braces', () => {
+        const content = 'See {vendor-lib/R042} for context.';
+        const refs = parseClaimReferences(content);
+        expect(refs).toHaveLength(1);
+        expect(refs[0].address.aliasPrefix).toBe('vendor-lib');
+        expect(refs[0].address.noteId).toBe('R042');
+        expect(refs[0].braced).toBe(true);
+      });
+
+      it('finds an alias-prefixed claim reference inside braces', () => {
+        const content = 'Cited: {vendor-lib/R005.§1.AC.01}';
+        const refs = parseClaimReferences(content);
+        expect(refs).toHaveLength(1);
+        expect(refs[0].address.aliasPrefix).toBe('vendor-lib');
+        expect(refs[0].address.claimPrefix).toBe('AC');
+        expect(refs[0].address.claimNumber).toBe(1);
+      });
+
+      it('expands an alias-prefixed range: {vendor-lib/R005.§1.AC.01-03}', () => {
+        const content = '{vendor-lib/R005.§1.AC.01-03}';
+        const refs = parseClaimReferences(content);
+        expect(refs).toHaveLength(3);
+        for (const r of refs) {
+          expect(r.address.aliasPrefix).toBe('vendor-lib');
+          expect(r.address.noteId).toBe('R005');
+          expect(r.address.claimPrefix).toBe('AC');
+        }
+        expect(refs[0].address.claimNumber).toBe(1);
+        expect(refs[2].address.claimNumber).toBe(3);
+        expect(refs[0].address.raw).toBe('vendor-lib/R005.1.AC.01');
+        expect(refs[2].address.raw).toBe('vendor-lib/R005.1.AC.03');
+      });
+
+      it('finds an alias-prefixed reference in a code-annotation context', () => {
+        // Code-comment annotations also use braces: @implements {alias/...}
+        const content = '// @implements {vendor-lib/R005.§1.AC.01}';
+        const refs = parseClaimReferences(content);
+        expect(refs).toHaveLength(1);
+        expect(refs[0].address.aliasPrefix).toBe('vendor-lib');
+      });
+
+      it('mixes local and cross-project references in the same content', () => {
+        const content = 'Local {R042} and cross-project {vendor-lib/R005.§1.AC.01}.';
+        const refs = parseClaimReferences(content, { knownShortcodes: new Set(['R']) });
+        const cross = refs.filter((r) => r.address.aliasPrefix !== undefined);
+        const local = refs.filter((r) => r.address.aliasPrefix === undefined);
+        expect(cross).toHaveLength(1);
+        expect(cross[0].address.noteId).toBe('R005');
+        expect(local.length).toBeGreaterThan(0);
+        expect(local.find((r) => r.address.noteId === 'R042')).toBeDefined();
+      });
+
+      it('rejects transitive alias inside braces: {a/b/R001} produces no refs', () => {
+        const content = '{a/b/R001}';
+        const refs = parseClaimReferences(content);
+        expect(refs).toHaveLength(0);
+      });
+    });
+  });
 });

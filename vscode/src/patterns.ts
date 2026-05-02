@@ -21,6 +21,15 @@ export interface ClaimMatch {
   end: number;
   normalizedId: string;
   kind: 'claim' | 'note' | 'bare-claim' | 'section';
+  /**
+   * Cross-project alias prefix when the underlying claim address
+   * begins with `<alias>/`. Downstream providers (hover, definition,
+   * decoration, diagnostics) branch on this to route to the peer
+   * resolver instead of the local index.
+   *
+   * @implements {R011.§4.AC.01} alias prefix preserved on ClaimMatch
+   */
+  aliasPrefix?: string;
 }
 
 // --- Normalization ---
@@ -163,6 +172,7 @@ export function findAllMatches(
       end: claimEnd,
       normalizedId: normalize(rawId),
       kind,
+      ...(addr.aliasPrefix ? { aliasPrefix: addr.aliasPrefix } : {}),
     });
 
     // Cover the claim span AND the metadata suffix (so :derives= renders as plain text)
