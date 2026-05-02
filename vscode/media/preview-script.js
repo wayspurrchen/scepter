@@ -37,7 +37,12 @@
     tooltip = document.createElement('div');
     tooltip.className = 'scepter-tooltip';
     tooltip.style.cssText = [
-      'position: fixed',
+      // `absolute` (not `fixed`) so the tooltip lives in document flow
+      // and scrolls in lockstep with its anchor. Fixed-positioned
+      // tooltips have to be repositioned on every `scroll` event, which
+      // produces visible jitter / wiggle as the JS handler fights the
+      // browser's scroll compositing.
+      'position: absolute',
       'z-index: 10000',
       'max-width: 720px',
       'min-width: 280px',
@@ -503,17 +508,29 @@
   // --- Tooltip positioning --------------------------------------------
 
   function positionTooltip(el) {
+    // `getBoundingClientRect()` returns viewport-relative coordinates;
+    // for an absolutely-positioned tooltip on `document.body` we want
+    // document-relative coordinates, so add the page scroll offsets.
     var rect = el.getBoundingClientRect();
-    var left = rect.left;
-    var top = rect.bottom + 4;
-    if (top + 200 > window.innerHeight) {
-      top = rect.top - 4;
+    var scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
+    var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+    var left = rect.left + scrollX;
+    var top = rect.bottom + scrollY + 4;
+
+    // Above-vs-below flip: viewport-aware at show time. If the anchor's
+    // bottom is too close to the viewport bottom, place the tooltip
+    // above the anchor instead. The flip is decided once at show; it
+    // doesn't re-evaluate during scroll (which would cause the tooltip
+    // to reorient mid-scroll, the original jitter complaint).
+    if (rect.bottom + 200 > window.innerHeight) {
+      top = rect.top + scrollY - 4;
       tooltip.style.transform = 'translateY(-100%)';
     } else {
       tooltip.style.transform = 'none';
     }
-    if (left + 720 > window.innerWidth) {
-      left = Math.max(4, window.innerWidth - 730);
+    if (rect.left + 720 > window.innerWidth) {
+      left = Math.max(4, window.innerWidth - 730) + scrollX;
     }
     tooltip.style.left = Math.max(4, left) + 'px';
     tooltip.style.top = top + 'px';
@@ -572,26 +589,10 @@
     });
   }
 
-  // Reposition tooltip on scroll so it tracks its anchor element.
-  window.addEventListener('scroll', function () {
-    if (!tooltip || tooltip.style.display === 'none' || !currentRef) return;
-    var rect = currentRef.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) {
-      hideTooltip();
-      return;
-    }
-    var left = rect.left;
-    var top = rect.bottom + 4;
-    if (top + 200 > window.innerHeight) {
-      top = rect.top - 4;
-      tooltip.style.transform = 'translateY(-100%)';
-    } else {
-      tooltip.style.transform = 'none';
-    }
-    if (left + 720 > window.innerWidth) left = Math.max(4, window.innerWidth - 730);
-    tooltip.style.left = Math.max(4, left) + 'px';
-    tooltip.style.top = top + 'px';
-  }, { passive: true });
+  // No scroll handler needed: the tooltip is `position: absolute` on
+  // document.body, so it scrolls in lockstep with its anchor for free.
+  // mouseleave on the anchor (which fires when the cursor's no longer
+  // over it after scrolling) triggers the normal hide path.
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attachListeners);
