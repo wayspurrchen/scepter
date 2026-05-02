@@ -686,7 +686,17 @@ export class ClaimIndexCache {
     if (!this.excerptMd) {
       try {
         const MarkdownIt = require('markdown-it');
-        this.excerptMd = new MarkdownIt({ html: false, linkify: true, breaks: true });
+        const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
+        // Attach the SCEpter plugin so body excerpts get the same
+        // claim-ref styling, badges, and data attributes the main
+        // preview emits. After attachment, every claim ref inside an
+        // excerpt renders as <a class="scepter-ref">…</a> and any
+        // claim definition that lands at a recognized line gets its
+        // ●N badge. The webview re-runs attachListeners after rendering
+        // so those refs become hoverable inside the tooltip itself.
+        const { createScepterPlugin } = require('./markdown-plugin');
+        md.use(createScepterPlugin(this));
+        this.excerptMd = md;
       } catch {
         // markdown-it not available — return null and skip HTML rendering
         return null;
@@ -695,11 +705,20 @@ export class ClaimIndexCache {
     return this.excerptMd;
   }
 
-  private renderMarkdownToHtml(raw: string): string | null {
+  /**
+   * Render markdown to HTML through the excerpt renderer. `envExtras`
+   * is merged into the markdown-it env so the SCEpter plugin can
+   * resolve `currentDocument` (for contextNoteId) and apply the line
+   * offset (`_scepterLineOffset`) — the excerpt content is a slice of
+   * the original document, so line indices need to be shifted before
+   * comparing against the claim index's 1-indexed entry.line values.
+   */
+  private renderMarkdownToHtml(raw: string, envExtras?: any): string | null {
     const md = this.getExcerptRenderer();
     if (!md) return null;
     try {
-      return md.render(raw).trim();
+      const env = envExtras ? { ...envExtras } : {};
+      return md.render(raw, env).trim();
     } catch {
       return null;
     }
@@ -735,7 +754,14 @@ export class ClaimIndexCache {
       const raw = await this.readClaimContext(entry, 1, 200);
       if (!raw) return null;
       noteExcerpts.set('claim:' + fqid, raw);
-      const html = this.renderMarkdownToHtml(raw);
+      // Render through the SCEpter plugin with env carrying the parent
+      // note's path (for contextNoteId) and the line offset so badge-
+      // line comparisons map onto the original document's coordinates.
+      const absPath = this.resolveFilePath(entry.noteFilePath);
+      const html = this.renderMarkdownToHtml(raw, {
+        currentDocument: { fsPath: absPath },
+        _scepterLineOffset: Math.max(0, entry.line - 1),
+      });
       if (html) htmlExcerpts.set('claim:' + fqid, html);
       return null;
     });
