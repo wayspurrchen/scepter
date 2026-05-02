@@ -42,14 +42,42 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       }
     });
 
-    // Override heading_open to track current heading state. Headings are
-    // where we anchor the inline crossref-count badge — we render it
-    // immediately after the matched claim id, not at end-of-line.
+    // Build the crossref-count badge for a block whose source line we
+    // know. Returns '' when no claim of the current note is defined at
+    // that line, or when the claim has no inbound refs. Same color
+    // encoding as the editor decoration: green = any source ref, red =
+    // only note-to-note. Block close hooks (heading_close, paragraph_close)
+    // call this so the badge appears just before the closing tag,
+    // regardless of how the inline content was rendered.
+    function buildClaimBadgeForLine(line0: number | undefined, env: any): string {
+      if (typeof line0 !== 'number') return '';
+      const currentDocPath = env?.currentDocument?.fsPath ?? env?.docUri?.fsPath ?? null;
+      const contextNoteId = currentDocPath ? noteIdFromPath(currentDocPath) : null;
+      if (!contextNoteId) return '';
+      const claims = index.claimsForNote(contextNoteId);
+      // line0 is 0-indexed; entry.line is 1-indexed.
+      const entry = claims.find((e) => e.line === line0 + 1);
+      if (!entry) return '';
+      const refs = index.incomingRefs(entry.fullyQualified);
+      if (refs.length === 0) return '';
+      const hasSource = refs.some((r) => r.fromNoteId.startsWith('source:'));
+      const cls = hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
+      return ` <span class="scepter-claim-badge ${cls}" data-scepter-claim-badge="1">●${refs.length}</span>`;
+    }
+
     const defaultHeadingOpen = md.renderer.rules.heading_open ||
       function (tokens: any[], idx: number, options: any, env: any, self: any): string {
         return self.renderToken(tokens, idx, options);
       };
     const defaultHeadingClose = md.renderer.rules.heading_close ||
+      function (tokens: any[], idx: number, options: any, env: any, self: any): string {
+        return self.renderToken(tokens, idx, options);
+      };
+    const defaultParagraphOpen = md.renderer.rules.paragraph_open ||
+      function (tokens: any[], idx: number, options: any, env: any, self: any): string {
+        return self.renderToken(tokens, idx, options);
+      };
+    const defaultParagraphClose = md.renderer.rules.paragraph_close ||
       function (tokens: any[], idx: number, options: any, env: any, self: any): string {
         return self.renderToken(tokens, idx, options);
       };
@@ -74,31 +102,39 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       env: any,
       self: any,
     ): string {
-      // Emit the inline crossref-count badge here, just before the
-      // closing heading tag. Doing it at heading_close time (rather than
-      // during inline text rendering) is robust to whatever tok.map
-      // propagation quirks markdown-it has on a given pass: we ask the
-      // index directly "does any claim of the current note get defined
-      // at this heading's source line?" If yes, render the badge.
-      const headingLine = env?._scepterHeadingLine;
-      const currentDocPath = env?.currentDocument?.fsPath ?? env?.docUri?.fsPath ?? null;
-      const contextNoteId = currentDocPath ? noteIdFromPath(currentDocPath) : null;
-      let badgeHtml = '';
-      if (typeof headingLine === 'number' && contextNoteId) {
-        const claims = index.claimsForNote(contextNoteId);
-        // headingLine is 0-indexed, entry.line is 1-indexed
-        const entry = claims.find((e) => e.line === headingLine + 1);
-        if (entry) {
-          const refs = index.incomingRefs(entry.fullyQualified);
-          if (refs.length > 0) {
-            const hasSource = refs.some((r) => r.fromNoteId.startsWith('source:'));
-            const cls = hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
-            badgeHtml = ` <span class="scepter-claim-badge ${cls}" data-scepter-claim-badge="1">●${refs.length}</span>`;
-          }
-        }
-      }
+      const badgeHtml = buildClaimBadgeForLine(env?._scepterHeadingLine, env);
       env._scepterHeadingLine = undefined;
       return badgeHtml + defaultHeadingClose(tokens, idx, options, env, self);
+    };
+
+    // Paragraph claims (`§5.AC.01 Some text…` as a standalone paragraph)
+    // are the dominant claim shape in real notes. Hook paragraph_open
+    // to capture the source line and paragraph_close to emit the badge,
+    // mirroring the heading hooks. List-item claims (in tight lists)
+    // would need an additional list_item hook; not in scope here.
+    md.renderer.rules.paragraph_open = function (
+      tokens: any[],
+      idx: number,
+      options: any,
+      env: any,
+      self: any,
+    ): string {
+      const tok = tokens[idx];
+      if (tok.map) {
+        env._scepterParagraphLine = tok.map[0];
+      }
+      return defaultParagraphOpen(tokens, idx, options, env, self);
+    };
+    md.renderer.rules.paragraph_close = function (
+      tokens: any[],
+      idx: number,
+      options: any,
+      env: any,
+      self: any,
+    ): string {
+      const badgeHtml = buildClaimBadgeForLine(env?._scepterParagraphLine, env);
+      env._scepterParagraphLine = undefined;
+      return badgeHtml + defaultParagraphClose(tokens, idx, options, env, self);
     };
 
     md.renderer.rules.text = function (
