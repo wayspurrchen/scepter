@@ -686,7 +686,15 @@ export class ClaimIndexCache {
     if (!this.excerptMd) {
       try {
         const MarkdownIt = require('markdown-it');
-        this.excerptMd = new MarkdownIt({ html: false, linkify: true, breaks: true });
+        const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
+        // Attach the SCEpter plugin so excerpts get the same claim-ref
+        // styling, badges, and data attributes the main preview emits.
+        // Hovering an excerpt becomes a traceable surface — refs inside
+        // the body render as `.scepter-ref` spans the webview can bind
+        // to for nested hover navigation.
+        const { createScepterMarkdownPlugin } = require('./markdown-plugin');
+        md.use(createScepterMarkdownPlugin(this));
+        this.excerptMd = md;
       } catch {
         // markdown-it not available — return null and skip HTML rendering
         return null;
@@ -695,11 +703,19 @@ export class ClaimIndexCache {
     return this.excerptMd;
   }
 
-  private renderMarkdownToHtml(raw: string): string | null {
+  /**
+   * Render markdown to HTML through the excerpt renderer. `envExtras`
+   * is merged into the markdown-it env so the SCEpter plugin can
+   * resolve `currentDocument` (for contextNoteId) and `_scepterLineOffset`
+   * (the 0-indexed file-line offset of the first excerpt line, so the
+   * badge logic can compare against entry.line in the original document).
+   */
+  private renderMarkdownToHtml(raw: string, envExtras?: any): string | null {
     const md = this.getExcerptRenderer();
     if (!md) return null;
     try {
-      return md.render(raw).trim();
+      const env = envExtras ? { ...envExtras } : {};
+      return md.render(raw, env).trim();
     } catch {
       return null;
     }
@@ -735,7 +751,15 @@ export class ClaimIndexCache {
       const raw = await this.readClaimContext(entry, 1, 200);
       if (!raw) return null;
       noteExcerpts.set('claim:' + fqid, raw);
-      const html = this.renderMarkdownToHtml(raw);
+      // Render the excerpt through the SCEpter plugin with env carrying
+      // the parent note's file path (for contextNoteId resolution) and
+      // the line offset (so badge-line comparisons land on the original
+      // document's coordinate system, not the excerpt-local line 0).
+      const absPath = this.resolveFilePath(entry.noteFilePath);
+      const html = this.renderMarkdownToHtml(raw, {
+        currentDocument: { fsPath: absPath },
+        _scepterLineOffset: Math.max(0, entry.line - 1),
+      });
       if (html) htmlExcerpts.set('claim:' + fqid, html);
       return null;
     });
