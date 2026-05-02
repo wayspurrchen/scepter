@@ -74,8 +74,31 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       env: any,
       self: any,
     ): string {
+      // Emit the inline crossref-count badge here, just before the
+      // closing heading tag. Doing it at heading_close time (rather than
+      // during inline text rendering) is robust to whatever tok.map
+      // propagation quirks markdown-it has on a given pass: we ask the
+      // index directly "does any claim of the current note get defined
+      // at this heading's source line?" If yes, render the badge.
+      const headingLine = env?._scepterHeadingLine;
+      const currentDocPath = env?.currentDocument?.fsPath ?? env?.docUri?.fsPath ?? null;
+      const contextNoteId = currentDocPath ? noteIdFromPath(currentDocPath) : null;
+      let badgeHtml = '';
+      if (typeof headingLine === 'number' && contextNoteId) {
+        const claims = index.claimsForNote(contextNoteId);
+        // headingLine is 0-indexed, entry.line is 1-indexed
+        const entry = claims.find((e) => e.line === headingLine + 1);
+        if (entry) {
+          const refs = index.incomingRefs(entry.fullyQualified);
+          if (refs.length > 0) {
+            const hasSource = refs.some((r) => r.fromNoteId.startsWith('source:'));
+            const cls = hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
+            badgeHtml = ` <span class="scepter-claim-badge ${cls}" data-scepter-claim-badge="1">●${refs.length}</span>`;
+          }
+        }
+      }
       env._scepterHeadingLine = undefined;
-      return defaultHeadingClose(tokens, idx, options, env, self);
+      return badgeHtml + defaultHeadingClose(tokens, idx, options, env, self);
     };
 
     md.renderer.rules.text = function (
@@ -200,34 +223,6 @@ function highlightWithData(
       result += `<a href="${linkTarget}" class="scepter-ref ${cssClass}" ${dataAttrs}>${escaped}</a>`;
     } else {
       result += `<span class="scepter-ref ${cssClass}" ${dataAttrs}>${escaped}</span>`;
-    }
-
-    // Inline crossref-count badge on claim definition heading lines.
-    // Anchor: when the matched FQID's definition line equals the current
-    // heading_open's source line (1-indexed compare) AND the matched span
-    // sits in the same heading, append a colored ●N badge after the id.
-    // Color: green if any inbound source ref, red if only note-to-note.
-    if (
-      headingLine !== null &&
-      sourceLine !== null &&
-      sourceLine === headingLine &&
-      (match.kind === 'claim' || match.kind === 'bare-claim') &&
-      contextNoteId
-    ) {
-      const entry = index.resolve(match.normalizedId, contextNoteId);
-      // 1-indexed comparison: entry.line is 1-indexed, headingLine is 0-indexed
-      if (
-        entry &&
-        entry.noteId === contextNoteId &&
-        entry.line === headingLine + 1
-      ) {
-        const refs = index.incomingRefs(entry.fullyQualified);
-        if (refs.length > 0) {
-          const hasSource = refs.some((r) => r.fromNoteId.startsWith('source:'));
-          const colorClass = hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
-          result += `<span class="scepter-claim-badge ${colorClass}" data-scepter-claim-badge="1">●${refs.length}</span>`;
-        }
-      }
     }
 
     cursor = match.end;
