@@ -49,6 +49,11 @@ export function createScepterPlugin(index: ClaimIndexCache) {
     // only note-to-note. Block close hooks (heading_close, paragraph_close)
     // call this so the badge appears just before the closing tag,
     // regardless of how the inline content was rendered.
+    // Fallback path: if the text-render hook didn't emit the badge for
+    // this block (e.g., tok.map missing on the inline child), emit it
+    // here just before the closing tag. The text-render path is preferred
+    // because it places the badge right after the FQID; this catches the
+    // tail case so the badge never disappears entirely.
     function buildClaimBadgeForLine(line0: number | undefined, env: any): string {
       if (typeof line0 !== 'number') return '';
       const currentDocPath = env?.currentDocument?.fsPath ?? env?.docUri?.fsPath ?? null;
@@ -58,6 +63,9 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       // line0 is 0-indexed; entry.line is 1-indexed.
       const entry = claims.find((e) => e.line === line0 + 1);
       if (!entry) return '';
+      // Skip if the text-render path already emitted the badge inline.
+      const emitted: Set<string> | undefined = env?._scepterBadgesEmitted;
+      if (emitted && emitted.has(entry.fullyQualified)) return '';
       const refs = index.incomingRefs(entry.fullyQualified);
       if (refs.length === 0) return '';
       const hasSource = refs.some((r) => r.fromNoteId.startsWith('source:'));
@@ -259,6 +267,40 @@ function highlightWithData(
       result += `<a href="${linkTarget}" class="scepter-ref ${cssClass}" ${dataAttrs}>${escaped}</a>`;
     } else {
       result += `<span class="scepter-ref ${cssClass}" ${dataAttrs}>${escaped}</span>`;
+    }
+
+    // Inline crossref-count badge anchored right after the FQID. Same
+    // placement as the editor decoration: badge sits between the claim
+    // id and whatever text follows. We fire it when:
+    //   - The match is a claim or bare-claim,
+    //   - The text token's source line equals the matched entry's
+    //     definition line (so this is the *defining* mention, not a
+    //     citation of the same id elsewhere in the document),
+    //   - The entry has inbound refs.
+    // Dedupe via env._scepterBadgesEmitted: we set the entry's FQID
+    // after emission so a block-close fallback hook can skip it.
+    if (
+      sourceLine !== null &&
+      contextNoteId &&
+      (match.kind === 'claim' || match.kind === 'bare-claim')
+    ) {
+      const resolved = index.resolve(match.normalizedId, contextNoteId);
+      if (
+        resolved &&
+        resolved.noteId === contextNoteId &&
+        resolved.line === sourceLine + 1
+      ) {
+        const emitted: Set<string> = env._scepterBadgesEmitted || (env._scepterBadgesEmitted = new Set());
+        if (!emitted.has(resolved.fullyQualified)) {
+          const refs = index.incomingRefs(resolved.fullyQualified);
+          if (refs.length > 0) {
+            const hasSource = refs.some((r) => r.fromNoteId.startsWith('source:'));
+            const cls = hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
+            result += `<span class="scepter-claim-badge ${cls}" data-scepter-claim-badge="1">●${refs.length}</span>`;
+            emitted.add(resolved.fullyQualified);
+          }
+        }
+      }
     }
 
     cursor = match.end;
