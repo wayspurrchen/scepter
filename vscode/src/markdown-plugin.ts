@@ -61,7 +61,8 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       if (!contextNoteId) return '';
       const claims = index.claimsForNote(contextNoteId);
       // line0 is 0-indexed; entry.line is 1-indexed.
-      const entry = claims.find((e) => e.line === line0 + 1);
+      const offset = typeof env?._scepterLineOffset === 'number' ? env._scepterLineOffset : 0;
+      const entry = claims.find((e) => e.line === line0 + 1 + offset);
       if (!entry) return '';
       // Skip if the text-render path already emitted the badge inline.
       const emitted: Set<string> | undefined = env?._scepterBadgesEmitted;
@@ -284,11 +285,12 @@ function highlightWithData(
       contextNoteId &&
       (match.kind === 'claim' || match.kind === 'bare-claim')
     ) {
+      const offset = typeof env?._scepterLineOffset === 'number' ? env._scepterLineOffset : 0;
       const resolved = index.resolve(match.normalizedId, contextNoteId);
       if (
         resolved &&
         resolved.noteId === contextNoteId &&
-        resolved.line === sourceLine + 1
+        resolved.line === sourceLine + 1 + offset
       ) {
         const emitted: Set<string> = env._scepterBadgesEmitted || (env._scepterBadgesEmitted = new Set());
         if (!emitted.has(resolved.fullyQualified)) {

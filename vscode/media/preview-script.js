@@ -143,6 +143,11 @@
     isTooltipMutation = true;
     tip.innerHTML = html;
     bindInternalLinks(tip);
+    // Rebind .scepter-ref hover behavior on any refs inside the tooltip
+    // body (the rich-rendered excerpt contains them). This lets the user
+    // hover a claim ref *inside* the tooltip and drill into its hover —
+    // navigating through a chain of related claims by hover alone.
+    attachListeners();
     positionTooltip(el);
     setTimeout(function () { isTooltipMutation = false; }, 0);
   }
@@ -272,15 +277,20 @@
     if (args.badges) {
       html += '<div style="font-size:11px;opacity:0.7;margin-bottom:6px">' + args.badges + '</div>';
     }
-    // Body excerpt — render as word-wrapped block with a "show more"
-    // affordance when the raw text is longer than the initial slice.
+    // Body excerpt — prefer the pre-rendered HTML (which has gone
+    // through the SCEpter plugin, so claim refs render as `.scepter-ref`
+    // links and definitions get badges) over the raw text. The HTML
+    // path covers the rich rendering the user expects; raw is fallback
+    // only when the plugin was unable to render (e.g. markdown-it
+    // missing). After insertion we'll re-run attachListeners on the
+    // tooltip so any nested `.scepter-ref` spans become hoverable.
     if (args.contextHtml || args.rawContext) {
       html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;margin-top:4px">';
-      if (args.rawContext) {
-        // Stash the raw context on a hidden textarea-like element so the
-        // "show more" buttons can read it. Encoded as data attribute for
-        // simpler escape semantics.
-        var initialSlice = sliceBody(args.rawContext, 0, 12); // first 12 lines
+      if (args.contextHtml) {
+        html += '<div class="scepter-tooltip-excerpt scepter-body-rich" style="font-size:12px;opacity:0.95">' +
+          args.contextHtml + '</div>';
+      } else if (args.rawContext) {
+        var initialSlice = sliceBody(args.rawContext, 0, 12);
         html += '<div class="scepter-tooltip-excerpt scepter-body-excerpt" ' +
           'data-scepter-raw="' + escAttr(args.rawContext) + '" ' +
           'data-scepter-start="' + initialSlice.start + '" ' +
@@ -296,11 +306,6 @@
             '<button class="scepter-show-more-btn" data-direction="below">↓ show 12 more lines below</button></div>';
         }
         html += '</div>';
-      } else if (args.contextHtml) {
-        // Pre-rendered HTML excerpt — embed directly. No show-more here
-        // because we don't have the raw lines for the slice math.
-        html += '<div class="scepter-tooltip-excerpt" style="font-size:12px;opacity:0.95">' +
-          args.contextHtml + '</div>';
       }
       html += '</div>';
     }
