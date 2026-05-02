@@ -534,21 +534,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     );
   }, 500);
 
-  // Refresh any open markdown preview whenever the claim index updates so
-  // tooltips, refs panels, and crossref-count badges reflect the latest
-  // data. Debounced because Phase A + Phase B + excerpt-cache fire
-  // `onDidRefresh` three times per index rebuild and we don't want to
-  // trash the preview repeatedly.
-  let previewRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-  index.onDidRefresh(() => {
-    if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
-    previewRefreshTimer = setTimeout(() => {
-      vscode.commands.executeCommand('markdown.preview.refresh').then(
-        undefined,
-        () => { /* no preview open — ignore */ }
-      );
-    }, 750);
-  });
+  // Note: we deliberately do NOT auto-refresh the markdown preview on
+  // every `index.onDidRefresh`. Background agents writing files in the
+  // workspace cause the index to rebuild repeatedly, and refreshing the
+  // preview each time tears down the rendered HTML — dismissing any
+  // open hover tooltip and disrupting keyboard focus. The trade-off:
+  // when another file changes, the preview's badges and refs panel
+  // stay slightly stale until the user manually refreshes the preview
+  // (Cmd+Shift+P → "Markdown: Refresh Preview") or saves the current
+  // file (which retriggers render). The current-file edit case still
+  // re-renders automatically because VS Code re-runs the markdown
+  // pipeline (and our plugin) on every keystroke.
 
   // Return the markdown-it plugin for the preview pane.
   return {
