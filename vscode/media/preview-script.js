@@ -66,6 +66,32 @@
     tooltip.addEventListener('mouseenter', function () { cancelHide(); });
     tooltip.addEventListener('mouseleave', function () { scheduleHide(); });
 
+    // Dispatch `command:` links explicitly. VS Code's markdown preview
+    // installs a click delegator on the `.markdown-body` content area to
+    // forward `command:` URI clicks to the extension host; our tooltip
+    // is a sibling of that area (appended to `document.body`), so its
+    // dynamically-injected anchors don't reach the delegator. Setting
+    // `window.location.href = "command:..."` triggers the webview's
+    // `will-navigate` interception, which dispatches the command no
+    // matter where the click originated. This is the documented escape
+    // hatch for webview content outside the markdown body.
+    tooltip.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href^="command:"]') : null;
+      if (!a) return;
+      // The show-more buttons handle their own click and don't carry a
+      // command href, so they don't match this selector.
+      var href = a.getAttribute('href');
+      if (!href) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        window.location.href = href;
+      } catch (_) {
+        // Fall back to letting the natural click proceed if location
+        // assignment is blocked for any reason.
+      }
+    });
+
     // Trap scroll events inside the tooltip (and its column scroll regions)
     // so wheel input doesn't leak to the page.
     tooltip.addEventListener('wheel', function (e) {
