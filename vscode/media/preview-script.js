@@ -208,7 +208,16 @@
     if (isOriginal) {
       // Single-column layout: header + metadata + refs.
       var html = '';
-      html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' + esc(fqid) + '</div>';
+      var origBadge = computeBadgeFromRefsJson(refsJson);
+      var origBadgeHtml = '';
+      if (origBadge) {
+        var oc = origBadge.hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
+        origBadgeHtml = ' <span class="scepter-claim-badge ' + oc + '">●' + origBadge.count + '</span>';
+      }
+      html += '<div style="font-weight:600;margin-bottom:4px">' +
+        '<span class="scepter-ref scepter-claim">' + esc(fqid) + '</span>' +
+        origBadgeHtml +
+        '</div>';
       html += '<div style="color:#9cdcfe;margin-bottom:6px">' +
         '<i>' + esc(noteType || '') + '</i> — ' + escMarkdownLike(noteTitle || '') + '</div>';
       if (heading) {
@@ -235,6 +244,7 @@
       badges: badges,
       contextHtml: contextHtml,
       rawContext: rawContext,
+      refsJson: refsJson,
     });
 
     var twoCol = '';
@@ -254,9 +264,46 @@
     return '<i>' + parts.join(' · ') + '</i>';
   }
 
+  /**
+   * Compute badge data (count + source-coverage flag) from the refsJson
+   * descriptor that drives the refs panel. Returns null if no inbound
+   * refs are recorded.
+   */
+  function computeBadgeFromRefsJson(refsJson) {
+    if (!refsJson) return null;
+    try {
+      var data = JSON.parse(refsJson);
+      var sources = (data && data.sources) || [];
+      var groups = (data && data.noteGroups) || [];
+      var noteCount = 0;
+      for (var i = 0; i < groups.length; i++) {
+        noteCount += (groups[i].items && groups[i].items.length) || 0;
+      }
+      var total = sources.length + noteCount;
+      if (total === 0) return null;
+      return { count: total, hasSource: sources.length > 0 };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function buildBodyPanelHtml(args) {
     var html = '';
-    html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' + esc(args.fqid) + '</div>';
+    // Render the FQID heading as a ref-styled span so it picks up the
+    // same dotted-underline + color treatment as claim refs in the main
+    // preview body. Inline a colored ●N badge derived from the refs
+    // descriptor — the user expects the body-panel header to look like
+    // the same artifact it represents on the page, badge included.
+    var badge = computeBadgeFromRefsJson(args.refsJson);
+    var badgeHtml = '';
+    if (badge) {
+      var cls = badge.hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
+      badgeHtml = ' <span class="scepter-claim-badge ' + cls + '">●' + badge.count + '</span>';
+    }
+    html += '<div style="font-weight:600;margin-bottom:4px">' +
+      '<span class="scepter-ref scepter-claim">' + esc(args.fqid) + '</span>' +
+      badgeHtml +
+      '</div>';
     html += '<div style="color:#9cdcfe;margin-bottom:4px">' +
       '<i>' + esc(args.noteType || '') + '</i> — ' + escMarkdownLike(args.noteTitle || '') + '</div>';
     if (args.noteFile) {
