@@ -528,26 +528,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     });
   });
 
-  // Small delay to let the preview settle before refreshing
-  setTimeout(() => {
-    vscode.commands.executeCommand('markdown.preview.refresh').then(
-      undefined,
-      () => { /* no preview open — ignore */ }
-    );
-  }, 500);
-
-  // Note: we deliberately do NOT auto-refresh the markdown preview on
-  // every `index.onDidRefresh`. Background agents writing files in the
-  // workspace cause the index to rebuild repeatedly, and refreshing the
-  // preview each time tears down the rendered HTML — dismissing any
-  // open hover tooltip and disrupting keyboard focus. The trade-off:
-  // when another file changes, the preview's badges and refs panel
-  // stay slightly stale until the user manually refreshes the preview
-  // (Cmd+Shift+P → "Markdown: Refresh Preview") or saves the current
-  // file (which retriggers render). The current-file edit case still
-  // re-renders automatically because VS Code re-runs the markdown
-  // pipeline (and our plugin) on every keystroke.
+  // One-shot post-activation preview refresh.
+  //
+  // The index rebuilds in stages — Phase A (active note), Phase B (full
+  // corpus), then excerpt cache — and fires `onDidRefresh` after each.
+  // A preview that rendered before all three settle ends up with empty
+  // `data-claim-context`, `data-claim-refs`, etc. on its refs (the
+  // user-visible "Loading"/"no references" tooltip).
+  //
+  // We coalesce all `onDidRefresh` events that fire within 1 second of
+  // each other into a single preview refresh (so we land *after* the
+  // excerpt cache settles), then disarm — no further auto-refresh. That
+  // preserves the hover-stability win from removing the per-event
+  // refresh while still seeding the initial preview with populated
+  // data attrs.
+  //
   // @implements {R012.§3.AC.07} no auto-refresh on index.onDidRefresh; preserves hover stability during background writes
+  let initialPreviewRefreshDone = false;
+  let initialRefreshDebounce: ReturnType<typeof setTimeout> | undefined;
+  index.onDidRefresh(() => {
+    if (initialPreviewRefreshDone) return;
+    if (initialRefreshDebounce) clearTimeout(initialRefreshDebounce);
+    initialRefreshDebounce = setTimeout(() => {
+      initialPreviewRefreshDone = true;
+      vscode.commands.executeCommand('markdown.preview.refresh').then(
+        undefined,
+        () => { /* no preview open — ignore */ },
+      );
+    }, 1000);
+  });
 
   // Return the markdown-it plugin for the preview pane.
   return {

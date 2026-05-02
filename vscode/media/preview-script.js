@@ -711,6 +711,31 @@
   // mouseleave on the anchor (which fires when the cursor's no longer
   // over it after scrolling) triggers the normal hide path.
 
+  // Document-level click delegator for `command:` URIs on .scepter-ref
+  // anchors (the main markdown body, NOT just the tooltip — the in-tooltip
+  // delegator handles those). VS Code's preview installs a click delegator
+  // on `.markdown-body` that normally forwards command: clicks to the
+  // extension host, but third-party markdown extensions (Markdown All In
+  // One, etc.) sometimes intercept clicks first and break that path. We
+  // bind in capture phase so we own clicks on our refs unconditionally
+  // and dispatch via window.location.href, which the webview's
+  // will-navigate hook resolves to a command execution regardless of
+  // who else is on the bubble path.
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="command:"]') : null;
+    if (!a) return;
+    if (!a.classList || !a.classList.contains('scepter-ref')) return;
+    var href = a.getAttribute('href');
+    if (!href) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      window.location.href = href;
+    } catch (_) {
+      /* fall through to natural click handling */
+    }
+  }, true);
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attachListeners);
   } else {
