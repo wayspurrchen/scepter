@@ -23,63 +23,70 @@
 (function () {
   'use strict';
 
-  var tooltip = null;
   var isTooltipMutation = false;
-  var hideTimer = null;
-  var currentRef = null;
-  /** Stack of refs we've drilled into (for range-member → single-claim
-   * traversal). Each entry is the originating element so we can render
-   * its tooltip again on "back". */
-  var drillStack = [];
 
-  function createTooltip() {
-    if (tooltip) return tooltip;
-    tooltip = document.createElement('div');
-    tooltip.className = 'scepter-tooltip';
-    tooltip.style.cssText = [
-      // `absolute` (not `fixed`) so the tooltip lives in document flow
-      // and scrolls in lockstep with its anchor. Fixed-positioned
-      // tooltips have to be repositioned on every `scroll` event, which
-      // produces visible jitter / wiggle as the JS handler fights the
-      // browser's scroll compositing.
-      'position: absolute',
-      'z-index: 10000',
-      'max-width: 720px',
-      'min-width: 280px',
-      'max-height: 70vh',
-      'overflow-y: auto',
-      'overflow-x: hidden',
-      'padding: 10px 14px',
-      'border-radius: 4px',
-      'font-size: 13px',
-      'line-height: 1.5',
-      'display: none',
-      'box-shadow: 0 2px 8px rgba(0,0,0,0.3)',
-      'background: var(--vscode-editorHoverWidget-background, #2d2d2d)',
-      'color: var(--vscode-editorHoverWidget-foreground, #cccccc)',
-      'border: 1px solid var(--vscode-editorHoverWidget-border, #454545)',
-      'font-family: var(--vscode-editor-font-family, monospace)',
-      'word-wrap: break-word',
-    ].join(';');
+  /**
+   * Stack of active tooltips. Each entry is `{tip, anchor, level, hideTimer}`
+   * where `tip` is the DOM element, `anchor` is the .scepter-ref that
+   * spawned it, and `level` is its 0-indexed depth (top-level hover from
+   * the markdown body is level 0; hovering a ref *inside* tooltip 0
+   * spawns level 1; and so on).
+   *
+   * Each tooltip is its own DOM element appended to document.body — that
+   * way the parent tooltip stays visible underneath the child, and
+   * positioning the child against its anchor doesn't relocate the parent
+   * (the singleton-tooltip approach had a feedback loop where moving the
+   * tooltip moved the inner anchor inside it, throwing position off).
+   */
+  var tooltipStack = [];
 
-    // Keep tooltip visible when mouse enters it
-    tooltip.addEventListener('mouseenter', function () { cancelHide(); });
-    tooltip.addEventListener('mouseleave', function () { scheduleHide(); });
+  var TOOLTIP_STYLE = [
+    'position: absolute',
+    'z-index: 10000',
+    'max-width: 720px',
+    'min-width: 280px',
+    'max-height: 70vh',
+    'overflow-y: auto',
+    'overflow-x: hidden',
+    'padding: 10px 14px',
+    'border-radius: 4px',
+    'font-size: 13px',
+    'line-height: 1.5',
+    'display: none',
+    'box-shadow: 0 2px 8px rgba(0,0,0,0.3)',
+    'background: var(--vscode-editorHoverWidget-background, #2d2d2d)',
+    'color: var(--vscode-editorHoverWidget-foreground, #cccccc)',
+    'border: 1px solid var(--vscode-editorHoverWidget-border, #454545)',
+    'font-family: var(--vscode-editor-font-family, monospace)',
+    'word-wrap: break-word',
+  ].join(';');
 
-    // Dispatch `command:` links explicitly. VS Code's markdown preview
-    // installs a click delegator on the `.markdown-body` content area to
-    // forward `command:` URI clicks to the extension host; our tooltip
-    // is a sibling of that area (appended to `document.body`), so its
-    // dynamically-injected anchors don't reach the delegator. Setting
-    // `window.location.href = "command:..."` triggers the webview's
-    // `will-navigate` interception, which dispatches the command no
-    // matter where the click originated. This is the documented escape
-    // hatch for webview content outside the markdown body.
-    tooltip.addEventListener('click', function (e) {
+  function createTooltipElement(level) {
+    var tip = document.createElement('div');
+    tip.className = 'scepter-tooltip';
+    tip.setAttribute('data-scepter-tooltip-level', String(level));
+    // Stack levels gain a tiny z-index bump so children sit above parents.
+    tip.style.cssText = TOOLTIP_STYLE + ';z-index:' + (10000 + level);
+
+    // Mouseenter on this tooltip cancels its own hide AND every ancestor's
+    // hide — so moving from a ref into a child tooltip doesn't dismiss
+    // the parent.
+    tip.addEventListener('mouseenter', function () {
+      cancelHideUpTo(level);
+    });
+    // Mouseleave schedules a hide for this tooltip and any deeper ones.
+    tip.addEventListener('mouseleave', function () {
+      scheduleHideFromLevel(level);
+    });
+
+    // Dispatch `command:` links by setting `window.location.href`. The
+    // markdown preview's built-in click delegator only watches the
+    // `.markdown-body` area, and our tooltip is appended to document.body
+    // outside that area; navigation via window.location triggers the
+    // webview's will-navigate interception which dispatches the command.
+    tip.addEventListener('click', function (e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href^="command:"]') : null;
       if (!a) return;
-      // The show-more buttons handle their own click and don't carry a
-      // command href, so they don't match this selector.
       var href = a.getAttribute('href');
       if (!href) return;
       e.preventDefault();
@@ -87,18 +94,13 @@
       try {
         window.location.href = href;
       } catch (_) {
-        // Fall back to letting the natural click proceed if location
-        // assignment is blocked for any reason.
+        /* fall through */
       }
     });
 
-    // Trap scroll events inside the tooltip (and its column scroll regions)
-    // so wheel input doesn't leak to the page.
-    tooltip.addEventListener('wheel', function (e) {
-      // If the wheel is happening inside an inner scroll region, let that
-      // region absorb it; only fall back to the outer tooltip otherwise.
-      var inner = findInnerScroller(e.target);
-      var target = inner || tooltip;
+    tip.addEventListener('wheel', function (e) {
+      var inner = findInnerScrollerWithin(e.target, tip);
+      var target = inner || tip;
       var atTop = target.scrollTop === 0;
       var atBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 1;
       if (target.scrollHeight > target.clientHeight) {
@@ -109,47 +111,100 @@
       }
     }, { passive: false });
 
-    document.body.appendChild(tooltip);
-    return tooltip;
+    document.body.appendChild(tip);
+    return tip;
   }
 
-  function findInnerScroller(node) {
-    while (node && node !== tooltip && node.nodeType === 1) {
+  function findInnerScrollerWithin(node, boundary) {
+    while (node && node !== boundary && node.nodeType === 1) {
       if (node.classList && node.classList.contains('scepter-scroll')) return node;
       node = node.parentNode;
     }
     return null;
   }
 
-  function cancelHide() {
-    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  /** Find which tooltip in the stack contains `el` (as anchor or descendant).
+   *  Returns the level, or -1 if `el` isn't inside any tooltip. */
+  function findEnclosingLevel(el) {
+    if (!el || !el.closest) return -1;
+    var enclosing = el.closest('.scepter-tooltip');
+    if (!enclosing) return -1;
+    for (var i = 0; i < tooltipStack.length; i++) {
+      if (tooltipStack[i].tip === enclosing) return i;
+    }
+    return -1;
   }
 
-  function scheduleHide() {
-    cancelHide();
-    hideTimer = setTimeout(hideTooltip, 150);
+  /** Find the stack entry whose anchor === el. */
+  function findEntryByAnchor(el) {
+    for (var i = 0; i < tooltipStack.length; i++) {
+      if (tooltipStack[i].anchor === el) return i;
+    }
+    return -1;
+  }
+
+  function cancelHideUpTo(level) {
+    for (var i = 0; i <= level && i < tooltipStack.length; i++) {
+      if (tooltipStack[i].hideTimer) {
+        clearTimeout(tooltipStack[i].hideTimer);
+        tooltipStack[i].hideTimer = null;
+      }
+    }
+  }
+
+  function scheduleHideFromLevel(level) {
+    if (level < 0 || level >= tooltipStack.length) return;
+    var entry = tooltipStack[level];
+    if (entry.hideTimer) clearTimeout(entry.hideTimer);
+    entry.hideTimer = setTimeout(function () {
+      hideTooltipsFromLevel(level);
+    }, 150);
+  }
+
+  function hideTooltipsFromLevel(level) {
+    while (tooltipStack.length > level) {
+      var top = tooltipStack.pop();
+      if (top.hideTimer) clearTimeout(top.hideTimer);
+      if (top.tip && top.tip.parentNode) {
+        isTooltipMutation = true;
+        top.tip.parentNode.removeChild(top.tip);
+        setTimeout(function () { isTooltipMutation = false; }, 0);
+      }
+    }
   }
 
   // --- Rendering ---------------------------------------------------------
 
   function showTooltip(el) {
-    cancelHide();
-    currentRef = el;
-    drillStack = [];
-    var tip = createTooltip();
+    // What level is this hover at? If the anchor is inside an existing
+    // tooltip at level N, this hover spawns a tooltip at level N+1.
+    // Otherwise (anchor is in the markdown body), it's a new level-0
+    // hover and any existing stack should be torn down first.
+    var parentLevel = findEnclosingLevel(el);
+    var newLevel = parentLevel + 1;
+
+    // Tear down anything at or below newLevel — siblings replace,
+    // children of a different parent need to go.
+    hideTooltipsFromLevel(newLevel);
+
+    // Cancel any pending hides for ancestors so they stay visible.
+    cancelHideUpTo(newLevel - 1);
+
     var html = renderTooltipContent(el, /*allowDrill*/ true);
     if (!html) return;
 
+    var tip = createTooltipElement(newLevel);
     isTooltipMutation = true;
     tip.innerHTML = html;
     bindInternalLinks(tip);
-    // Rebind .scepter-ref hover behavior on any refs inside the tooltip
-    // body — the rich-rendered excerpt contains them. Hovering one
-    // drills into that claim's hover, which lets the user trace a chain
-    // of related claims by hover alone.
+    // Bind hover behavior to refs inside this tooltip so deeper hovers
+    // can stack on top.
     attachListeners();
-    positionTooltip(el);
+    positionTooltipNear(tip, el);
+    tip.style.display = 'block';
     setTimeout(function () { isTooltipMutation = false; }, 0);
+
+    tooltipStack.push({ tip: tip, anchor: el, level: newLevel, hideTimer: null });
   }
 
   function renderTooltipContent(el, allowDrill) {
@@ -213,14 +268,8 @@
     if (isOriginal) {
       // Single-column layout: header + metadata + refs.
       var html = '';
-      var origBadge = computeBadgeFromRefsJson(refsJson);
-      var origBadgeHtml = '';
-      if (origBadge) {
-        var oc = origBadge.hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
-        origBadgeHtml = ' <span class="scepter-claim-badge ' + oc + '">●' + origBadge.count + '</span>';
-      }
       html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' +
-        esc(fqid) + origBadgeHtml +
+        esc(fqid) +
         '</div>';
       html += '<div style="color:#9cdcfe;margin-bottom:6px">' +
         '<i>' + esc(noteType || '') + '</i> — ' + escMarkdownLike(noteTitle || '') + '</div>';
@@ -268,44 +317,15 @@
     return '<i>' + parts.join(' · ') + '</i>';
   }
 
-  /**
-   * Compute badge data (count + source-coverage flag) from the refsJson
-   * descriptor that drives the refs panel. Returns null if no inbound
-   * refs are recorded.
-   */
-  function computeBadgeFromRefsJson(refsJson) {
-    if (!refsJson) return null;
-    try {
-      var data = JSON.parse(refsJson);
-      var sources = (data && data.sources) || [];
-      var groups = (data && data.noteGroups) || [];
-      var noteCount = 0;
-      for (var i = 0; i < groups.length; i++) {
-        noteCount += (groups[i].items && groups[i].items.length) || 0;
-      }
-      var total = sources.length + noteCount;
-      if (total === 0) return null;
-      return { count: total, hasSource: sources.length > 0 };
-    } catch (_) {
-      return null;
-    }
-  }
 
   function buildBodyPanelHtml(args) {
     var html = '';
-    // Render the FQID heading as a ref-styled span so it picks up the
-    // same dotted-underline + color treatment as claim refs in the main
-    // preview body. Inline a colored ●N badge derived from the refs
-    // descriptor — the user expects the body-panel header to look like
-    // the same artifact it represents on the page, badge included.
-    var badge = computeBadgeFromRefsJson(args.refsJson);
-    var badgeHtml = '';
-    if (badge) {
-      var cls = badge.hasSource ? 'scepter-claim-badge-source' : 'scepter-claim-badge-note';
-      badgeHtml = ' <span class="scepter-claim-badge ' + cls + '">●' + badge.count + '</span>';
-    }
+    // FQID heading: bold colored text only — no badge, no dotted
+    // underline. The badge would suggest hover behavior but hovering
+    // the header does nothing (the user is already viewing this claim's
+    // hover), so the affordance is misleading.
     html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' +
-      esc(args.fqid) + badgeHtml +
+      esc(args.fqid) +
       '</div>';
     html += '<div style="color:#9cdcfe;margin-bottom:4px">' +
       '<i>' + esc(args.noteType || '') + '</i> — ' + escMarkdownLike(args.noteTitle || '') + '</div>';
@@ -581,7 +601,7 @@
 
   // --- Tooltip positioning --------------------------------------------
 
-  function positionTooltip(el) {
+  function positionTooltipNear(tip, el) {
     // `getBoundingClientRect()` returns viewport-relative coordinates;
     // for an absolutely-positioned tooltip on `document.body` we want
     // document-relative coordinates, so add the page scroll offsets.
@@ -592,33 +612,17 @@
     var left = rect.left + scrollX;
     var top = rect.bottom + scrollY + 4;
 
-    // Above-vs-below flip: viewport-aware at show time. If the anchor's
-    // bottom is too close to the viewport bottom, place the tooltip
-    // above the anchor instead. The flip is decided once at show; it
-    // doesn't re-evaluate during scroll (which would cause the tooltip
-    // to reorient mid-scroll, the original jitter complaint).
     if (rect.bottom + 200 > window.innerHeight) {
       top = rect.top + scrollY - 4;
-      tooltip.style.transform = 'translateY(-100%)';
+      tip.style.transform = 'translateY(-100%)';
     } else {
-      tooltip.style.transform = 'none';
+      tip.style.transform = 'none';
     }
     if (rect.left + 720 > window.innerWidth) {
       left = Math.max(4, window.innerWidth - 730) + scrollX;
     }
-    tooltip.style.left = Math.max(4, left) + 'px';
-    tooltip.style.top = top + 'px';
-    tooltip.style.display = 'block';
-  }
-
-  function hideTooltip() {
-    cancelHide();
-    currentRef = null;
-    if (tooltip && tooltip.style.display !== 'none') {
-      isTooltipMutation = true;
-      tooltip.style.display = 'none';
-      setTimeout(function () { isTooltipMutation = false; }, 0);
-    }
+    tip.style.left = Math.max(4, left) + 'px';
+    tip.style.top = top + 'px';
   }
 
   // --- Helpers --------------------------------------------------------
@@ -658,8 +662,29 @@
     var refs = document.querySelectorAll('.scepter-ref:not([data-scepter-bound])');
     refs.forEach(function (el) {
       el.setAttribute('data-scepter-bound', '1');
-      el.addEventListener('mouseenter', function () { showTooltip(el); });
-      el.addEventListener('mouseleave', function () { scheduleHide(); });
+      el.addEventListener('mouseenter', function () {
+        // If this anchor already owns a tooltip in the stack, just keep
+        // it visible (cancel its pending hide). Otherwise spawn a new
+        // tooltip; showTooltip figures out the right level based on
+        // whether the anchor sits inside an existing tooltip.
+        var owned = findEntryByAnchor(el);
+        if (owned >= 0) {
+          cancelHideUpTo(owned);
+        } else {
+          showTooltip(el);
+        }
+      });
+      el.addEventListener('mouseleave', function () {
+        // Schedule hide for the tooltip this anchor owns (if any).
+        // If the anchor lives inside a tooltip but hasn't spawned a child
+        // yet, scheduling the parent's hide is wrong — the cursor is
+        // still inside the parent. Only act when the anchor is at the
+        // markdown-body level OR has actually spawned a child tooltip.
+        var owned = findEntryByAnchor(el);
+        if (owned >= 0) {
+          scheduleHideFromLevel(owned);
+        }
+      });
     });
   }
 
