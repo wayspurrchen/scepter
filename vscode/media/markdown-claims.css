@@ -93,6 +93,185 @@ a.scepter-ref:hover {
   text-decoration: underline solid;
 }
 
+/* Inline crossref-count badge on claim definition headings.
+ * Anchored next to the claim id (rendered by markdown-plugin.ts as a
+ * sibling span immediately following the id link). Color encodes source
+ * coverage: green if any inbound source ref, red if only note-to-note refs.
+ * Mirrors the editor decoration in vscode/src/decoration-provider.ts. */
+.scepter-claim-badge {
+  display: inline-block;
+  margin-left: 2px;
+  font-weight: bold;
+  font-size: 0.95em;
+  letter-spacing: 0;
+  user-select: none;
+}
+.scepter-claim-badge-source {
+  color: #6CC04A;
+}
+.scepter-claim-badge-note {
+  color: #F48771;
+}
+.vscode-light .scepter-claim-badge-source {
+  color: #2e8b1f;
+}
+.vscode-light .scepter-claim-badge-note {
+  color: #c44a2c;
+}
+
+/* Two-column tooltip layout for reference-to-claim hovers.
+ * Each column scrolls independently — this is the preview-only feature
+ * the editor hover renderer can't reliably do (inline style stripping). */
+.scepter-tooltip-cols {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+}
+.scepter-tooltip-col {
+  flex: 1 1 50%;
+  min-width: 0; /* allow flex children to shrink past content width */
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  word-break: break-word;
+}
+.scepter-tooltip-col + .scepter-tooltip-col {
+  border-left: 1px solid rgba(255,255,255,0.1);
+  padding-left: 12px;
+}
+.vscode-light .scepter-tooltip-col + .scepter-tooltip-col {
+  border-left-color: rgba(0,0,0,0.1);
+}
+
+/* Refs panel — sources + grouped notes. */
+.scepter-refs-panel {
+  font-size: 12px;
+}
+.scepter-refs-section {
+  margin-bottom: 8px;
+}
+.scepter-refs-section:last-child {
+  margin-bottom: 0;
+}
+.scepter-refs-heading {
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: var(--vscode-editorHoverWidget-foreground, #cccccc);
+}
+.scepter-refs-list {
+  list-style: none;
+  padding-left: 12px;
+  margin: 2px 0 4px 0;
+}
+.scepter-refs-list li {
+  margin: 2px 0;
+  line-height: 1.45;
+}
+.scepter-refs-list li::before {
+  content: "• ";
+  opacity: 0.5;
+  margin-right: 2px;
+}
+.scepter-refs-link,
+.scepter-refs-grouplink {
+  color: #4EC9B0;
+  text-decoration: none;
+}
+.scepter-refs-link:hover,
+.scepter-refs-grouplink:hover {
+  text-decoration: underline;
+}
+.vscode-light .scepter-refs-link,
+.vscode-light .scepter-refs-grouplink {
+  color: #0e7a6b;
+}
+.scepter-refs-count {
+  opacity: 0.5;
+  font-size: 11px;
+}
+
+/* <details> collapsibles for grouped note refs. Auto-open when small;
+ * collapsed by default for large groups so the tooltip stays scannable. */
+.scepter-refs-details {
+  margin: 2px 0;
+}
+.scepter-refs-details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 2px 0;
+}
+.scepter-refs-details > summary::-webkit-details-marker {
+  display: none;
+}
+.scepter-refs-details > summary::before {
+  content: "▶ ";
+  display: inline-block;
+  font-size: 9px;
+  margin-right: 2px;
+  opacity: 0.6;
+  transition: transform 0.1s ease;
+}
+.scepter-refs-details[open] > summary::before {
+  content: "▼ ";
+}
+.scepter-refs-group > summary {
+  margin-bottom: 2px;
+}
+
+/* Citing-line snippet: dim surrounding text, bold the matched FQID. */
+.scepter-snippet-dim {
+  opacity: 0.6;
+}
+
+/* "Show more above / below" buttons in the body excerpt. */
+.scepter-show-more-btn {
+  background: rgba(255,255,255,0.06);
+  color: var(--vscode-editorHoverWidget-foreground, #cccccc);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.scepter-show-more-btn:hover {
+  background: rgba(255,255,255,0.12);
+}
+.vscode-light .scepter-show-more-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.15);
+}
+.vscode-light .scepter-show-more-btn:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+/* Range-expansion hover list. */
+.scepter-range-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+.scepter-range-list li {
+  padding: 3px 0;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  line-height: 1.4;
+}
+.scepter-range-list li:first-child {
+  border-top: none;
+}
+.scepter-range-link {
+  color: #4EC9B0;
+  text-decoration: none;
+}
+.scepter-range-link:hover {
+  text-decoration: underline;
+}
+.vscode-light .scepter-range-link {
+  color: #0e7a6b;
+}
+
 /* Tooltip excerpt styling — rendered markdown inside the hover tooltip */
 .scepter-tooltip-excerpt p {
   margin: 0 0 6px 0;
