@@ -238,12 +238,15 @@ export class ClaimIndexCache {
   /** Pre-cached raw markdown excerpts for notes */
   private noteExcerptCache = new Map<string, string>();
   /** Pre-rendered HTML excerpts for the markdown preview tooltips */
+  // @implements {R012.§7.AC.01} HTML excerpt cache populated via markdown-it with SCEpter plugin attached
   private htmlExcerptCache = new Map<string, string>();
   /**
    * Pre-cached aggregated note contents split into lines, keyed by noteId.
    * Used by the markdown-it plugin (synchronous, no async access in render
    * hooks) to build citing-line snippets for the refs panel of the preview
    * tooltip. Populated alongside the excerpt cache after Phase B.
+   *
+   * @implements {R012.§7.AC.06} aggregated note-lines cache populated for every indexed note
    */
   private noteLinesCache = new Map<string, string[]>();
   /** Standalone markdown-it instance for rendering excerpts (no plugins) */
@@ -724,6 +727,9 @@ export class ClaimIndexCache {
     }
   }
 
+  // @implements {R012.§7.AC.01} excerpt cache built by rendering each claim/note body through markdown-it + SCEpter plugin
+  // @implements {R012.§7.AC.02} env carries currentDocument.fsPath and _scepterLineOffset for badge anchor remap
+  // @implements {R012.§7.AC.05} note excerpt capped at 50 lines with `*…content continues*` truncation marker
   private async buildExcerptCache(): Promise<void> {
     const noteExcerpts = new Map<string, string>();
     const htmlExcerpts = new Map<string, string>();

@@ -37,6 +37,8 @@
    * positioning the child against its anchor doesn't relocate the parent
    * (the singleton-tooltip approach had a feedback loop where moving the
    * tooltip moved the inner anchor inside it, throwing position off).
+   *
+   * @implements {R012.§3.AC.02} each tooltip is its own DOM element appended to document.body
    */
   var tooltipStack = [];
 
@@ -84,6 +86,7 @@
     // `.markdown-body` area, and our tooltip is appended to document.body
     // outside that area; navigation via window.location triggers the
     // webview's will-navigate interception which dispatches the command.
+    // @implements {R012.§3.AC.05} command URI dispatch via window.location.href assignment (own dispatcher, body-attached)
     tip.addEventListener('click', function (e) {
       var a = e.target && e.target.closest ? e.target.closest('a[href^="command:"]') : null;
       if (!a) return;
@@ -98,6 +101,7 @@
       }
     });
 
+    // @implements {R012.§3.AC.06} wheel handler scrolls inner two-column scrollable region; no propagation at bounds
     tip.addEventListener('wheel', function (e) {
       var inner = findInnerScrollerWithin(e.target, tip);
       var target = inner || tip;
@@ -143,6 +147,7 @@
     return -1;
   }
 
+  // @implements {R012.§3.AC.03} mouseenter on a tooltip cancels pending hides for it AND every ancestor up the stack
   function cancelHideUpTo(level) {
     for (var i = 0; i <= level && i < tooltipStack.length; i++) {
       if (tooltipStack[i].hideTimer) {
@@ -152,6 +157,7 @@
     }
   }
 
+  // @implements {R012.§3.AC.03} mouseleave schedules hide for self AND every deeper level; ancestors stay visible
   function scheduleHideFromLevel(level) {
     if (level < 0 || level >= tooltipStack.length) return;
     var entry = tooltipStack[level];
@@ -175,6 +181,8 @@
 
   // --- Rendering ---------------------------------------------------------
 
+  // @implements {R012.§3.AC.01} tooltip appears on mouseenter of any `.scepter-ref` element with hide-timer cancel behavior
+  // @implements {R012.§3.AC.02} stacked tooltips: child spawned on top with parent visible underneath
   function showTooltip(el) {
     // What level is this hover at? If the anchor is inside an existing
     // tooltip at level N, this hover spawns a tooltip at level N+1.
@@ -225,6 +233,8 @@
     return '';
   }
 
+  // @implements {R012.§7.AC.03} prefer pre-rendered HTML excerpt (data-claim-context) over raw text; re-attach listeners after innerHTML inject
+  // @implements {R012.§7.AC.04} fall back to raw text excerpt with show-more-above/below in 12-line increments
   function renderClaimHover(el) {
     var fqid = el.getAttribute('data-claim-fqid');
     var heading = el.getAttribute('data-claim-heading');
@@ -389,6 +399,11 @@
     };
   }
 
+  // @implements {R012.§4.AC.01} sources/notes split with counts (preview-side mirror)
+  // @implements {R012.§4.AC.03} `<details>` collapsibles per group; group header shows id, type, title
+  // @implements {R012.§4.AC.04} default-open heuristic: notes ≤3 groups + ≤5 refs/group; sources ≤5
+  // @implements {R012.§4.AC.05} kind flag drives derivation (heading excerpt) vs reference (snippetHtml) rendering
+  // @implements {R012.§4.AC.08} snippetHtml dropped into innerHTML without re-escape
   function buildRefsPanelHtml(refsJson) {
     var data;
     try { data = JSON.parse(refsJson); } catch (e) { return ''; }
@@ -470,6 +485,7 @@
     return html;
   }
 
+  // @implements {R012.§5.AC.04} preview detects `data-claim-range-members` and renders one row per member
   function renderRangeHover(el, membersJson) {
     var members;
     try { members = JSON.parse(membersJson); } catch (e) { return ''; }
@@ -601,6 +617,7 @@
 
   // --- Tooltip positioning --------------------------------------------
 
+  // @implements {R012.§3.AC.04} document-relative position: absolute coords (page scroll included); viewport clamping
   function positionTooltipNear(tip, el) {
     // `getBoundingClientRect()` returns viewport-relative coordinates;
     // for an absolutely-positioned tooltip on `document.body` we want
@@ -658,6 +675,7 @@
 
   // --- Listener wiring -------------------------------------------------
 
+  // @implements {R012.§3.AC.01} mouseenter/mouseleave bound to .scepter-ref elements; idempotent via data-scepter-bound
   function attachListeners() {
     var refs = document.querySelectorAll('.scepter-ref:not([data-scepter-bound])');
     refs.forEach(function (el) {

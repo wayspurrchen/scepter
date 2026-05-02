@@ -97,7 +97,9 @@ a.scepter-ref:hover {
  * Anchored next to the claim id (rendered by markdown-plugin.ts as a
  * sibling span immediately following the id link). Color encodes source
  * coverage: green if any inbound source ref, red if only note-to-note refs.
- * Mirrors the editor decoration in vscode/src/decoration-provider.ts. */
+ * Mirrors the editor decoration in vscode/src/decoration-provider.ts.
+ * @implements {R012.§1.AC.03} badge color encodes source vs note-only coverage
+ * @implements {R012.§1.AC.05} preview badge as inline `<span class="scepter-claim-badge">` adjacent to FQID */
 .scepter-claim-badge {
   display: inline-block;
   margin-left: 2px;
@@ -121,7 +123,8 @@ a.scepter-ref:hover {
 
 /* Two-column tooltip layout for reference-to-claim hovers.
  * Each column scrolls independently — this is the preview-only feature
- * the editor hover renderer can't reliably do (inline style stripping). */
+ * the editor hover renderer can't reliably do (inline style stripping).
+ * @implements {R012.§3.AC.06} inner two-column scrollable region (paired with wheel handler in preview-script.js) */
 .scepter-tooltip-cols {
   display: flex;
   gap: 12px;
@@ -193,7 +196,8 @@ a.scepter-ref:hover {
 }
 
 /* <details> collapsibles for grouped note refs. Auto-open when small;
- * collapsed by default for large groups so the tooltip stays scannable. */
+ * collapsed by default for large groups so the tooltip stays scannable.
+ * @implements {R012.§4.AC.03} `<details>` collapsible per group */
 .scepter-refs-details {
   margin: 2px 0;
 }
@@ -220,7 +224,8 @@ a.scepter-ref:hover {
   margin-bottom: 2px;
 }
 
-/* Citing-line snippet: dim surrounding text, bold the matched FQID. */
+/* Citing-line snippet: dim surrounding text, bold the matched FQID.
+ * @implements {R012.§4.AC.07} snippet styling: dim surrounding, bold target FQID */
 .scepter-snippet-dim {
   opacity: 0.6;
 }

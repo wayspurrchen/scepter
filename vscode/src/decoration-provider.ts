@@ -50,6 +50,7 @@ const crossProjectUnresolvedDecoration = vscode.window.createTextEditorDecoratio
 // Claim-definition badge — rendered as an `after` decoration anchored next to
 // the claim id in its heading line. Color encodes source coverage (green if
 // any source ref, red if only note-to-note refs). Count is total inbound refs.
+// @implements {R012.§1.AC.04} editor badge via `after`-decoration mechanism
 const claimBadgeDecoration = vscode.window.createTextEditorDecorationType({});
 
 function escapeHtml(s: string): string {
@@ -76,6 +77,7 @@ export class DecorationProvider {
       })
     );
 
+    // @implements {R012.§1.AC.04} editor badge refreshes on document change (debounced) and index refresh
     let changeTimer: ReturnType<typeof setTimeout> | undefined;
     this.disposables.push(
       vscode.workspace.onDidChangeTextDocument((event) => {
@@ -203,6 +205,11 @@ export class DecorationProvider {
     editor.setDecorations(claimBadgeDecoration, claimBadges);
   }
 
+  // @implements {R012.§1.AC.02} badge displays total inbound count (sources + notes)
+  // @implements {R012.§1.AC.03} badge color encodes source coverage (green for source, red for note-only)
+  // @implements {R012.§1.AC.04} editor badge anchored on claim id range via `after`-decoration
+  // @implements {R012.§1.AC.06} badge appears only on claim definition (entry.line match), not citations
+  // @implements {R012.§1.AC.07} badge omitted when total === 0
   private collectClaimBadges(
     doc: vscode.TextDocument,
     contextNoteId: string,

@@ -547,6 +547,7 @@ export function parseClaimReferences(
     }
   }
 
+  // @implements {R012.§6.AC.01} parseClaimReferences invokes adjacent-section binding before returning
   bindAdjacentSectionRefs(references, lines);
 
   return references;
@@ -577,6 +578,11 @@ export function parseClaimReferences(
  * Only `address.noteId` (and `aliasPrefix` if the prev ref carried one)
  * is mutated. `address.raw` stays as the literal source text so consumers
  * that surface raw in messages still echo what the author wrote.
+ *
+ * @implements {R012.§6.AC.01} bind bare section ref to preceding bare note ref; mutates noteId/aliasPrefix, leaves raw intact
+ * @implements {R012.§6.AC.02} allowed gap: whitespace, optional `'s` possessive, or post-brace whitespace
+ * @implements {R012.§6.AC.03} range-expansion siblings share column, inherit binding when first member binds
+ * @implements {R012.§6.AC.04} only first section ref after a note ref binds; non-allowed gap stops further binding
  */
 function bindAdjacentSectionRefs(refs: ClaimReference[], lines: string[]): void {
   const byLine = new Map<number, ClaimReference[]>();

@@ -28,6 +28,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     private outputChannel: vscode.OutputChannel
   ) {}
 
+  // @implements {R012.§2.AC.08} fallback message when reference recognized but not in index
+  // @implements {R012.§2.AC.09} every hover attempt logged with line/char/kind/snippet
   async provideHover(
     document: vscode.TextDocument,
     position: vscode.Position,
@@ -68,6 +70,7 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
       // Range expansions (`{AC.01-06}`) carry every member's FQID on
       // `match.rangeMembers`; show a compact one-per-row summary so the
       // user can scan all members of the range without opening each.
+      // @implements {R012.§5.AC.03} editor hover detects range matches and routes to range renderer
       if (match.rangeMembers && match.rangeMembers.length > 1) {
         return new vscode.Hover(
           await this.buildClaimRangeHover(match, contextNoteId ?? undefined),
@@ -114,6 +117,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
    * surface metadata + sources/refs instead. When false, this is a
    * reference to the claim from elsewhere; show the body excerpt
    * alongside refs so they can preview without navigating.
+   *
+   * @implements {R012.§2.AC.01} two-mode hover detection (original-claim vs reference-to-claim)
    */
   private isOnClaimDefinition(
     entry: ClaimIndexEntry,
@@ -125,6 +130,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     return position.line === entry.line - 1;
   }
 
+  // @implements {R012.§2.AC.01} original-claim mode: metadata + refs only, body omitted
+  // @implements {R012.§2.AC.02} reference-to-claim mode: two-column layout with independent scroll
   private async buildClaimHover(
     entry: ClaimIndexEntry,
     isOriginal: boolean,
@@ -185,6 +192,10 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
    * with each ref labeled as derivation or reference and showing a short
    * heading excerpt). Empty subsections get an explicit "no refs" line so
    * the user knows the absence is informative, not a missing render.
+   *
+   * @implements {R012.§2.AC.04} sources/notes split with counts; "No X references" lines when empty
+   * @implements {R012.§2.AC.05} notes grouped by source noteId; derivation vs reference flag
+   * @implements {R012.§2.AC.06} derivation: localId + heading excerpt; reference: localId + citing-line snippet
    */
   private async buildRefsHtml(
     targetFqid: string,
@@ -286,6 +297,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
    * leading-context like "see also" or "derives from"), an ellipsis,
    * then a window centered on the hit. Without this, a citation that
    * appears 300 chars into a list-item line was completely cut off.
+   *
+   * @implements {R012.§2.AC.07} head-budget vs window-around-hit truncation
    */
   private buildReferenceSnippet(
     noteLines: string[] | null | undefined,
@@ -378,6 +391,9 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
    * Cross-project ranges (with `match.aliasPrefix`) fall back to a single
    * line per member showing only the FQID — peer resolution per-member
    * would round-trip too many file reads for a hover surface.
+   *
+   * @implements {R012.§2.AC.03} range hover renders one row per member; cross-project falls back to listing-only
+   * @implements {R012.§5.AC.06} cross-project ranges fall back to listing-only mode
    */
   private async buildClaimRangeHover(
     match: { normalizedId: string; rangeMembers?: string[]; aliasPrefix?: string },

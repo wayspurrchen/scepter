@@ -38,6 +38,8 @@ export interface ClaimMatch {
    * compatibility with single-claim consumers; range-aware consumers
    * (hover, preview tooltip) iterate `rangeMembers` to render each
    * claim in the bundle.
+   *
+   * @implements {R012.§5.AC.01} single match per range token; rangeMembers carries every expanded FQID
    */
   rangeMembers?: string[];
 }
@@ -56,6 +58,8 @@ export interface ClaimMatch {
  *
  * Alias prefix is intentionally NOT included — consumers carry it on
  * the parent ClaimMatch and route cross-project lookups separately.
+ *
+ * @implements {R012.§6.AC.05} downstream consumers derive FQID from address fields, not raw
  */
 function buildNormalizedId(addr: ClaimAddressParsed): string {
   const parts: string[] = [];
@@ -92,6 +96,8 @@ export function findAllMatches(
 
   // Group by column to merge range expansions.
   // {R004.§1.AC.01-06} produces 6 refs at the same column — we want one span.
+  // @implements {R012.§5.AC.02} range match returned as single span (decoration providers see one match, not N adjacent)
+  // @implements {R012.§5.AC.05} works for braced AND braceless ranges (bracelessEnabled=isMarkdown)
   const grouped = new Map<number, ClaimReference[]>();
   for (const ref of refs) {
     const key = ref.column;

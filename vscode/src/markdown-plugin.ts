@@ -31,6 +31,7 @@ export function createScepterPlugin(index: ClaimIndexCache) {
     // Core ruler that propagates source-line numbers from inline tokens to
     // their text children, so the text renderer can correlate a rendered
     // claim id with its definition line.
+    // @implements {R012.§1.AC.06} text-render path is preferred badge emission point (line tracker enables it)
     md.core.ruler.push('scepter-line-tracker', function (state: any) {
       for (const tok of state.tokens) {
         if (tok.type === 'inline' && Array.isArray(tok.children) && tok.map) {
@@ -54,6 +55,9 @@ export function createScepterPlugin(index: ClaimIndexCache) {
     // here just before the closing tag. The text-render path is preferred
     // because it places the badge right after the FQID; this catches the
     // tail case so the badge never disappears entirely.
+    // @implements {R012.§1.AC.06} block-close fallback hook with dedup against inline emission
+    // @implements {R012.§1.AC.07} returns '' when refs.length === 0 (badge omitted for zero-cite claims)
+    // @implements {R012.§1.AC.08} excerpt-render line offset (`_scepterLineOffset`) shifts onto original doc coords
     function buildClaimBadgeForLine(line0: number | undefined, env: any): string {
       if (typeof line0 !== 'number') return '';
       const currentDocPath = env?.currentDocument?.fsPath ?? env?.docUri?.fsPath ?? null;
@@ -93,6 +97,7 @@ export function createScepterPlugin(index: ClaimIndexCache) {
         return self.renderToken(tokens, idx, options);
       };
 
+    // @implements {R012.§1.AC.01} badge reaches heading-level claim definitions (`### AC.01 — title`)
     md.renderer.rules.heading_open = function (
       tokens: any[],
       idx: number,
@@ -123,6 +128,7 @@ export function createScepterPlugin(index: ClaimIndexCache) {
     // to capture the source line and paragraph_close to emit the badge,
     // mirroring the heading hooks. List-item claims (in tight lists)
     // would need an additional list_item hook; not in scope here.
+    // @implements {R012.§1.AC.01} badge reaches paragraph-level claim definitions (`§5.AC.01 The system MUST...`)
     md.renderer.rules.paragraph_open = function (
       tokens: any[],
       idx: number,
@@ -282,6 +288,10 @@ function highlightWithData(
     //   - The entry has inbound refs.
     // Dedupe via env._scepterBadgesEmitted: we set the entry's FQID
     // after emission so a block-close fallback hook can skip it.
+    // @implements {R012.§1.AC.02} badge displays total inbound count (sources + notes)
+    // @implements {R012.§1.AC.03} color encodes source coverage: green for source, red for note-only
+    // @implements {R012.§1.AC.05} preview emits inline `<span class="scepter-claim-badge">` adjacent to FQID
+    // @implements {R012.§1.AC.06} text-render path is preferred badge emission point; dedup via _scepterBadgesEmitted
     if (
       sourceLine !== null &&
       contextNoteId &&
@@ -377,12 +387,14 @@ function buildDataAttrs(
       }
 
       // Pre-rendered HTML context for the preview tooltip body panel
+      // @implements {R012.§7.AC.03} HTML excerpt emitted on `data-claim-context` for tooltip body panel
       const contextHtml = index.getClaimContextHtml(entry.fullyQualified);
       if (contextHtml) {
         attrs.push(`data-claim-context="${escAttr(contextHtml)}"`);
       }
       // Raw claim body excerpt — used for "show more" expansion in the
       // body panel where the rendered HTML excerpt is too eager.
+      // @implements {R012.§7.AC.04} raw text excerpt emitted on `data-claim-context-raw` for show-more fallback
       const rawContext = index.getClaimContextSync(entry);
       if (rawContext) {
         attrs.push(`data-claim-context-raw="${escAttr(rawContext)}"`);
@@ -392,6 +404,7 @@ function buildDataAttrs(
       // derivation/reference distinction and citing-line snippets.
       // Encoded as a JSON array on a data attribute so the webview can
       // build the panel DOM without round-tripping back to the host.
+      // @implements {R012.§4.AC.08} pre-built JSON descriptor on `data-claim-refs`; webview drops into innerHTML without re-escape
       const refsJson = buildRefsJson(index, entry, currentDocDir);
       if (refsJson) {
         attrs.push(`data-claim-refs="${escAttr(refsJson)}"`);
@@ -439,6 +452,7 @@ function buildDataAttrs(
   // FQIDs as a JSON-encoded data attribute so the webview script can
   // render one row per member.
   // @implements {R011.§4.AC.08}
+  // @implements {R012.§5.AC.04} plugin emits `data-claim-range-members` JSON-encoded array
   if (match.rangeMembers && match.rangeMembers.length > 1) {
     const memberData = match.rangeMembers.map((fqid) => {
       const entry = index.resolve(fqid, contextNoteId ?? undefined);
@@ -469,6 +483,14 @@ function buildDataAttrs(
  * hover so output is visually consistent across surfaces.
  *
  * Returns null if there are no refs at all (caller skips the attribute).
+ *
+ * @implements {R012.§4.AC.01} sources/notes split with counts
+ * @implements {R012.§4.AC.02} sources rendered as `relative-path:line`
+ * @implements {R012.§4.AC.03} notes grouped by source noteId with id/type/title header
+ * @implements {R012.§4.AC.05} `kind` flag distinguishes derivation vs reference
+ * @implements {R012.§4.AC.06} derivation refs carry localId + heading excerpt
+ * @implements {R012.§4.AC.07} reference refs carry localId + citing-line snippetHtml
+ * @implements {R012.§4.AC.09} returns null when zero refs (caller omits attribute)
  */
 function buildRefsJson(
   index: ClaimIndexCache,
@@ -581,6 +603,8 @@ function makeOpenCommandHref(absPath: string, line: number): string {
  * surrounding text is dimmed; the target FQID is bolded if locatable
  * via the same matcher the decoration layer uses. Mirrors the editor
  * hover algorithm in `hover-provider.buildReferenceSnippet`.
+ *
+ * @implements {R012.§2.AC.07} head-budget vs window-around-hit truncation (preview-side mirror)
  */
 function buildReferenceSnippetHtml(
   noteLines: string[] | null,

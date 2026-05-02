@@ -395,6 +395,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
      * `command:vscode.open?` works in trusted hovers but is unreliable
      * across all preview hosts. This thin wrapper takes plain string args
      * so the URI encoding stays simple.
+     *
+     * @implements {R012.§3.AC.05} command URI dispatch target for refs panel `<a href="command:...">` links
      */
     vscode.commands.registerCommand('scepter.previewOpenAt', async (filePath: string, line?: number) => {
       if (!filePath) return;
@@ -545,6 +547,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
   // file (which retriggers render). The current-file edit case still
   // re-renders automatically because VS Code re-runs the markdown
   // pipeline (and our plugin) on every keystroke.
+  // @implements {R012.§3.AC.07} no auto-refresh on index.onDidRefresh; preserves hover stability during background writes
 
   // Return the markdown-it plugin for the preview pane.
   return {
