@@ -875,4 +875,93 @@ describe('Claim Parser', () => {
       });
     });
   });
+
+  /**
+   * Adjacent-section binding: when a bare section ref follows a bare note
+   * ref separated only by whitespace (and optionally a possessive `'s`),
+   * the section ref is bound to that note id. Resolves common author
+   * patterns like `R005 §3` or `{S001} §10` that LLMs and humans both
+   * write naturally.
+   */
+  describe('adjacent section binding', () => {
+    const codes = new Set(['R', 'S', 'E', 'T', 'DD']);
+
+    it('binds bare section to preceding bare note id: E032 §5.2', () => {
+      const refs = parseClaimReferences('See E032 §5.2 for context.', { knownShortcodes: codes });
+      const sectionRef = refs.find((r) => r.address.sectionPath?.length === 2);
+      expect(sectionRef).toBeDefined();
+      expect(sectionRef!.address.noteId).toBe('E032');
+      expect(sectionRef!.address.sectionPath).toEqual([5, 2]);
+    });
+
+    it('binds bare section to braced preceding note: {E032} §5.2', () => {
+      const refs = parseClaimReferences('See {E032} §5.2 for context.', { knownShortcodes: codes });
+      const sectionRef = refs.find((r) => r.address.sectionPath?.length === 2);
+      expect(sectionRef).toBeDefined();
+      expect(sectionRef!.address.noteId).toBe('E032');
+    });
+
+    it("binds across possessive: T057's §1.AC.01", () => {
+      const refs = parseClaimReferences("Per T057's §1.AC.01 the rule holds.", { knownShortcodes: codes });
+      const claimRef = refs.find((r) => r.address.claimPrefix === 'AC');
+      expect(claimRef).toBeDefined();
+      expect(claimRef!.address.noteId).toBe('T057');
+      expect(claimRef!.address.sectionPath).toEqual([1]);
+      expect(claimRef!.address.claimNumber).toBe(1);
+    });
+
+    it('propagates binding across range siblings: T057\'s §1.AC.01-02', () => {
+      const refs = parseClaimReferences("T057's §1.AC.01-02 are valid.", { knownShortcodes: codes });
+      const acRefs = refs.filter((r) => r.address.claimPrefix === 'AC');
+      expect(acRefs).toHaveLength(2);
+      for (const r of acRefs) {
+        expect(r.address.noteId).toBe('T057');
+        expect(r.address.sectionPath).toEqual([1]);
+      }
+    });
+
+    it('does not bind across intervening prose: R005 §1 (importance) and §2', () => {
+      const refs = parseClaimReferences('R005 §1 (importance) and §2 (lifecycle)', { knownShortcodes: codes });
+      const sec1 = refs.find((r) => r.address.sectionPath?.[0] === 1);
+      const sec2 = refs.find((r) => r.address.sectionPath?.[0] === 2);
+      expect(sec1?.address.noteId).toBe('R005');
+      // §2 has prose between it and R005 — must remain unbound.
+      expect(sec2?.address.noteId).toBeUndefined();
+    });
+
+    it('does not bind when separated by comma: {R005}, §3', () => {
+      const refs = parseClaimReferences('{R005}, §3', { knownShortcodes: codes });
+      const sec = refs.find((r) => r.address.sectionPath?.[0] === 3);
+      expect(sec?.address.noteId).toBeUndefined();
+    });
+
+    it('leaves already-qualified section refs untouched: {R005.§3}', () => {
+      const refs = parseClaimReferences('{R005.§3}', { knownShortcodes: codes });
+      expect(refs).toHaveLength(1);
+      expect(refs[0].address.noteId).toBe('R005');
+      expect(refs[0].address.sectionPath).toEqual([3]);
+    });
+
+    it('does not bind a leading section to a following note: §3 R005', () => {
+      const refs = parseClaimReferences('Look at §3 R005.', { knownShortcodes: codes });
+      const sec = refs.find((r) => r.address.sectionPath?.[0] === 3);
+      expect(sec?.address.noteId).toBeUndefined();
+    });
+
+    it('binds last preceding bare note when multiple appear: R009 R012 §5', () => {
+      const refs = parseClaimReferences('R009 R012 §5', { knownShortcodes: codes });
+      const sec = refs.find((r) => r.address.sectionPath?.[0] === 5);
+      expect(sec?.address.noteId).toBe('R012');
+    });
+
+    it('preserves alias prefix from braced peer note: {vendor-lib/R005} §1.AC.01', () => {
+      const refs = parseClaimReferences(
+        '{vendor-lib/R005} §1.AC.01',
+        { knownShortcodes: codes },
+      );
+      const claimRef = refs.find((r) => r.address.claimPrefix === 'AC');
+      expect(claimRef?.address.noteId).toBe('R005');
+      expect(claimRef?.address.aliasPrefix).toBe('vendor-lib');
+    });
+  });
 });

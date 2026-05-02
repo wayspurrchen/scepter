@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ClaimIndexCache, ClaimIndexEntry, NoteInfo, SectionEntry } from './claim-index';
-import { matchAtPosition, noteIdFromPath } from './patterns';
+import { matchAtPosition, findAllMatches, noteIdFromPath } from './patterns';
 
 function escapeHtml(s: string): string {
   return s
@@ -10,6 +10,17 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+/** Escape characters that markdown-it would otherwise interpret as emphasis,
+ *  so paths like `__tests__/foo.ts` don't get rendered as **tests** bold. */
+function escapeMarkdown(s: string): string {
+  return escapeHtml(s).replace(/_/g, '\\_').replace(/\*/g, '\\*');
+}
+
+/** Inline style for a hover-cell scroll region. VS Code's hover renderer
+ *  may strip some style props; we keep what's most likely to survive
+ *  (vertical-align, max-height, overflow). */
+const CELL_STYLE = 'vertical-align: top; max-height: 360px; overflow-y: auto; overflow-x: hidden;';
 
 export class ClaimHoverProvider implements vscode.HoverProvider {
   constructor(
@@ -54,6 +65,15 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
 
     // --- Claim-level hover ---
     if (match.kind === 'claim' || match.kind === 'bare-claim') {
+      // Range expansions (`{AC.01-06}`) carry every member's FQID on
+      // `match.rangeMembers`; show a compact one-per-row summary so the
+      // user can scan all members of the range without opening each.
+      if (match.rangeMembers && match.rangeMembers.length > 1) {
+        return new vscode.Hover(
+          await this.buildClaimRangeHover(match, contextNoteId ?? undefined),
+          range,
+        );
+      }
       const entry = this.index.resolve(match.normalizedId, contextNoteId ?? undefined);
       if (entry) {
         const isOriginal = this.isOnClaimDefinition(entry, document, position);
@@ -125,7 +145,7 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     const sourceRefs = incoming.filter((r) => r.fromNoteId.startsWith('source:'));
     const noteRefs = incoming.filter((r) => !r.fromNoteId.startsWith('source:'));
 
-    const refsHtml = this.buildRefsHtml(entry.fullyQualified, sourceRefs, noteRefs, projectDir);
+    const refsHtml = await this.buildRefsHtml(entry.fullyQualified, sourceRefs, noteRefs, projectDir);
 
     const badges: string[] = [];
     if (entry.importance !== undefined) badges.push(`importance: ${entry.importance}`);
@@ -151,8 +171,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
 
     md.appendMarkdown(
       `<table><tr>` +
-        `<td valign="top" width="40%">${refsHtml}</td>` +
-        `<td valign="top" width="60%">${bodyHtml}</td>` +
+        `<td valign="top" width="50%" style="${CELL_STYLE}">${refsHtml}</td>` +
+        `<td valign="top" width="50%" style="${CELL_STYLE}">${bodyHtml}</td>` +
       `</tr></table>`,
     );
 
@@ -166,15 +186,14 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
    * heading excerpt). Empty subsections get an explicit "no refs" line so
    * the user knows the absence is informative, not a missing render.
    */
-  private buildRefsHtml(
+  private async buildRefsHtml(
     targetFqid: string,
     sourceRefs: { fromClaim: string; fromNoteId: string; filePath: string; line: number }[],
     noteRefs: { fromClaim: string; fromNoteId: string; filePath: string; line: number }[],
     projectDir: string,
-  ): string {
+  ): Promise<string> {
     const lines: string[] = [];
 
-    // Sources
     lines.push(`<b>Sources (${sourceRefs.length})</b>`);
     if (sourceRefs.length === 0) {
       lines.push(`<i>No source references.</i>`);
@@ -183,7 +202,7 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
         const abs = this.index.resolveFilePath(r.filePath) ?? r.filePath;
         const rel = path.relative(projectDir, abs);
         const u = vscode.Uri.file(abs).with({ fragment: `L${r.line || 1}` });
-        lines.push(`<a href="${u.toString()}">${escapeHtml(rel)}:${r.line}</a>`);
+        lines.push(`<a href="${u.toString()}">${escapeMarkdown(rel)}:${r.line}</a>`);
       }
     }
 
@@ -192,7 +211,23 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     if (noteRefs.length === 0) {
       lines.push(`<i>No note references.</i>`);
     } else {
-      // Group by source note id so the user sees which note each ref lives in.
+      // Pre-read source notes (one read per distinct fromNoteId) so reference
+      // snippets can be drawn from the actual line where the citation occurs.
+      // Derivation entries don't need this — their format already conveys intent.
+      const distinctNotes = Array.from(new Set(
+        noteRefs
+          .filter((r) => {
+            const e = this.index.lookup(r.fromClaim);
+            return !(e?.derivedFrom.includes(targetFqid) ?? false);
+          })
+          .map((r) => r.fromNoteId),
+      ));
+      const noteLineMap = new Map<string, string[] | null>();
+      await Promise.all(distinctNotes.map(async (id) => {
+        noteLineMap.set(id, await this.index.getAggregatedNoteLines(id));
+      }));
+
+      // Group refs by source note id.
       const grouped = new Map<string, typeof noteRefs>();
       for (const r of noteRefs) {
         const arr = grouped.get(r.fromNoteId) ?? [];
@@ -202,28 +237,36 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
       for (const [noteId, refs] of grouped) {
         const info = this.index.lookupNote(noteId);
         const typeLabel = info?.noteType ? escapeHtml(info.noteType) : '';
-        const titleLabel = info?.noteTitle ? escapeHtml(info.noteTitle) : escapeHtml(noteId);
+        const titleLabel = info?.noteTitle ? escapeMarkdown(info.noteTitle) : escapeMarkdown(noteId);
         lines.push(`<b>${escapeHtml(noteId)}</b>${typeLabel ? ` — <i>${typeLabel}</i>` : ''}: ${titleLabel}`);
         for (const r of refs) {
           const sourceEntry = this.index.lookup(r.fromClaim);
           const isDerivation = sourceEntry?.derivedFrom.includes(targetFqid) ?? false;
-          const relLabel = isDerivation ? 'derivation' : 'reference';
           const abs = this.index.resolveFilePath(r.filePath) ?? r.filePath;
           const u = vscode.Uri.file(abs).with({ fragment: `L${r.line || 1}` });
 
-          if (sourceEntry) {
-            // Strip the noteId prefix to show just the local claim id.
+          if (isDerivation && sourceEntry) {
+            // Derivation: show local claim id + heading excerpt (current format the user approved).
             const localId = r.fromClaim.startsWith(`${noteId}.`)
               ? r.fromClaim.slice(noteId.length + 1)
               : r.fromClaim;
             const excerpt = this.firstSentence(sourceEntry.heading, 80);
             lines.push(
-              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(localId)}</a> — <i>${relLabel}</i>: ${escapeHtml(excerpt)}`,
+              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(localId)}</a> — <i>derivation</i>: ${escapeMarkdown(excerpt)}`,
             );
           } else {
-            // No containing claim — render as a line reference into the note.
+            // Reference: dim excerpt of the actual citing line, with the
+            // target FQID bolded if we can locate it. The line link stays
+            // on the left as the navigation handle.
+            const noteLines = noteLineMap.get(noteId);
+            const snippet = this.buildReferenceSnippet(noteLines, r.line, targetFqid);
+            const linkText = sourceEntry
+              ? (r.fromClaim.startsWith(`${noteId}.`)
+                  ? r.fromClaim.slice(noteId.length + 1)
+                  : r.fromClaim)
+              : `line ${r.line}`;
             lines.push(
-              `&nbsp;&nbsp;• <a href="${u.toString()}">line ${r.line}</a> — <i>${relLabel}</i>`,
+              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(linkText)}</a> — ${snippet}`,
             );
           }
         }
@@ -231,6 +274,41 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     }
 
     return lines.join('<br>');
+  }
+
+  /**
+   * Return an HTML snippet for the line containing a reference. The
+   * surrounding text is dimmed; the target FQID (if findable in the line
+   * via the same matcher decoration uses) is bolded.
+   */
+  private buildReferenceSnippet(
+    noteLines: string[] | null | undefined,
+    line: number,
+    targetFqid: string,
+  ): string {
+    if (!noteLines || line < 1 || line > noteLines.length) {
+      return `<span style="opacity:0.6"><i>(snippet unavailable)</i></span>`;
+    }
+    const raw = noteLines[line - 1].trim();
+    if (raw.length === 0) {
+      return `<span style="opacity:0.6"><i>(empty line)</i></span>`;
+    }
+    // Use findAllMatches to locate where the citation lives in the line.
+    const matches = findAllMatches(raw, true, this.index.knownShortcodes);
+    const hit = matches.find((m) => m.normalizedId === targetFqid);
+    const truncated = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+
+    if (!hit || hit.start >= truncated.length) {
+      return `<span style="opacity:0.6">${escapeMarkdown(truncated)}</span>`;
+    }
+    const before = truncated.slice(0, hit.start);
+    const matched = truncated.slice(hit.start, Math.min(hit.end, truncated.length));
+    const after = truncated.slice(Math.min(hit.end, truncated.length));
+    return (
+      `<span style="opacity:0.6">${escapeMarkdown(before)}</span>` +
+      `<b>${escapeMarkdown(matched)}</b>` +
+      `<span style="opacity:0.6">${escapeMarkdown(after)}</span>`
+    );
   }
 
   private buildBodyHtml(
@@ -242,13 +320,80 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
   ): string {
     const out: string[] = [];
     out.push(`<b>${escapeHtml(entry.fullyQualified)}</b>`);
-    out.push(`<i>${escapeHtml(entry.noteType)}</i> — ${escapeHtml(noteTitle)}`);
-    out.push(`<a href="${openCmd}">${escapeHtml(entry.noteFilePath)}:${entry.line}</a>`);
+    out.push(`<i>${escapeHtml(entry.noteType)}</i> — ${escapeMarkdown(noteTitle)}`);
+    out.push(`<a href="${openCmd}">${escapeMarkdown(entry.noteFilePath)}:${entry.line}</a>`);
     if (badgeHtml) out.push(badgeHtml);
+    let html = out.join('<br>');
     if (contextText) {
-      out.push(`<pre>${escapeHtml(contextText.trim())}</pre>`);
+      // word-wrap the body excerpt rather than rendering in a <pre> that
+      // forces horizontal scroll. Keep newlines visible via white-space rule.
+      html += `<br><div style="white-space: pre-wrap; word-break: break-word; opacity: 0.95;">${escapeMarkdown(contextText.trim())}</div>`;
     }
-    return out.join('<br>');
+    return html;
+  }
+
+  /**
+   * Render a compact summary for a range expansion like `{AC.01-06}` or
+   * `{R004.§1.AC.01-AC.06}`. One row per expanded member: clickable FQID,
+   * note type, and a heading excerpt — enough to scan the whole range
+   * without dispatching N separate hovers. The same shape can be carried
+   * to the markdown preview tooltip via a `data-claim-range-members` JSON
+   * attribute on the wrapping span; the preview script iterates the same
+   * member list to render the same rows.
+   *
+   * Cross-project ranges (with `match.aliasPrefix`) fall back to a single
+   * line per member showing only the FQID — peer resolution per-member
+   * would round-trip too many file reads for a hover surface.
+   */
+  private async buildClaimRangeHover(
+    match: { normalizedId: string; rangeMembers?: string[]; aliasPrefix?: string },
+    contextNoteId: string | undefined,
+  ): Promise<vscode.MarkdownString> {
+    const md = new vscode.MarkdownString();
+    md.isTrusted = true;
+    md.supportHtml = true;
+
+    const members = match.rangeMembers ?? [match.normalizedId];
+    const first = members[0];
+    const last = members[members.length - 1];
+    const isCrossProject = !!match.aliasPrefix;
+
+    const headerPrefix = isCrossProject ? `\`${match.aliasPrefix}/\` ` : '';
+    md.appendMarkdown(
+      `${headerPrefix}**Range** \`${first}\` – \`${last}\` · *${members.length} claim${members.length !== 1 ? 's' : ''}*\n\n`,
+    );
+
+    if (isCrossProject) {
+      // Listing-only view — peer lookup per member is too expensive on
+      // a hover. The member list still gives the user the full enumerated
+      // address range so they can inspect individually if needed.
+      for (const fqid of members) {
+        md.appendMarkdown(`- \`${match.aliasPrefix}/${fqid}\`\n`);
+      }
+      return md;
+    }
+
+    for (const fqid of members) {
+      const entry = this.index.resolve(fqid, contextNoteId);
+      if (!entry) {
+        md.appendMarkdown(`- **${escapeHtml(fqid)}** — *not in index*\n`);
+        continue;
+      }
+      const noteInfo = this.index.lookupNote(entry.noteId);
+      const noteTitle = noteInfo?.noteTitle;
+      const absPath = this.index.resolveFilePath(entry.noteFilePath);
+      const uri = vscode.Uri.file(absPath);
+      const openCmd = `command:vscode.open?${encodeURIComponent(
+        JSON.stringify([uri, { selection: { startLineNumber: entry.line, startColumn: 1 } }]),
+      )}`;
+      const headingPreview = this.firstSentence(entry.heading, 80);
+      const titlePart = noteTitle ? ` (${escapeMarkdown(noteTitle)})` : '';
+      md.appendMarkdown(
+        `- [**${escapeHtml(entry.fullyQualified)}**](${openCmd}) — *${escapeHtml(entry.noteType)}*${titlePart}: ${escapeMarkdown(headingPreview)}\n`,
+      );
+    }
+
+    return md;
   }
 
   /** Take the first sentence (or up to maxLen characters) for ref previews. */
