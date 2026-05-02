@@ -60,8 +60,11 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       const contextNoteId = currentDocPath ? noteIdFromPath(currentDocPath) : null;
       if (!contextNoteId) return '';
       const claims = index.claimsForNote(contextNoteId);
-      // line0 is 0-indexed; entry.line is 1-indexed.
-      const entry = claims.find((e) => e.line === line0 + 1);
+      // line0 is 0-indexed; entry.line is 1-indexed. When the renderer
+      // is processing an excerpt (a slice of the original document),
+      // _scepterLineOffset shifts line0 onto the original doc's lines.
+      const offset = typeof env?._scepterLineOffset === 'number' ? env._scepterLineOffset : 0;
+      const entry = claims.find((e) => e.line === line0 + 1 + offset);
       if (!entry) return '';
       // Skip if the text-render path already emitted the badge inline.
       const emitted: Set<string> | undefined = env?._scepterBadgesEmitted;
