@@ -239,6 +239,13 @@ export class ClaimIndexCache {
   private noteExcerptCache = new Map<string, string>();
   /** Pre-rendered HTML excerpts for the markdown preview tooltips */
   private htmlExcerptCache = new Map<string, string>();
+  /**
+   * Pre-cached aggregated note contents split into lines, keyed by noteId.
+   * Used by the markdown-it plugin (synchronous, no async access in render
+   * hooks) to build citing-line snippets for the refs panel of the preview
+   * tooltip. Populated alongside the excerpt cache after Phase B.
+   */
+  private noteLinesCache = new Map<string, string[]>();
   /** Standalone markdown-it instance for rendering excerpts (no plugins) */
   private excerptMd: any = null;
   private _onDidRefresh = new vscode.EventEmitter<void>();
@@ -664,6 +671,17 @@ export class ClaimIndexCache {
     return this.htmlExcerptCache.get('claim:' + fqid) ?? null;
   }
 
+  /**
+   * Synchronous accessor for the aggregated content of a note as a line
+   * array. Returns null if the cache hasn't been populated yet (e.g. during
+   * an in-flight refresh) — callers in the markdown-it plugin should
+   * tolerate this and fall back to omitting citing-line snippets rather
+   * than blocking. The async equivalent is `getAggregatedNoteLines`.
+   */
+  getAggregatedNoteLinesSync(noteId: string): string[] | null {
+    return this.noteLinesCache.get(noteId) ?? null;
+  }
+
   private getExcerptRenderer(): any {
     if (!this.excerptMd) {
       try {
@@ -690,18 +708,25 @@ export class ClaimIndexCache {
   private async buildExcerptCache(): Promise<void> {
     const noteExcerpts = new Map<string, string>();
     const htmlExcerpts = new Map<string, string>();
+    const noteLines = new Map<string, string[]>();
 
     const noteIds = Array.from(this.noteMap.keys());
     await mapWithConcurrency(noteIds, 32, async (noteId) => {
       const raw = await this.readNoteExcerpt(noteId, Infinity);
-      if (!raw) return null;
-      noteExcerpts.set(noteId, raw);
-      const lines = raw.split('\n');
-      const capped = lines.length > 50
-        ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*'
-        : raw;
-      const html = this.renderMarkdownToHtml(capped);
-      if (html) htmlExcerpts.set(noteId, html);
+      if (raw) {
+        noteExcerpts.set(noteId, raw);
+        const lines = raw.split('\n');
+        const capped = lines.length > 50
+          ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*'
+          : raw;
+        const html = this.renderMarkdownToHtml(capped);
+        if (html) htmlExcerpts.set(noteId, html);
+      }
+      // Cache aggregated full-content lines (frontmatter and headings
+      // included). The markdown-it plugin needs these to build citing-line
+      // snippets at line offsets reported by the cross-ref index.
+      const aggregated = await this.getAggregatedNoteLines(noteId);
+      if (aggregated) noteLines.set(noteId, aggregated);
       return null;
     });
 
@@ -717,6 +742,7 @@ export class ClaimIndexCache {
 
     this.noteExcerptCache = noteExcerpts;
     this.htmlExcerptCache = htmlExcerpts;
+    this.noteLinesCache = noteLines;
   }
 
   /**
@@ -1420,6 +1446,7 @@ export class ClaimIndexCache {
     this.knownShortcodes = new Set();
     this.noteExcerptCache = new Map();
     this.htmlExcerptCache = new Map();
+    this.noteLinesCache = new Map();
 
     // Reset ready gate
     this.ready = new Promise((resolve) => {
