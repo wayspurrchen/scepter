@@ -547,12 +547,90 @@ export function parseClaimReferences(
     }
   }
 
+  bindAdjacentSectionRefs(references, lines);
+
   return references;
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Bind a bare section reference (no `noteId`) to an immediately-preceding
+ * note reference when the source text places them adjacent. Resolves the
+ * common authoring shape where the note id and section ref are written as
+ * separate tokens but logically form one address:
+ *
+ *   E032 §5.2          → §5.2 binds to E032
+ *   {E032} §5.2        → §5.2 binds to E032
+ *   T057's §1.AC.01-02 → both expanded range members bind to T057
+ *
+ * Conservative rule: binding fires only when the previous distinct-column
+ * ref is a *bare* note ref (note id only — no section, no claim) and the
+ * current ref is a section-only ref (no note id). Allowed gap between the
+ * two tokens: whitespace, optionally preceded by `'s` for the possessive
+ * form. Anything else (commas, parentheses, prose) leaves both refs
+ * untouched. Range expansions share a column, so once the first range
+ * member binds, same-column siblings inherit the binding.
+ *
+ * Only `address.noteId` (and `aliasPrefix` if the prev ref carried one)
+ * is mutated. `address.raw` stays as the literal source text so consumers
+ * that surface raw in messages still echo what the author wrote.
+ */
+function bindAdjacentSectionRefs(refs: ClaimReference[], lines: string[]): void {
+  const byLine = new Map<number, ClaimReference[]>();
+  for (const r of refs) {
+    const arr = byLine.get(r.line) ?? [];
+    arr.push(r);
+    byLine.set(r.line, arr);
+  }
+
+  for (const [lineNo, lineRefs] of byLine) {
+    if (lineRefs.length < 2) continue;
+    lineRefs.sort((a, b) => a.column - b.column);
+    const lineText = lines[lineNo - 1] ?? '';
+
+    for (let i = 0; i < lineRefs.length; i++) {
+      const cur = lineRefs[i];
+
+      // Binding target: section-only ref (no noteId, has sectionPath).
+      if (cur.address.noteId !== undefined) continue;
+      if (!cur.address.sectionPath || cur.address.sectionPath.length === 0) continue;
+
+      // Find the most recent ref in a *distinct* column. Refs that share
+      // cur's column are range-expansion siblings of cur itself; skip past.
+      let j = i - 1;
+      while (j >= 0 && lineRefs[j].column === cur.column) j--;
+      if (j < 0) continue;
+      const prev = lineRefs[j];
+
+      const prevIsBareNote =
+        prev.address.noteId !== undefined &&
+        (!prev.address.sectionPath || prev.address.sectionPath.length === 0) &&
+        prev.address.claimPrefix === undefined;
+      if (!prevIsBareNote) continue;
+
+      // Compute prev's source-text span. Braced refs include {} around raw;
+      // braceless refs span exactly raw.
+      const prevRawLen = prev.address.raw.length;
+      const prevEndExclusive =
+        prev.column - 1 + (prev.braced ? prevRawLen + 2 : prevRawLen);
+      const curStart = cur.column - 1;
+      if (curStart <= prevEndExclusive) continue;
+
+      const between = lineText.slice(prevEndExclusive, curStart);
+      // Allowed gap: optional `'s` (possessive) followed by required whitespace.
+      // Reject anything else — prose, parentheses, commas, etc. break adjacency.
+      if (!/^(?:'s)?\s+$/.test(between)) continue;
+
+      cur.address.noteId = prev.address.noteId;
+      if (prev.address.aliasPrefix !== undefined) {
+        cur.address.aliasPrefix = prev.address.aliasPrefix;
+      }
+    }
+  }
+}
 
 /**
  * Check if a position in a line falls inside curly braces.

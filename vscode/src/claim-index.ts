@@ -551,6 +551,21 @@ export class ClaimIndexCache {
    * Returns the lines from claim start to endLine (plus a few before for heading context).
    * @implements {DD012.§DC.12} Async readClaimContext using core file manager
    */
+  /**
+   * Return the aggregated content of a note as a line array, using the same
+   * note-file-manager path as `readClaimContext` so line numbers align with
+   * the indexer's view of the file (folder notes' companions concatenated).
+   */
+  async getAggregatedNoteLines(noteId: string): Promise<string[] | null> {
+    if (!this.projectManager) return null;
+    try {
+      const content = await this.projectManager.noteFileManager.getAggregatedContents(noteId);
+      return content === null ? null : content.split('\n');
+    } catch {
+      return null;
+    }
+  }
+
   async readClaimContext(entry: ClaimIndexEntry, contextLinesBefore = 1, maxLines = 15): Promise<string | null> {
     try {
       let content: string | null = null;

@@ -13,6 +13,7 @@ import {
   parseClaimReferences,
   parseNoteMentions,
   type ClaimReference,
+  type ClaimAddressParsed,
 } from 'scepter';
 
 export interface ClaimMatch {
@@ -30,12 +31,44 @@ export interface ClaimMatch {
    * @implements {R011.§4.AC.01} alias prefix preserved on ClaimMatch
    */
   aliasPrefix?: string;
+  /**
+   * When the source token expanded to multiple claims (range syntax
+   * like `{AC.01-06}`), the normalized FQIDs for ALL expanded members
+   * in source order. `normalizedId` equals `rangeMembers[0]` for
+   * compatibility with single-claim consumers; range-aware consumers
+   * (hover, preview tooltip) iterate `rangeMembers` to render each
+   * claim in the bundle.
+   */
+  rangeMembers?: string[];
 }
 
 // --- Normalization ---
 
-function normalize(id: string): string {
-  return id.replace(/§/g, '');
+/**
+ * Compute the normalized fully-qualified id from a parsed address.
+ *
+ * Reads `address` fields (noteId, sectionPath, claimPrefix, claimNumber,
+ * claimSubLetter) directly rather than re-parsing `address.raw` — this
+ * is what lets adjacent-section binding take effect downstream. For
+ * `E032 §5.2`, the parser sets `noteId='E032'` on the section ref's
+ * address while leaving raw as `'§5.2'`; deriving from raw alone would
+ * lose the binding.
+ *
+ * Alias prefix is intentionally NOT included — consumers carry it on
+ * the parent ClaimMatch and route cross-project lookups separately.
+ */
+function buildNormalizedId(addr: ClaimAddressParsed): string {
+  const parts: string[] = [];
+  if (addr.noteId) parts.push(addr.noteId);
+  if (addr.sectionPath && addr.sectionPath.length > 0) {
+    parts.push(addr.sectionPath.join('.'));
+  }
+  if (addr.claimPrefix && addr.claimNumber !== undefined) {
+    const num = String(addr.claimNumber).padStart(2, '0');
+    const sub = addr.claimSubLetter ?? '';
+    parts.push(`${addr.claimPrefix}.${num}${sub}`);
+  }
+  return parts.join('.');
 }
 
 // --- Matching functions ---
@@ -82,6 +115,9 @@ export function findAllMatches(
   const allRefs: Array<{
     ref: ClaimReference;
     addr: (typeof refs)[0]['address'];
+    /** Sibling refs at the same column from a range expansion. Length 1
+     *  for non-range refs; >1 means {AC.01-06} or similar. */
+    group: ClaimReference[];
     start: number;
     claimEnd: number;   // end of just the claim ID part (before metadata)
     fullEnd: number;    // end including metadata suffix
@@ -95,7 +131,7 @@ export function findAllMatches(
     if (ref.braced) {
       const braceEnd = lineText.indexOf('}', start) + 1;
       const end = braceEnd > 0 ? braceEnd : start + addr.raw.length + 2;
-      allRefs.push({ ref, addr, start, claimEnd: end, fullEnd: end });
+      allRefs.push({ ref, addr, group, start, claimEnd: end, fullEnd: end });
     } else {
       // claimEnd: just the claim ID (before any : metadata)
       const colonIdx = addr.raw.indexOf(':');
@@ -111,7 +147,7 @@ export function findAllMatches(
         // Just cover the = sign so it renders as plain text
       }
 
-      allRefs.push({ ref, addr, start, claimEnd, fullEnd });
+      allRefs.push({ ref, addr, group, start, claimEnd, fullEnd });
     }
   }
 
@@ -165,14 +201,18 @@ export function findAllMatches(
       kind = 'claim';
     }
 
-    const rawId = addr.raw.split(':')[0]; // strip metadata suffix for ID
+    const rangeMembers = rg.group.length > 1
+      ? rg.group.map((r) => buildNormalizedId(r.address))
+      : undefined;
+
     matches.push({
       raw: lineText.slice(start, claimEnd),
       start,
       end: claimEnd,
-      normalizedId: normalize(rawId),
+      normalizedId: buildNormalizedId(addr),
       kind,
       ...(addr.aliasPrefix ? { aliasPrefix: addr.aliasPrefix } : {}),
+      ...(rangeMembers ? { rangeMembers } : {}),
     });
 
     // Cover the claim span AND the metadata suffix (so :derives= renders as plain text)

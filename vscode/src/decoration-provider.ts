@@ -161,10 +161,15 @@ export class DecorationProvider {
           if (sectionEntry) {
             sections.push({ range });
           } else {
+            // Qualified ids (e.g., E032.5.2 from binding) print as-is;
+            // bare numeric ids print with leading § for the user-facing
+            // form they wrote.
+            const isQualified = /^[A-Z]/.test(match.normalizedId);
+            const display = isQualified ? match.normalizedId : `§${match.normalizedId}`;
             unresolvedList.push({
               range,
               hoverMessage: new vscode.MarkdownString(
-                `*SCEpter section* \`§${match.normalizedId}\` — not found in index`
+                `*SCEpter section* \`${display}\` — not found in index`
               ),
             });
           }
