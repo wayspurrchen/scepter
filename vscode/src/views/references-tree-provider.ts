@@ -5,11 +5,11 @@ import { getTypeIcon } from './notes-tree-provider';
 
 // @implements {DD013.§DC.11} References tree provider
 
-export type RefsTreeElement = RefDirectionGroup | RefNoteItem | RefSourceItem;
+export type RefsTreeElement = RefDirectionGroup | RefNoteItem | RefSourceItem | RefCrossProjectItem;
 
 export interface RefDirectionGroup {
   kind: 'direction';
-  direction: 'outgoing' | 'incoming' | 'source';
+  direction: 'outgoing' | 'incoming' | 'source' | 'cross-project';
   count: number;
   noteId: string;
 }
@@ -27,6 +27,21 @@ export interface RefSourceItem {
   filePath: string;
   refType: string;
   line: number | undefined;
+}
+
+/**
+ * Cross-project (alias-prefixed) outgoing reference. Rendered with a
+ * distinct icon and label to fulfill R011.§4.AC.09's visual-distinction
+ * requirement.
+ *
+ * @implements {R011.§4.AC.09} cross-project outgoing refs distinct in tree view
+ */
+export interface RefCrossProjectItem {
+  kind: 'ref-cross-project';
+  aliasName: string;
+  peerNoteId: string;
+  raw: string;
+  resolved: boolean;
 }
 
 export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeElement> {
@@ -78,12 +93,14 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
         outgoing: 'Outgoing',
         incoming: 'Incoming',
         source: 'Source References',
-      };
+        'cross-project': 'Cross-project Citations',
+      } as const;
       const iconMap = {
         outgoing: 'arrow-right',
         incoming: 'arrow-left',
         source: 'file-code',
-      };
+        'cross-project': 'globe',
+      } as const;
       const isExpanded = this.expandedDirections.has(element.direction);
       const item = new vscode.TreeItem(
         `${labelMap[element.direction]} (${element.count})`,
@@ -114,6 +131,21 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
         };
       }
       item.contextValue = 'refNote';
+      return item;
+    }
+
+    if (element.kind === 'ref-cross-project') {
+      // @implements {R011.§4.AC.09} cross-project ref item rendered distinctly
+      const item = new vscode.TreeItem(
+        `${element.aliasName}/${element.peerNoteId}`,
+        vscode.TreeItemCollapsibleState.None,
+      );
+      item.description = element.resolved ? 'cross-project' : 'cross-project (unresolved)';
+      item.tooltip = new vscode.MarkdownString(
+        `**Cross-project citation**\n\nAlias: \`${element.aliasName}\`\nPeer note: \`${element.peerNoteId}\`\nFull reference: \`${element.raw}\`\n\n${element.resolved ? '*Peer is resolved.*' : '*Peer is unresolved.*'}`,
+      );
+      item.iconPath = new vscode.ThemeIcon('globe');
+      item.contextValue = 'refCrossProject';
       return item;
     }
 
@@ -179,10 +211,20 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
         noteId: this.activeNoteId,
       });
     }
+    // Cross-project (alias-prefixed) outgoing refs.
+    // @implements {R011.§4.AC.09} cross-project outgoing refs distinct
+    if (refs.crossProjectOutgoing.length > 0) {
+      groups.push({
+        kind: 'direction',
+        direction: 'cross-project',
+        count: refs.crossProjectOutgoing.length,
+        noteId: this.activeNoteId,
+      });
+    }
     return groups;
   }
 
-  private getRefsForDirection(group: RefDirectionGroup): (RefNoteItem | RefSourceItem)[] {
+  private getRefsForDirection(group: RefDirectionGroup): (RefNoteItem | RefSourceItem | RefCrossProjectItem)[] {
     const refs = this.index.getReferencesForNote(group.noteId);
 
     if (group.direction === 'outgoing') {
@@ -202,6 +244,16 @@ export class ReferencesTreeProvider implements vscode.TreeDataProvider<RefsTreeE
         noteTitle: ref.noteInfo?.noteTitle ?? ref.noteId,
         noteType: ref.noteInfo?.noteType ?? 'Unknown',
         direction: 'incoming' as const,
+      }));
+    }
+
+    if (group.direction === 'cross-project') {
+      return refs.crossProjectOutgoing.map(cp => ({
+        kind: 'ref-cross-project' as const,
+        aliasName: cp.aliasName,
+        peerNoteId: cp.peerNoteId,
+        raw: cp.raw,
+        resolved: cp.resolved,
       }));
     }
 

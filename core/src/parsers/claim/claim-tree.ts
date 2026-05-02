@@ -52,9 +52,26 @@ export interface ClaimTreeResult {
  * @implements {R005.§2.AC.05} 'reference-to-removed' error type for removed claims with refs
  * @implements {R005.§2.AC.06} 'invalid-supersession-target' error type for unresolvable supersession targets
  * @implements {R005.§2.AC.07} 'multiple-lifecycle' error type for claims with multiple lifecycle tags
+ * @implements {R011.§2.AC.03} 'cross-project-derives' rejected: derivation is per-project
+ * @implements {R011.§2.AC.04} 'cross-project-superseded' rejected: lifecycle authority is per-project
+ * @implements {DD015.§1.DC.09} two distinct error types so DiagnosticsProvider can apply correct severity and carry R011 rationale
  */
 export interface ClaimTreeError {
-  type: 'duplicate' | 'non-monotonic' | 'ambiguous' | 'unresolved-reference' | 'forbidden-form' | 'multiple-lifecycle' | 'invalid-supersession-target' | 'reference-to-removed' | 'unresolvable-derivation-target';
+  type:
+    | 'duplicate'
+    | 'non-monotonic'
+    | 'ambiguous'
+    | 'unresolved-reference'
+    | 'forbidden-form'
+    | 'multiple-lifecycle'
+    | 'invalid-supersession-target'
+    | 'reference-to-removed'
+    | 'unresolvable-derivation-target'
+    | 'cross-project-derives'
+    | 'cross-project-superseded'
+    | 'alias-unknown'
+    | 'peer-unresolved'
+    | 'peer-target-not-found';
   claimId: string;
   line: number;
   message: string;
@@ -216,12 +233,34 @@ export function buildClaimTree(content: string): ClaimTreeResult {
   // Check for table-claims opt-out directive
   const tableClaimsEnabled = !TABLE_CLAIMS_OFF_RE.test(content);
 
-  // First pass: extract all structural nodes (headings + standalone claim lines)
+  // First pass: extract all structural nodes (headings + standalone claim lines).
+  // `isParagraph` distinguishes paragraph-claims and table-row claims (which
+  // are pushed at `currentHeadingLevel + 1` and should terminate at a blank
+  // line) from heading-claims and section nodes (which terminate at the next
+  // markdown heading at a same-or-shallower level).
   const structuralNodes: Array<{
     node: ClaimNode;
     headingLevel: number;
     lineNum: number;
+    isParagraph: boolean;
   }> = [];
+
+  // Track every markdown heading we encounter — even plain non-claim,
+  // non-section headings — so the endLine pass can use them as soft
+  // boundaries. A heading-claim's body must end at the next markdown heading
+  // at a same-or-shallower level whether or not that heading is itself a
+  // structural node. Without this, plain headings like `### Identity
+  // TypeDefinition` between two claim definitions silently leak into the
+  // earlier claim's body (Pattern B in the boundary audit).
+  const allHeadings: Array<{ level: number; lineNum: number }> = [];
+
+  // Pre-compute the set of blank line numbers (1-based) for the
+  // paragraph-claim termination pass. A line is "blank" if it is empty or
+  // contains only whitespace — the markdown paragraph rule.
+  const blankLines: boolean[] = new Array(lines.length + 1).fill(false);
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === '') blankLines[i + 1] = true;
+  }
 
   // Track the current heading level for standalone claim lines
   let currentHeadingLevel = 0;
@@ -237,6 +276,11 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       const text = headingMatch[2].trim();
       currentHeadingLevel = level;
 
+      // Record every markdown heading — including plain ones that don't
+      // match a claim or section pattern — so endLine computation can
+      // terminate heading-claim bodies at the right place.
+      allHeadings.push({ level, lineNum });
+
       // Check for forbidden forms in the heading
       checkForbiddenForm(text, lineNum, errors);
       checkAlphanumericPrefix(text, lineNum, errors);
@@ -245,16 +289,17 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       // Try to match as a claim heading first (more specific)
       const claimNode = tryParseClaimText(text, level, lineNum);
       if (claimNode) {
-        structuralNodes.push({ node: claimNode, headingLevel: level, lineNum });
+        structuralNodes.push({ node: claimNode, headingLevel: level, lineNum, isParagraph: false });
         continue;
       }
 
       // Try to match as a section heading
       const sectionNode = trySectionText(text, level, lineNum);
       if (sectionNode) {
-        structuralNodes.push({ node: sectionNode, headingLevel: level, lineNum });
+        structuralNodes.push({ node: sectionNode, headingLevel: level, lineNum, isParagraph: false });
       }
-      // Plain headings without numeric or claim patterns are skipped
+      // Plain headings without numeric or claim patterns are skipped from
+      // structuralNodes but still recorded in allHeadings above.
       continue;
     }
 
@@ -284,6 +329,7 @@ export function buildClaimTree(content: string): ClaimTreeResult {
             node: claimNode,
             headingLevel: currentHeadingLevel + 1,
             lineNum,
+            isParagraph: true,
           });
         }
       }
@@ -305,6 +351,7 @@ export function buildClaimTree(content: string): ClaimTreeResult {
           node: claimNode,
           headingLevel: currentHeadingLevel + 1,
           lineNum,
+          isParagraph: true,
         });
       }
     } else if (strippedLine.length > 0 && LINE_ALPHANUMERIC_PREFIX_RE.test(strippedLine)) {
@@ -326,14 +373,39 @@ export function buildClaimTree(content: string): ClaimTreeResult {
     return { roots, claims, sections, errors };
   }
 
-  // Second pass: compute endLine for each node
+  // Second pass: compute endLine for each node.
+  //
+  // Three rules apply, and the *minimum* (tightest) of the applicable caps
+  // wins — every cap is a "no later than" upper bound.
+  //
+  //   1. Structural-sibling fallback (preserved from prior behavior): the
+  //      next structural node at same-or-shallower level terminates the body.
+  //      If the next node is deeper, walk forward until one at same-or-
+  //      shallower level is found.
+  //
+  //   2. Heading-claim termination: a heading-claim or section node's body
+  //      ends at the next markdown heading at level ≤ its own level — even
+  //      if that heading is plain prose (not a claim or section). Without
+  //      this, a `### Identity TypeDefinition` heading sandwiched between
+  //      two claim definitions silently leaks into the previous claim's
+  //      body. This is Pattern B from the boundary audit
+  //      (~15-20% of real claims).
+  //
+  //   3. Paragraph-claim termination: a paragraph-claim's body ends at the
+  //      first blank line after its definition — the markdown paragraph
+  //      rule. Without this, a paragraph-claim embedded inside a heading-
+  //      claim's body (e.g. a §1.PERF.01 sentence inside §1.DC.01's cypher
+  //      fence in DD006) attributes ~18 unrelated lines that semantically
+  //      belong to the enclosing heading-claim. This is Pattern C from the
+  //      audit. Table-row claims also use this rule — they have the
+  //      `isParagraph: true` flag — but in practice the next-row sibling
+  //      always terminates first since table rows are not separated by
+  //      blank lines.
   for (let i = 0; i < structuralNodes.length; i++) {
     const current = structuralNodes[i];
     let endLine = lines.length;
 
-    // For claim nodes that are paragraph-level (not headings), endLine extends to
-    // the next structural node or the next blank line (whichever comes first),
-    // unless the next structural element is at a deeper level.
+    // Rule 1: structural-sibling fallback.
     if (i + 1 < structuralNodes.length) {
       const next = structuralNodes[i + 1];
       if (next.headingLevel <= current.headingLevel) {
@@ -348,6 +420,38 @@ export function buildClaimTree(content: string): ClaimTreeResult {
         }
       }
     }
+
+    // Rule 2: tighten to next markdown heading at same-or-shallower level
+    // for heading-claim and section nodes. Paragraph-claims should NOT use
+    // their pseudo-level (currentHeadingLevel + 1) here because that would
+    // make a deeper plain heading like `#### Detail` terminate them — too
+    // tight and inconsistent with the paragraph-claim rule below. Instead,
+    // paragraph-claims rely on Rule 3.
+    if (!current.isParagraph) {
+      for (const h of allHeadings) {
+        if (h.lineNum <= current.lineNum) continue;
+        if (h.level <= current.headingLevel) {
+          if (h.lineNum - 1 < endLine) endLine = h.lineNum - 1;
+          break;
+        }
+      }
+    }
+
+    // Rule 3: tighten to first blank line for paragraph-claims (and table-
+    // row claims). The body of a paragraph claim ends at the first blank
+    // line after its starting line, exclusive of the blank itself. If no
+    // blank line is found before EOF the existing endLine stands.
+    if (current.isParagraph) {
+      for (let k = current.lineNum + 1; k <= lines.length; k++) {
+        if (blankLines[k]) {
+          if (k - 1 < endLine) endLine = k - 1;
+          break;
+        }
+      }
+    }
+
+    // Defensive floor: endLine must not precede the claim's own line.
+    if (endLine < current.lineNum) endLine = current.lineNum;
 
     current.node.endLine = endLine;
   }
@@ -468,9 +572,13 @@ function tryParseClaimText(text: string, level: number, lineNum: number): ClaimN
   // Check immediately after claim ID first (e.g., §AC.01:5 description),
   // then fall back to end-of-text (e.g., §AC.01 description:5)
   const afterClaimId = text.substring(claimMatch[0].length);
-  let metadataMatch = afterClaimId.match(/^:([A-Za-z0-9=_.§-]+(?::[A-Za-z0-9=_.§-]+)*)/);
+  // `/` permitted in metadata values for cross-project alias targets; see
+  // claim-parser.ts parseMetadataSuffix for the source of truth on charset.
+  // @implements {R011.§2.AC.03} parser captures cross-project derives= targets
+  // @implements {R011.§2.AC.04} parser captures cross-project superseded= targets
+  let metadataMatch = afterClaimId.match(/^:([A-Za-z0-9=_.§/-]+(?::[A-Za-z0-9=_.§/-]+)*)/);
   if (!metadataMatch) {
-    metadataMatch = text.match(/:([A-Za-z0-9=_.§-]+(?::[A-Za-z0-9=_.§-]+)*)$/);
+    metadataMatch = text.match(/:([A-Za-z0-9=_.§/-]+(?::[A-Za-z0-9=_.§/-]+)*)$/);
   }
   const metadata = metadataMatch
     ? metadataMatch[1].split(':').filter((s) => s.length > 0)

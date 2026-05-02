@@ -122,6 +122,31 @@ export interface SourceCodeIntegrationConfig {
   validateOnStartup?: boolean;
 }
 
+/**
+ * Object form of a project alias target. The `path` field is required;
+ * additional fields (description, future extensions) are optional. The
+ * shorthand string form (`"alias": "../peer"`) is equivalent to
+ * `{ path: "../peer" }`.
+ *
+ * @implements {R011.§1.AC.01} projectAliases target shape
+ * @implements {R011.§1.AC.02} object form leaves room for future fields
+ */
+export interface ProjectAliasTarget {
+  /** Filesystem path to a peer SCEpter project root. Resolved relative to the
+   * config file's directory; supports absolute paths and `~` expansion. */
+  path: string;
+  /** Optional human-readable description of the peer project. */
+  description?: string;
+}
+
+/**
+ * Discriminated value form for a single alias entry. The string form is
+ * shorthand for `{ path: <string> }`; the object form permits extension.
+ *
+ * @implements {R011.§1.AC.02} string-or-object alias value
+ */
+export type ProjectAliasValue = string | ProjectAliasTarget;
+
 export interface SCEpterConfig {
   noteTypes: Record<string, NoteTypeConfig>;
   notes?: NotesConfig;
@@ -133,6 +158,18 @@ export interface SCEpterConfig {
   sourceCodeIntegration?: SourceCodeIntegrationConfig;
   statusMappings?: Record<string, StatusMapping | string>;
   folderNotesEnabled?: boolean; // Global enable/disable for folder-based notes (defaults to true)
+
+  /**
+   * Map from alias name to peer SCEpter project. Aliases declared here
+   * may be used as a `<alias>/<reference>` prefix in note content and
+   * code annotations to cite peer-project notes and claims for display.
+   * Read-only citation only — peer claims do not enter the local index,
+   * derivation graph, gap report, or trace matrix.
+   *
+   * @implements {R011.§1.AC.01} projectAliases configuration field
+   * @implements {DD015.§1.DC.02} field name `projectAliases` (camelCase, matches existing convention)
+   */
+  projectAliases?: Record<string, ProjectAliasValue>;
 
   /**
    * Directories to scan for notes. Each entry is relative to the project root.

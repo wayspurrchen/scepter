@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 // @implements {DD012.§DC.04} Import domain types from core barrel instead of duplicating
-import type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, ClaimTreeError, ClaimNode, SourceReference, TraceabilityMatrix, ConfidenceAuditResult } from 'scepter';
+import type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, ClaimTreeError, ClaimNode, SourceReference, TraceabilityMatrix, ConfidenceAuditResult, Note } from 'scepter';
 // @implements {DD012.§DC.07} ProjectManager as composition root
 // @implements {DD012.§DC.08} ClaimIndex.build from core
 // @implements {DD012.§DC.10} Note content reading via core
@@ -15,8 +15,30 @@ import {
   buildTraceabilityMatrix,
   auditConfidence,
 } from 'scepter';
+import { noteIdFromPath } from './patterns';
 
 export type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, ClaimTreeError, ClaimNode, SourceReference, TraceabilityMatrix, ConfidenceAuditResult };
+
+// Bounded-concurrency parallel map. Used to keep file-read storms inside
+// a sane handle/CPU budget while still being far faster than sequential
+// awaits on multi-thousand-note projects.
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 /**
  * A section heading in a note, with enough metadata to render hovers,
@@ -43,10 +65,29 @@ export interface SectionWithClaims {
   claims: ClaimIndexEntry[];
 }
 
+/**
+ * A cross-project outgoing reference appearing in a local note. Per
+ * R011.§4.AC.09, these MAY appear in the per-note outgoing-references
+ * listing as long as they are visually distinguished from local refs.
+ *
+ * @implements {R011.§4.AC.09} cross-project outgoing refs in references view
+ */
+export interface CrossProjectOutgoingRef {
+  aliasName: string;
+  peerNoteId: string;
+  /** The full raw reference (e.g., `vendor-lib/R005.§1.AC.01`). */
+  raw: string;
+  resolved: boolean;
+}
+
 export interface NoteReferences {
   outgoing: Array<{ noteId: string; noteInfo: NoteInfo | undefined }>;
   incoming: Array<{ noteId: string; noteInfo: NoteInfo | undefined }>;
   source: SourceReference[];
+  /** Cross-project (alias-prefixed) outgoing references — kept SEPARATE
+   * from `outgoing` so consumers can render them with a distinct badge
+   * per R011.§4.AC.09. */
+  crossProjectOutgoing: CrossProjectOutgoingRef[];
 }
 
 export interface TraceResult {
@@ -136,9 +177,39 @@ function extractNoteTitle(filePath: string, projectDir: string): string {
  * Manages the cached claim index using the core library API directly.
  * @implements {DD012.§DC.07} ProjectManager as composition root
  */
+/**
+ * A resolved cross-project alias entry. Mirrors the core's
+ * `AliasResolution` shape but flattened for the extension's display
+ * needs.
+ *
+ * @implements {R011.§4.AC.02} extension-side alias map
+ */
+export interface AliasMapEntry {
+  aliasName: string;
+  resolvedPath: string;
+  resolved: boolean;
+  /** When `resolved` is false, a human-readable reason. */
+  unresolvedReason?: string;
+  description?: string;
+}
+
+/** Cross-project lookup result for the extension providers. */
+export type CrossProjectLookup =
+  | { ok: true; entry: ClaimIndexEntry; aliasName: string; peerPath: string }
+  | { ok: true; note: NoteInfo; aliasName: string; peerPath: string }
+  | { ok: false; reason: string; aliasName: string };
+
 export class ClaimIndexCache {
   private entries = new Map<string, ClaimIndexEntry>();
   private crossRefs: ClaimCrossReference[] = [];
+  /**
+   * Cross-project (alias-prefixed) references encountered in local
+   * notes' content. Kept SEPARATE from `crossRefs` so they don't
+   * pollute the local trace matrix or gap report per R011.§3.AC.04.
+   *
+   * @implements {R011.§3.AC.03} cross-project refs tracked separately
+   */
+  private crossProjectRefs: ClaimIndexData['crossProjectRefs'] = [];
   private noteMap = new Map<string, NoteInfo>();
   /** Section headings, keyed by fqid (`R005.1`, `DD036.2.3`, …). */
   private sections = new Map<string, SectionEntry>();
@@ -146,6 +217,14 @@ export class ClaimIndexCache {
   private latestErrors: ClaimTreeError[] = [];
   /** Reverse index: bare claim suffix (e.g. "DC.01") → fully qualified IDs */
   private suffixIndex = new Map<string, string[]>();
+  /**
+   * Alias map populated from the loaded config's `projectAliases` at
+   * refresh time. Used by hover/definition/decoration/diagnostics
+   * providers to determine whether an alias is declared and resolved.
+   *
+   * @implements {R011.§4.AC.02} extension-side alias map
+   */
+  private aliasMap = new Map<string, AliasMapEntry>();
   projectDir: string;
   private outputChannel: vscode.OutputChannel;
   private projectManager: ProjectManager | null = null;
@@ -207,6 +286,153 @@ export class ClaimIndexCache {
   /** Look up a note by its ID (e.g. "R004", "T001"). */
   lookupNote(noteId: string): NoteInfo | undefined {
     return this.noteMap.get(noteId);
+  }
+
+  /**
+   * Get the alias resolution entry for the given alias name, or
+   * `undefined` if the alias is not declared in `projectAliases`.
+   *
+   * @implements {R011.§4.AC.02} extension-side alias map query
+   */
+  getAlias(aliasName: string): AliasMapEntry | undefined {
+    return this.aliasMap.get(aliasName);
+  }
+
+  /** All declared aliases — for diagnostics and the openConfig command. */
+  getAllAliases(): AliasMapEntry[] {
+    return Array.from(this.aliasMap.values());
+  }
+
+  /**
+   * Resolve a cross-project reference to a peer note or peer claim.
+   * The peer's project is loaded lazily via the core's
+   * `peerResolver`, which caches loads for the lifetime of the
+   * extension's `ProjectManager` instance.
+   *
+   * Pass either:
+   *   - `{ noteId: 'R042' }` to look up a peer note by ID
+   *   - `{ noteId: 'R005', sectionPath: [1], claimPrefix: 'AC', claimNumber: 1 }` to look up a claim
+   *
+   * Returns a `CrossProjectLookup` discriminated by the `ok` flag.
+   *
+   * @implements {R011.§4.AC.07} lazy peer-index cache via core resolver
+   */
+  async resolveCrossProject(
+    aliasName: string,
+    address: { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number; claimSubLetter?: string },
+  ): Promise<CrossProjectLookup> {
+    if (!this.projectManager) {
+      return { ok: false, reason: 'Project manager not initialized', aliasName };
+    }
+    const resolver = this.projectManager.peerResolver;
+    if (address.claimPrefix !== undefined && address.claimNumber !== undefined) {
+      const claimResult = await resolver.lookupClaim({
+        raw: `${aliasName}/${address.noteId}`,
+        aliasPrefix: aliasName,
+        noteId: address.noteId,
+        sectionPath: address.sectionPath,
+        claimPrefix: address.claimPrefix,
+        claimNumber: address.claimNumber,
+        ...(address.claimSubLetter ? { claimSubLetter: address.claimSubLetter } : {}),
+      });
+      if (claimResult.ok) {
+        return { ok: true, entry: claimResult.entry, aliasName, peerPath: claimResult.peer.resolvedPath };
+      }
+      return { ok: false, reason: claimResult.message, aliasName };
+    }
+    const noteResult = await resolver.lookupNote(aliasName, address.noteId);
+    if (noteResult.ok) {
+      const peer = noteResult.note;
+      // Map the peer Note to a NoteInfo. We don't have claimCount easily
+      // available without rebuilding the peer index here; report 0 to
+      // signal "unknown" without mis-counting.
+      return {
+        ok: true,
+        note: {
+          noteId: peer.id,
+          noteType: peer.type ?? '',
+          noteFilePath: peer.filePath ?? '',
+          noteTitle: peer.title ?? peer.id,
+          claimCount: 0,
+        },
+        aliasName,
+        peerPath: noteResult.peer.resolvedPath,
+      };
+    }
+    return { ok: false, reason: noteResult.message, aliasName };
+  }
+
+  /**
+   * Validate cross-project references and produce ClaimTreeError
+   * entries for alias-unknown / peer-unresolved / peer-target-not-found.
+   * Mirrors the logic in `lint-command.validateAliasReferences` but is
+   * used for the diagnostics-provider integration.
+   *
+   * @implements {R011.§4.AC.06} alias-validation errors as diagnostics
+   */
+  private async validateCrossProjectReferences(
+    refs: ClaimIndexData['crossProjectRefs'],
+  ): Promise<ClaimTreeError[]> {
+    if (!this.projectManager) return [];
+    const out: ClaimTreeError[] = [];
+    for (const ref of refs) {
+      const aliasName = ref.aliasPrefix;
+      const addr = ref.address;
+      const aliasEntry = this.aliasMap.get(aliasName);
+      if (!aliasEntry) {
+        out.push({
+          type: 'alias-unknown',
+          claimId: addr.raw,
+          line: ref.line,
+          message: `Alias '${aliasName}' is not declared in projectAliases.`,
+          noteId: ref.fromNoteId,
+          noteFilePath: ref.filePath,
+        });
+        continue;
+      }
+      if (!aliasEntry.resolved) {
+        out.push({
+          type: 'peer-unresolved',
+          claimId: addr.raw,
+          line: ref.line,
+          message: aliasEntry.unresolvedReason ?? `Peer project for alias '${aliasName}' is unresolved.`,
+          noteId: ref.fromNoteId,
+          noteFilePath: ref.filePath,
+        });
+        continue;
+      }
+      // Peer is reachable. Check the note (and claim) exists.
+      try {
+        if (addr.claimPrefix !== undefined && addr.claimNumber !== undefined) {
+          const r = await this.projectManager.peerResolver.lookupClaim(addr);
+          if (!r.ok) {
+            out.push({
+              type: 'peer-target-not-found',
+              claimId: addr.raw,
+              line: ref.line,
+              message: r.message,
+              noteId: ref.fromNoteId,
+              noteFilePath: ref.filePath,
+            });
+          }
+        } else if (addr.noteId) {
+          const r = await this.projectManager.peerResolver.lookupNote(aliasName, addr.noteId);
+          if (!r.ok) {
+            out.push({
+              type: 'peer-target-not-found',
+              claimId: addr.raw,
+              line: ref.line,
+              message: r.message,
+              noteId: ref.fromNoteId,
+              noteFilePath: ref.filePath,
+            });
+          }
+        }
+      } catch (err) {
+        this.outputChannel.appendLine(`[ClaimIndex] cross-project lookup failed: ${(err as Error).message}`);
+      }
+    }
+    return out;
   }
 
   /**
@@ -339,8 +565,16 @@ export class ClaimIndexCache {
       }
       const lines = content.split('\n');
 
+      // entry.endLine is the parser-computed boundary (next sibling claim,
+      // shallower heading, or end of file). Treat maxLines as a safety cap,
+      // not a fixed window — the previous arithmetic algebraically reduced
+      // to `entry.line + maxLines`, ignoring endLine entirely and spilling
+      // the excerpt into following claims on long notes.
       const startLine = Math.max(0, entry.line - 1 - contextLinesBefore);
-      const endLine = Math.min(lines.length, (entry.endLine || entry.line) + maxLines - (entry.endLine - entry.line));
+      const claimEnd = entry.endLine && entry.endLine >= entry.line
+        ? entry.endLine
+        : entry.line + maxLines - 1;
+      const endLine = Math.min(lines.length, claimEnd, entry.line + maxLines - 1);
       const contextLines = lines.slice(startLine, endLine);
 
       return contextLines.join('\n');
@@ -439,35 +673,35 @@ export class ClaimIndexCache {
   }
 
   private async buildExcerptCache(): Promise<void> {
-    this.noteExcerptCache = new Map();
-    this.htmlExcerptCache = new Map();
+    const noteExcerpts = new Map<string, string>();
+    const htmlExcerpts = new Map<string, string>();
 
-    // Note excerpts: full content sans frontmatter/title
-    for (const [noteId] of this.noteMap) {
+    const noteIds = Array.from(this.noteMap.keys());
+    await mapWithConcurrency(noteIds, 32, async (noteId) => {
       const raw = await this.readNoteExcerpt(noteId, Infinity);
-      if (raw) {
-        this.noteExcerptCache.set(noteId, raw);
-        // Pre-render to HTML for preview tooltips (cap at ~50 lines for attribute size)
-        const lines = raw.split('\n');
-        const capped = lines.length > 50 ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*' : raw;
-        const html = this.renderMarkdownToHtml(capped);
-        if (html) {
-          this.htmlExcerptCache.set(noteId, html);
-        }
-      }
-    }
+      if (!raw) return null;
+      noteExcerpts.set(noteId, raw);
+      const lines = raw.split('\n');
+      const capped = lines.length > 50
+        ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*'
+        : raw;
+      const html = this.renderMarkdownToHtml(capped);
+      if (html) htmlExcerpts.set(noteId, html);
+      return null;
+    });
 
-    // Claim contexts
-    for (const [fqid, entry] of this.entries) {
+    const entries = Array.from(this.entries.entries());
+    await mapWithConcurrency(entries, 32, async ([fqid, entry]) => {
       const raw = await this.readClaimContext(entry, 1, 200);
-      if (raw) {
-        this.noteExcerptCache.set('claim:' + fqid, raw);
-        const html = this.renderMarkdownToHtml(raw);
-        if (html) {
-          this.htmlExcerptCache.set('claim:' + fqid, html);
-        }
-      }
-    }
+      if (!raw) return null;
+      noteExcerpts.set('claim:' + fqid, raw);
+      const html = this.renderMarkdownToHtml(raw);
+      if (html) htmlExcerpts.set('claim:' + fqid, html);
+      return null;
+    });
+
+    this.noteExcerptCache = noteExcerpts;
+    this.htmlExcerptCache = htmlExcerpts;
   }
 
   /**
@@ -514,6 +748,176 @@ export class ClaimIndexCache {
     }
   }
 
+  /**
+   * Refresh the alias map from the loaded config's projectAliases.
+   * Cheap and safe to call from either Phase A or Phase B.
+   *
+   * @implements {R011.§4.AC.02} extension reloads alias map on refresh
+   * @implements {DD015.§1.DC.06} extension reads alias map from in-process ConfigManager (no CLI JSON serialization)
+   */
+  private refreshAliasMap(): void {
+    if (!this.projectManager) return;
+    const next = new Map<string, AliasMapEntry>();
+    try {
+      const resolutions = this.projectManager.configManager.getAllAliasResolutions();
+      for (const r of resolutions) {
+        next.set(r.aliasName, {
+          aliasName: r.aliasName,
+          resolvedPath: r.resolvedPath,
+          resolved: r.resolved,
+          unresolvedReason: r.resolved ? undefined : r.message,
+          description: r.resolved ? r.description : undefined,
+        });
+      }
+    } catch (err) {
+      // Older builds may not have getAllAliasResolutions; leave map empty.
+      this.outputChannel.appendLine(`[ClaimIndex] alias map skipped: ${(err as Error).message}`);
+    }
+    this.aliasMap = next;
+  }
+
+  /**
+   * Compute the derived cache structures (sections, suffixIndex, noteMap)
+   * from a built ClaimIndexData and the corresponding note list. Returns
+   * locally-built maps so callers can swap them in atomically.
+   *
+   * Used by both Phase A (single-note partial build) and Phase B (full
+   * corpus build) of `refresh()`.
+   */
+  private computeDerivedIndex(
+    data: ClaimIndexData,
+    allNotes: readonly Note[],
+  ): {
+    sections: Map<string, SectionEntry>;
+    suffixIndex: Map<string, string[]>;
+    noteMap: Map<string, NoteInfo>;
+  } {
+    // Sections: per-note trees so qualified section refs like {R005.§1}
+    // resolve to a heading + line + content.
+    const sections = new Map<string, SectionEntry>();
+    const noteTypes = data.noteTypes ?? new Map<string, string>();
+    const noteFilePaths = new Map<string, string>();
+    for (const note of allNotes) {
+      if (note.filePath) noteFilePaths.set(note.id, note.filePath);
+    }
+    for (const [noteId, roots] of data.trees) {
+      const noteType = noteTypes.get(noteId) ?? '';
+      const noteFilePath = noteFilePaths.get(noteId) ?? '';
+      collectSections(roots, (node, path) => {
+        const sectionId = path.join('.');
+        const fqid = `${noteId}.${sectionId}`;
+        sections.set(fqid, {
+          fqid,
+          noteId,
+          sectionId,
+          sectionPath: [...path],
+          heading: node.heading,
+          line: node.line,
+          endLine: node.endLine,
+          noteFilePath,
+          noteType,
+        });
+      });
+    }
+
+    // Suffix index: bare claim ID → FQIDs.
+    const suffixIndex = new Map<string, string[]>();
+    for (const [fqid, entry] of data.entries) {
+      const bareId = `${entry.claimPrefix}.${String(entry.claimNumber).padStart(2, '0')}${entry.claimSubLetter ?? ''}`;
+      const existing = suffixIndex.get(bareId) ?? [];
+      existing.push(fqid);
+      suffixIndex.set(bareId, existing);
+
+      // Also index by claimId (which includes section: "1.AC.01")
+      if (entry.claimId !== bareId) {
+        const byClaimId = suffixIndex.get(entry.claimId) ?? [];
+        byClaimId.push(fqid);
+        suffixIndex.set(entry.claimId, byClaimId);
+      }
+    }
+
+    // Note-level map — include ALL notes, not just those with claims.
+    const noteMap = new Map<string, NoteInfo>();
+    const noteLookup = new Map(allNotes.map(n => [n.id, n]));
+
+    if (data.noteTypes) {
+      for (const [noteId, noteType] of data.noteTypes) {
+        const note = noteLookup.get(noteId);
+        const filePath = note?.filePath || '';
+        noteMap.set(noteId, {
+          noteId,
+          noteType,
+          noteFilePath: filePath,
+          noteTitle: filePath ? extractNoteTitle(filePath, this.projectDir) : noteId,
+          claimCount: 0,
+        });
+      }
+    }
+
+    for (const entry of data.entries.values()) {
+      let info = noteMap.get(entry.noteId);
+      if (!info) {
+        info = {
+          noteId: entry.noteId,
+          noteType: entry.noteType,
+          noteFilePath: entry.noteFilePath,
+          noteTitle: extractNoteTitle(entry.noteFilePath, this.projectDir),
+          claimCount: 0,
+        };
+        noteMap.set(entry.noteId, info);
+      }
+      if (!info.noteFilePath) {
+        info.noteFilePath = entry.noteFilePath;
+        info.noteTitle = extractNoteTitle(entry.noteFilePath, this.projectDir);
+      }
+      info.claimCount++;
+    }
+
+    return { sections, suffixIndex, noteMap };
+  }
+
+  /**
+   * Atomically swap a freshly-built ClaimIndexData and its derived caches
+   * into the live fields. Done in a single synchronous block so subscribers
+   * never observe torn state across `entries` / `sections` / `suffixIndex` /
+   * `noteMap`.
+   */
+  private applyClaimIndexData(
+    data: ClaimIndexData,
+    allNotes: readonly Note[],
+    coreClaimIndex: ClaimIndex | null,
+  ): void {
+    const { sections, suffixIndex, noteMap } = this.computeDerivedIndex(data, allNotes);
+    this.entries = data.entries;
+    this.crossRefs = data.crossRefs ?? [];
+    this.crossProjectRefs = data.crossProjectRefs ?? [];
+    this.sections = sections;
+    this.suffixIndex = suffixIndex;
+    this.noteMap = noteMap;
+    if (coreClaimIndex) {
+      this.coreClaimIndex = coreClaimIndex;
+    }
+  }
+
+  /**
+   * Identify the active editor's note ID, if and only if it points at a
+   * markdown file inside this project. Returns null when there's no active
+   * editor, the file isn't markdown, the path is outside the project, or
+   * no note ID can be parsed from the basename.
+   */
+  private getActiveNoteId(): string | null {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return null;
+    const doc = editor.document;
+    if (doc.languageId !== 'markdown' && !doc.fileName.toLowerCase().endsWith('.md')) {
+      return null;
+    }
+    const fsPath = doc.uri.fsPath;
+    const rel = path.relative(this.projectDir, fsPath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
+    return noteIdFromPath(fsPath);
+  }
+
   // @implements {DD012.§DC.08} ClaimIndex.build from core library
   async refresh(): Promise<void> {
     try {
@@ -530,7 +934,9 @@ export class ClaimIndexCache {
       // Force the underlying caches to re-read from disk. Without this,
       // getAllNotes() returns the in-memory index built at activation time
       // and "Refresh claim index" appears to do nothing for files added or
-      // changed since startup.
+      // changed since startup. Phase A (active-file priority) also depends
+      // on noteFileManager.getAggregatedContents working, which requires
+      // the file index to be present.
       await this.projectManager.noteManager.rescan();
       await this.projectManager.noteFileManager.buildIndex();
       if (this.projectManager.sourceScanner) {
@@ -540,25 +946,128 @@ export class ClaimIndexCache {
         );
       }
 
-      // Get all notes and build NoteWithContent array.
-      // Use aggregated contents so folder-note claims defined in companion
-      // files (e.g. DD052/07-module-inventory.md) are indexed under the
-      // parent note's ID. Without this, only claims in the main file appear.
       const allNotes = await this.projectManager.noteManager.getAllNotes();
-      const notesWithContent: NoteWithContent[] = [];
-      for (const note of allNotes) {
-        const content = await this.projectManager.noteFileManager.getAggregatedContents(note.id);
-        if (content !== null) {
-          notesWithContent.push({
-            id: note.id,
-            type: note.type,
-            filePath: note.filePath || '',
-            content,
-          });
+      const fileManager = this.projectManager.noteFileManager;
+
+      // Alias map is sourced from config and is cheap; populate up-front so
+      // both phases see resolved aliases.
+      this.refreshAliasMap();
+
+      // -------- Phase A: active-file priority -----------------------------
+      // Build a partial index over JUST the active file's content so badges,
+      // hovers, and decorations light up before the full corpus is parsed.
+      // Cross-refs *to* the active note's claims won't be populated yet
+      // (we haven't scanned other files); Phase B fixes that.
+      //
+      // Phase A *merges* into existing caches rather than replacing them, so
+      // a debounced re-refresh doesn't transiently wipe data for non-active
+      // notes between Phase A and Phase B. On first refresh the prior caches
+      // are empty, so merge == replace and the active file's data lights up
+      // immediately.
+      const activeNoteId = this.getActiveNoteId();
+      if (activeNoteId) {
+        const phaseAStart = Date.now();
+        const activeNote = allNotes.find((n) => n.id === activeNoteId);
+        if (activeNote) {
+          try {
+            const content = await fileManager.getAggregatedContents(activeNoteId);
+            if (content !== null) {
+              const partial: NoteWithContent[] = [{
+                id: activeNote.id,
+                type: activeNote.type,
+                filePath: activeNote.filePath || '',
+                content,
+              }];
+              const partialIndex = new ClaimIndex();
+              const partialData = partialIndex.build(partial);
+              const partialDerived = this.computeDerivedIndex(partialData, [activeNote]);
+
+              // Atomic merge into live caches. Drop any prior entries /
+              // sections / suffix index buckets that belonged to the active
+              // note, then layer the freshly-parsed ones on top. Other notes'
+              // data is preserved untouched.
+              const nextEntries = new Map(this.entries);
+              for (const [fqid, entry] of nextEntries) {
+                if (entry.noteId === activeNoteId) nextEntries.delete(fqid);
+              }
+              for (const [fqid, entry] of partialData.entries) {
+                nextEntries.set(fqid, entry);
+              }
+
+              const nextSections = new Map(this.sections);
+              for (const [fqid, section] of nextSections) {
+                if (section.noteId === activeNoteId) nextSections.delete(fqid);
+              }
+              for (const [fqid, section] of partialDerived.sections) {
+                nextSections.set(fqid, section);
+              }
+
+              // Suffix index: rebuild from nextEntries since buckets can mix
+              // FQIDs from multiple notes per key. Cheap relative to parsing.
+              const nextSuffix = new Map<string, string[]>();
+              for (const [fqid, entry] of nextEntries) {
+                const bareId = `${entry.claimPrefix}.${String(entry.claimNumber).padStart(2, '0')}${entry.claimSubLetter ?? ''}`;
+                const existingBare = nextSuffix.get(bareId) ?? [];
+                existingBare.push(fqid);
+                nextSuffix.set(bareId, existingBare);
+                if (entry.claimId !== bareId) {
+                  const existingByClaimId = nextSuffix.get(entry.claimId) ?? [];
+                  existingByClaimId.push(fqid);
+                  nextSuffix.set(entry.claimId, existingByClaimId);
+                }
+              }
+
+              const nextNoteMap = new Map(this.noteMap);
+              const partialActiveInfo = partialDerived.noteMap.get(activeNoteId);
+              if (partialActiveInfo) {
+                nextNoteMap.set(activeNoteId, partialActiveInfo);
+              }
+
+              this.entries = nextEntries;
+              this.sections = nextSections;
+              this.suffixIndex = nextSuffix;
+              this.noteMap = nextNoteMap;
+              // Leave coreClaimIndex untouched: trace() / getTraceabilityData()
+              // would return half-corpus answers if we swapped it now.
+              // Leave crossRefs / crossProjectRefs / latestErrors untouched
+              // for the same reason — Phase B replaces them.
+
+              this.outputChannel.appendLine(
+                `[ClaimIndex] Phase A (${activeNoteId}): ${partialData.entries.size} claims merged in ${Date.now() - phaseAStart}ms — partial index visible`,
+              );
+
+              // Wake any waiters and let subscribers re-render with what we
+              // have so far. Phase B will fire again with the full corpus.
+              this.resolveReady();
+              this._onDidRefresh.fire();
+            }
+          } catch (err) {
+            this.outputChannel.appendLine(
+              `[ClaimIndex] Phase A skipped: ${(err as Error).message}`,
+            );
+          }
         }
+      } else {
+        this.outputChannel.appendLine('[ClaimIndex] Phase A skipped: no active markdown editor');
       }
 
-      // Build claim index using core library
+      // -------- Phase B: full corpus build --------------------------------
+      // Use aggregated contents so folder-note claims defined in companion
+      // files (e.g. DD052/07-module-inventory.md) are indexed under the
+      // parent note's ID. Reads are parallelized with bounded concurrency —
+      // sequential awaits were the dominant cost on multi-thousand-note
+      // projects (DD012 §perf).
+      const phaseBStart = Date.now();
+      const aggregated = await mapWithConcurrency(allNotes, 32, async (note) => {
+        const content = await fileManager.getAggregatedContents(note.id);
+        return content !== null
+          ? { id: note.id, type: note.type, filePath: note.filePath || '', content }
+          : null;
+      });
+      const notesWithContent: NoteWithContent[] = aggregated.filter(
+        (n): n is NoteWithContent => n !== null,
+      );
+
       const claimIndex = new ClaimIndex();
       const data: ClaimIndexData = claimIndex.build(notesWithContent);
 
@@ -570,112 +1079,45 @@ export class ClaimIndexCache {
         }
       }
 
-      // Store for reuse in trace() — avoids rebuilding on every trace call
-      this.coreClaimIndex = claimIndex;
-
-      // Populate from ClaimIndexData (which uses Maps)
-      this.entries = data.entries;
-      this.crossRefs = data.crossRefs ?? [];
-
-      // Build section index from per-note trees so qualified section
-       // references like {R005.§1} resolve to a heading + line + content.
-      this.sections = new Map();
-      const noteTypes = data.noteTypes ?? new Map();
-      const noteFilePaths = new Map<string, string>();
-      for (const note of allNotes) {
-        if (note.filePath) noteFilePaths.set(note.id, note.filePath);
-      }
-      for (const [noteId, roots] of data.trees) {
-        const noteType = noteTypes.get(noteId) ?? '';
-        const noteFilePath = noteFilePaths.get(noteId) ?? '';
-        collectSections(roots, (node, path) => {
-          const sectionId = path.join('.');
-          const fqid = `${noteId}.${sectionId}`;
-          this.sections.set(fqid, {
-            fqid,
-            noteId,
-            sectionId,
-            sectionPath: [...path],
-            heading: node.heading,
-            line: node.line,
-            endLine: node.endLine,
-            noteFilePath,
-            noteType,
-          });
-        });
-      }
-
-      // Build suffix index (bare claim ID → FQIDs)
-      this.suffixIndex = new Map();
-      for (const [fqid, entry] of this.entries) {
-        const bareId = `${entry.claimPrefix}.${String(entry.claimNumber).padStart(2, '0')}${entry.claimSubLetter ?? ''}`;
-        const existing = this.suffixIndex.get(bareId) ?? [];
-        existing.push(fqid);
-        this.suffixIndex.set(bareId, existing);
-
-        // Also index by claimId (which includes section: "1.AC.01")
-        if (entry.claimId !== bareId) {
-          const byClaimId = this.suffixIndex.get(entry.claimId) ?? [];
-          byClaimId.push(fqid);
-          this.suffixIndex.set(entry.claimId, byClaimId);
-        }
-      }
-
-      // Build note-level map — include ALL notes, not just those with claims
-      this.noteMap = new Map();
-      const noteLookup = new Map(allNotes.map(n => [n.id, n]));
-
-      // First: populate from noteTypes (covers zero-claim notes)
-      if (data.noteTypes) {
-        for (const [noteId, noteType] of data.noteTypes) {
-          const note = noteLookup.get(noteId);
-          const filePath = note?.filePath || '';
-          this.noteMap.set(noteId, {
-            noteId,
-            noteType,
-            noteFilePath: filePath,
-            noteTitle: filePath ? extractNoteTitle(filePath, this.projectDir) : noteId,
-            claimCount: 0,
-          });
-        }
-      }
-
-      // Then: enrich from claim entries
-      for (const entry of this.entries.values()) {
-        let info = this.noteMap.get(entry.noteId);
-        if (!info) {
-          info = {
-            noteId: entry.noteId,
-            noteType: entry.noteType,
-            noteFilePath: entry.noteFilePath,
-            noteTitle: extractNoteTitle(entry.noteFilePath, this.projectDir),
-            claimCount: 0,
-          };
-          this.noteMap.set(entry.noteId, info);
-        }
-        if (!info.noteFilePath) {
-          info.noteFilePath = entry.noteFilePath;
-          info.noteTitle = extractNoteTitle(entry.noteFilePath, this.projectDir);
-        }
-        info.claimCount++;
-      }
-
-      // Pre-cache note excerpts for sync access in the markdown-it plugin
-      await this.buildExcerptCache();
+      // Atomic swap: build derived caches into locals, then assign all
+      // fields in one synchronous block so subscribers never observe
+      // torn state across entries / sections / suffixIndex / noteMap.
+      this.applyClaimIndexData(data, allNotes, claimIndex);
 
       this.outputChannel.appendLine(
-        `[ClaimIndex] Loaded ${this.entries.size} claims across ${this.noteMap.size} notes, ${this.crossRefs.length} cross-refs, ${this.suffixIndex.size} bare suffixes`
+        `[ClaimIndex] Phase B: loaded ${this.entries.size} claims across ${this.noteMap.size} notes, ${this.crossRefs.length} cross-refs, ${this.suffixIndex.size} bare suffixes in ${Date.now() - phaseBStart}ms`,
       );
 
       this.latestErrors = data.errors ?? [];
+
+      // Validate cross-project references and append resulting errors so
+      // they appear in the Problems panel alongside the index errors.
+      // @implements {R011.§4.AC.06} surface alias-related errors as diagnostics
+      if (data.crossProjectRefs && data.crossProjectRefs.length > 0) {
+        const aliasErrors = await this.validateCrossProjectReferences(data.crossProjectRefs);
+        this.latestErrors = [...this.latestErrors, ...aliasErrors];
+      }
+
       if (this.latestErrors.length) {
         this.outputChannel.appendLine(
           `[ClaimIndex] ${this.latestErrors.length} parse errors surfaced as diagnostics`
         );
       }
 
+      // Fire refresh BEFORE the excerpt cache builds so badges, hover, and
+      // decorations light up immediately. The excerpt cache feeds the rich
+      // markdown-preview tooltips and can populate in the background — when
+      // it finishes, fire refresh again so preview tooltips upgrade.
       this.resolveReady();
       this._onDidRefresh.fire();
+
+      this.buildExcerptCache().then(() => {
+        this._onDidRefresh.fire();
+      }).catch((err) => {
+        this.outputChannel.appendLine(
+          `[ClaimIndex] Excerpt cache build failed: ${(err as Error).message}`,
+        );
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.appendLine(`[ClaimIndex] Refresh failed: ${message}`);
@@ -864,10 +1306,28 @@ export class ClaimIndexCache {
   }
 
   // @implements {DD013.§DC.07} getReferencesForNote aggregation
+  // @implements {R011.§4.AC.09} cross-project outgoing refs included separately
   getReferencesForNote(noteId: string): NoteReferences {
     const outgoingRefs = this.projectManager?.referenceManager?.getReferencesFrom(noteId) ?? [];
     const incomingRefs = this.projectManager?.referenceManager?.getReferencesTo(noteId, false) ?? [];
     const sourceRefs = this.projectManager?.sourceScanner?.getReferencesToNote(noteId) ?? [];
+
+    // Collect cross-project outgoing refs (deduped by aliasName + raw).
+    const seen = new Set<string>();
+    const crossProjectOutgoing: CrossProjectOutgoingRef[] = [];
+    for (const cpRef of this.crossProjectRefs) {
+      if (cpRef.fromNoteId !== noteId) continue;
+      const key = `${cpRef.aliasPrefix}|${cpRef.address.raw}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const aliasEntry = this.aliasMap.get(cpRef.aliasPrefix);
+      crossProjectOutgoing.push({
+        aliasName: cpRef.aliasPrefix,
+        peerNoteId: cpRef.address.noteId ?? '(unknown)',
+        raw: cpRef.address.raw,
+        resolved: aliasEntry?.resolved ?? false,
+      });
+    }
 
     return {
       outgoing: outgoingRefs.map(ref => ({
@@ -879,6 +1339,7 @@ export class ClaimIndexCache {
         noteInfo: this.noteMap.get(ref.fromId),
       })),
       source: sourceRefs,
+      crossProjectOutgoing,
     };
   }
 

@@ -465,4 +465,254 @@ describe('ConfigurationPersistence', () => {
       expect(configManager.saveConfig).toBeDefined();
     });
   });
+
+  /**
+   * @validates {R011.§1.AC.03} alias path resolution (relative, absolute, tilde)
+   * @validates {R011.§1.AC.06} eager target validation with warnings
+   * @validates {R011.§2.AC.06} per-invocation cache via getAliasResolution
+   */
+  describe('projectAliases — loading, resolution, and validation (R011)', () => {
+    /** Build a minimal valid SCEpter project (a config file under _scepter/) at the given dir. */
+    async function makePeerProject(dir: string): Promise<void> {
+      const configPath = path.join(dir, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+        }),
+      );
+    }
+
+    it('resolves a relative alias path against the config file directory', async () => {
+      const peerDir = path.join(process.cwd(), '.test-tmp', 'peer-relative');
+      await fs.rm(peerDir, { recursive: true, force: true });
+      await makePeerProject(peerDir);
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: {
+            'peer-rel': path.relative(path.dirname(configPath), peerDir),
+          },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const res = configManager.getAliasResolution('peer-rel');
+      expect(res?.resolved).toBe(true);
+      expect(path.resolve(res!.resolvedPath)).toBe(path.resolve(peerDir));
+
+      await fs.rm(peerDir, { recursive: true, force: true });
+    });
+
+    it('resolves an absolute alias path', async () => {
+      const peerDir = path.join(process.cwd(), '.test-tmp', 'peer-absolute');
+      await fs.rm(peerDir, { recursive: true, force: true });
+      await makePeerProject(peerDir);
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: { 'peer-abs': peerDir },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const res = configManager.getAliasResolution('peer-abs');
+      expect(res?.resolved).toBe(true);
+
+      await fs.rm(peerDir, { recursive: true, force: true });
+    });
+
+    it('expands tilde in alias paths', async () => {
+      // Use the resolveAliasPath public method directly so we don't need a
+      // real ~ peer project on the filesystem.
+      const fakeConfigFile = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      const result = configManager.resolveAliasPath('~/foo/bar', fakeConfigFile);
+      expect(result.startsWith(require('os').homedir())).toBe(true);
+      expect(result.endsWith(path.join('foo', 'bar'))).toBe(true);
+    });
+
+    it('marks unresolved when target path does not exist (warning, not error)', async () => {
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: { 'ghost-peer': '../this-path-does-not-exist-zzzz' },
+        }),
+      );
+
+      // Listen for the warning event
+      const warnings: any[] = [];
+      configManager.on('alias:warning', (w) => warnings.push(w));
+
+      // Should NOT throw — unresolved targets are warnings per AC.06
+      await expect(configManager.loadConfigFromFilesystem()).resolves.not.toBeNull();
+
+      const res = configManager.getAliasResolution('ghost-peer');
+      expect(res?.resolved).toBe(false);
+      expect(res && !res.resolved && res.reason).toBe('path-not-found');
+      expect(warnings.length).toBe(1);
+      expect(warnings[0].aliasName).toBe('ghost-peer');
+    });
+
+    it('marks unresolved when target is a file rather than a directory', async () => {
+      const peerFile = path.join(process.cwd(), '.test-tmp', 'peer-is-a-file.txt');
+      await fs.mkdir(path.dirname(peerFile), { recursive: true });
+      await fs.writeFile(peerFile, 'not a directory');
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: { 'file-peer': peerFile },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const res = configManager.getAliasResolution('file-peer');
+      expect(res?.resolved).toBe(false);
+      expect(res && !res.resolved && res.reason).toBe('not-a-directory');
+
+      await fs.unlink(peerFile);
+    });
+
+    it('marks unresolved when target dir is not a SCEpter project', async () => {
+      const emptyDir = path.join(process.cwd(), '.test-tmp', 'empty-dir');
+      await fs.rm(emptyDir, { recursive: true, force: true });
+      await fs.mkdir(emptyDir, { recursive: true });
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: { 'empty-peer': emptyDir },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const res = configManager.getAliasResolution('empty-peer');
+      expect(res?.resolved).toBe(false);
+      expect(res && !res.resolved && res.reason).toBe('not-a-scepter-project');
+
+      await fs.rm(emptyDir, { recursive: true, force: true });
+    });
+
+    it('accepts a peer with scepter.config.json at the root (no _scepter/ subdir)', async () => {
+      const peerDir = path.join(process.cwd(), '.test-tmp', 'peer-root-config');
+      await fs.rm(peerDir, { recursive: true, force: true });
+      await fs.mkdir(peerDir, { recursive: true });
+      await fs.writeFile(
+        path.join(peerDir, 'scepter.config.json'),
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+        }),
+      );
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: { 'root-peer': peerDir },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const res = configManager.getAliasResolution('root-peer');
+      expect(res?.resolved).toBe(true);
+
+      await fs.rm(peerDir, { recursive: true, force: true });
+    });
+
+    it('returns null for an undeclared alias name', async () => {
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      expect(configManager.getAliasResolution('not-declared')).toBeNull();
+    });
+
+    it('caches resolution results for the lifetime of the manager (no re-stat between calls)', async () => {
+      const peerDir = path.join(process.cwd(), '.test-tmp', 'peer-cache');
+      await fs.rm(peerDir, { recursive: true, force: true });
+      await makePeerProject(peerDir);
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: { 'cached-peer': peerDir },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const first = configManager.getAliasResolution('cached-peer');
+      // Even after deleting the peer, getAliasResolution returns the cached result
+      await fs.rm(peerDir, { recursive: true, force: true });
+      const second = configManager.getAliasResolution('cached-peer');
+      expect(second).toEqual(first);
+    });
+
+    it('handles the object form of an alias value', async () => {
+      const peerDir = path.join(process.cwd(), '.test-tmp', 'peer-object-form');
+      await fs.rm(peerDir, { recursive: true, force: true });
+      await makePeerProject(peerDir);
+
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+          projectAliases: {
+            'obj-peer': { path: peerDir, description: 'Object-form peer' },
+          },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      const res = configManager.getAliasResolution('obj-peer');
+      expect(res?.resolved).toBe(true);
+      expect(res && res.resolved && res.description).toBe('Object-form peer');
+
+      await fs.rm(peerDir, { recursive: true, force: true });
+    });
+
+    it('produces zero resolutions when projectAliases is absent', async () => {
+      const configPath = path.join(testProjectPath, '_scepter', 'scepter.config.json');
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          noteTypes: { Requirement: { folder: 'reqs', shortcode: 'R' } },
+        }),
+      );
+
+      await configManager.loadConfigFromFilesystem();
+      expect(configManager.getAllAliasResolutions()).toEqual([]);
+    });
+  });
 });

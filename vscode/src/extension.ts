@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 // @implements {DD012.§DC.05} Config detection via findProjectRoot from core
 import { findProjectRoot } from 'scepter';
 import { ClaimIndexCache } from './claim-index';
@@ -290,6 +291,102 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
     vscode.commands.registerCommand('scepter.searchClaims', () => {
       showClaimSearchQuickPick(index);
     }),
+    /**
+     * Open `scepter.config.json` in an editor tab. If `projectAliases`
+     * is declared, scrolls to that key; otherwise opens at the top of
+     * the file. Per R011.§4.AC.10.
+     *
+     * @implements {R011.§4.AC.10} extension command opens config file
+     */
+    vscode.commands.registerCommand('scepter.openConfig', async () => {
+      const configCandidates = [
+        path.join(index.projectDir, 'scepter.config.json'),
+        path.join(index.projectDir, '_scepter', 'scepter.config.json'),
+      ];
+      let configPath: string | null = null;
+      for (const candidate of configCandidates) {
+        try {
+          await fs.promises.access(candidate);
+          configPath = candidate;
+          break;
+        } catch {
+          // try next
+        }
+      }
+      if (!configPath) {
+        vscode.window.showErrorMessage(
+          'No scepter.config.json found in this project. Run `scepter init` first.',
+        );
+        return;
+      }
+      const uri = vscode.Uri.file(configPath);
+      const doc = await vscode.workspace.openTextDocument(uri);
+      const editor = await vscode.window.showTextDocument(doc, { preview: false });
+      // Scroll to projectAliases if present.
+      const text = doc.getText();
+      const match = text.match(/"projectAliases"\s*:/);
+      if (match) {
+        const offset = match.index ?? 0;
+        const pos = doc.positionAt(offset);
+        editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.AtTop);
+        editor.selection = new vscode.Selection(pos, pos);
+      }
+    }),
+    /**
+     * Open a cross-project (alias-prefixed) reference. Dispatched from
+     * the markdown preview (via `command:` URI on the `.scepter-cross-project`
+     * `<a>` element) and available for any caller that wants to navigate
+     * a peer note/claim.
+     *
+     * Args (positional):
+     *   1. aliasName: string — the alias prefix (e.g. `vendor-lib`)
+     *   2. normalizedId: string — the canonical no-§ id (e.g. `R005.1.AC.01`)
+     *
+     * On resolution success, opens the peer note's file in a new editor tab,
+     * jumping to the claim's line if a claim address was supplied. On
+     * failure, surfaces the typed reason via a warning message.
+     *
+     * @implements {R011.§4.AC.08} markdown preview click-target dispatcher
+     */
+    vscode.commands.registerCommand('scepter.openCrossProject', async (aliasName: string, normalizedId: string) => {
+      const address = parseNormalizedAddressForOpen(normalizedId);
+      if (!address) {
+        vscode.window.showWarningMessage(
+          `Cannot navigate cross-project reference: malformed address '${normalizedId}'.`,
+        );
+        return;
+      }
+      const result = await index.resolveCrossProject(aliasName, address);
+      if (!result.ok) {
+        vscode.window.showWarningMessage(
+          `Cross-project reference '${aliasName}/${normalizedId}': ${result.reason}`,
+        );
+        return;
+      }
+      // Pick the file path + optional line from the lookup result.
+      let filePath: string | undefined;
+      let line: number | undefined;
+      if ('entry' in result) {
+        filePath = result.entry.noteFilePath;
+        line = result.entry.line;
+      } else if ('note' in result) {
+        filePath = result.note.noteFilePath;
+      }
+      if (!filePath) {
+        vscode.window.showWarningMessage(
+          `Cross-project reference '${aliasName}/${normalizedId}' resolved but has no file path.`,
+        );
+        return;
+      }
+      const uri = vscode.Uri.file(filePath);
+      const doc = await vscode.workspace.openTextDocument(uri);
+      const editor = await vscode.window.showTextDocument(doc, { preview: false });
+      if (line && line > 0) {
+        const pos = new vscode.Position(Math.max(0, line - 1), 0);
+        editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+        editor.selection = new vscode.Selection(pos, pos);
+      }
+    }),
     vscode.commands.registerCommand('scepter.openFullMatrix', () => {
       traceabilityProvider.openFullPanel();
     }),
@@ -427,4 +524,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
 
 export function deactivate(): void {
   // Cleanup handled by disposables
+}
+
+/**
+ * Parse a normalized claim ID (e.g. `R005.1.AC.01`) into address
+ * components for `claimIndex.resolveCrossProject`. Local copy of the
+ * helper that lives in hover-provider/definition-provider; inlined
+ * here for the openCrossProject command rather than exporting from
+ * either provider (avoids deepening the module graph for one command).
+ */
+function parseNormalizedAddressForOpen(
+  normalized: string,
+): { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number } | null {
+  const parts = normalized.split('.');
+  if (parts.length === 0) return null;
+  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return null;
+  const noteId = parts[0];
+  if (parts.length === 1) return { noteId };
+  const sectionParts: number[] = [];
+  let i = 1;
+  for (; i < parts.length; i++) {
+    if (/^\d+$/.test(parts[i])) sectionParts.push(parseInt(parts[i], 10));
+    else break;
+  }
+  if (i < parts.length - 1 && /^[A-Z]+$/.test(parts[i]) && /^\d{2,3}[a-z]?$/.test(parts[i + 1])) {
+    const claimNumMatch = parts[i + 1].match(/^(\d{2,3})([a-z])?$/)!;
+    return {
+      noteId,
+      sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
+      claimPrefix: parts[i],
+      claimNumber: parseInt(claimNumMatch[1], 10),
+    };
+  }
+  return { noteId, sectionPath: sectionParts.length > 0 ? sectionParts : undefined };
 }

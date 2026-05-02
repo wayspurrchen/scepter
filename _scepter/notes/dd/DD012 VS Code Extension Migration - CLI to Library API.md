@@ -11,6 +11,7 @@ status: draft
 **Audit:** `docs/202604021030 VS Code Extension Audit.md`
 **Date:** 2026-04-02
 **Scope:** Implementation blueprint for Phase 3 of {A003}: migrating the VS Code extension from CLI subprocess invocation to direct library API usage. Covers types, config detection, claim indexing, pattern matching, and file watching -- five incremental migration steps per {A003.§5.AC.05}. Each step is independently mergeable.
+**Downstream consumers:** {R011.§4} (VS Code Extension Behavior — alias-prefixed reference handling) and {DD015} (Phases 9–12) build on the post-DD012 library surface — `parseClaimReferences`/`parseNoteMentions` in `vscode/src/patterns.ts` and the `ClaimIndexCache` shape are the contract those phases extend.
 
 ---
 

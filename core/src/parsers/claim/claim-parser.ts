@@ -36,6 +36,17 @@ export interface ClaimAddress {
   claimSubLetter?: string;
   metadata?: string[];
   raw: string;
+  /**
+   * Cross-project alias prefix, populated when the input begins with
+   * `<alias>/`. The remainder of the address resolves against the peer
+   * project named by the alias (per the local config's
+   * `projectAliases` map). When `aliasPrefix` is set, the address is a
+   * read-only citation; per R011 it must NOT be merged into the local
+   * claim index, derivation graph, or trace matrix.
+   *
+   * @implements {R011.§2.AC.01} alias-prefixed reference syntax
+   */
+  aliasPrefix?: string;
 }
 
 export interface ClaimParseOptions {
@@ -58,6 +69,19 @@ export interface ClaimReference {
 
 /** Pattern for a note ID: 1-5 uppercase letters followed by 3-5 digits */
 const NOTE_ID_RE = /^[A-Z]{1,5}\d{3,5}$/;
+
+/**
+ * Cross-project alias prefix at the start of a reference: `<alias>/`.
+ * Matches kebab-case alias names (lowercase letters, digits, internal
+ * hyphens; ≥2 chars; no leading or trailing hyphen) followed by `/`.
+ * Mirrors `ALIAS_NAME_REGEX` in `config-validator.ts`.
+ *
+ * Capture group 1 is the alias name (without the trailing `/`).
+ * Capture group 2 is the remainder of the reference.
+ *
+ * @implements {R011.§2.AC.01} alias-prefixed reference grammar
+ */
+const ALIAS_PREFIX_RE = /^([a-z][a-z0-9-]*[a-z0-9])\/(.+)$/;
 
 /**
  * Forbidden form: uppercase letters immediately followed by digits with no dot.
@@ -116,7 +140,15 @@ export function parseMetadataSuffix(raw: string): { id: string; metadata: string
   const metadata = metaStr
     .split(':')
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && /^[A-Za-z0-9=_.§-]+$/.test(s));
+    // `/` is permitted to support cross-project alias targets in metadata
+    // values such as `derives=vendor-lib/R005.§1.AC.01` or
+    // `superseded=vendor-lib/R005.§1.AC.04`. The lint/index layer rejects
+    // such forms with distinct cross-project errors per R011.§2.AC.03/.04;
+    // the parser must capture the full target so the rejection can fire on
+    // the actual offending value.
+    // @implements {R011.§2.AC.03} parser captures cross-project derives= targets
+    // @implements {R011.§2.AC.04} parser captures cross-project superseded= targets
+    .filter((s) => s.length > 0 && /^[A-Za-z0-9=_.§/-]+$/.test(s));
   return { id, metadata };
 }
 
@@ -139,10 +171,30 @@ export function parseClaimAddress(raw: string, options?: ClaimParseOptions): Cla
     return null;
   }
 
+  // Detect cross-project alias prefix `<alias>/<remainder>` and strip
+  // it before parsing the remainder against the existing grammar. The
+  // remainder must itself be a valid (local-shape) reference. Transitive
+  // aliasing — `a/b/R001` — is rejected: if the remainder still begins
+  // with an alias-prefix shape, return null so the resolver/linter can
+  // surface the error. Per R011.§2.AC.07.
+  // @implements {R011.§2.AC.01} alias-prefixed reference parsing
+  // @implements {R011.§2.AC.07} transitive aliases rejected
+  let aliasPrefix: string | undefined;
+  let workingRefPart = refPart;
+  const aliasMatch = ALIAS_PREFIX_RE.exec(refPart);
+  if (aliasMatch) {
+    aliasPrefix = aliasMatch[1];
+    workingRefPart = aliasMatch[2];
+    // Reject transitive aliases: remainder must not itself carry an alias prefix.
+    if (ALIAS_PREFIX_RE.test(workingRefPart)) {
+      return null;
+    }
+  }
+
   // Split into dot-separated segments, but we need to be careful:
   // A claim like AC.01 has a dot WITHIN it. The strategy is to split on dots
   // and then recombine letter-prefix + number segments into claim IDs.
-  const rawSegments = refPart.split('.');
+  const rawSegments = workingRefPart.split('.');
 
   if (rawSegments.length === 0 || rawSegments.some((s) => s.length === 0)) {
     return null;
@@ -225,6 +277,7 @@ export function parseClaimAddress(raw: string, options?: ClaimParseOptions): Cla
   if (claimNumber !== undefined) address.claimNumber = claimNumber;
   if (claimSubLetter !== undefined) address.claimSubLetter = claimSubLetter;
   if (metadata.length > 0) address.metadata = metadata;
+  if (aliasPrefix !== undefined) address.aliasPrefix = aliasPrefix;
 
   return address;
 }
@@ -248,18 +301,22 @@ export function parseRangeSuffix(
   // Match compact form: PREFIX.NN-MM (e.g., AC.01-06)
   // Match explicit form: PREFIX.NN-PREFIX.MM (e.g., AC.01-AC.06)
   // Also with optional leading path: R004.§1.AC.01-06, §1.AC.01-AC.06
+  // Also with optional cross-project alias prefix: vendor-lib/R004.§1.AC.01-06, vendor-lib/AC.01-06
   // The claim number portion is \d{2,3} (2-3 digits).
   //
-  // We use two patterns: one for bare claims (no leading path) and one for qualified claims.
-  // Bare:      ^(([A-Z]+)\.(\d{2,3}))-(?:(?:\2)\.)?(\d{2,3})$
-  // Qualified: ^((.+)\.([A-Z]+)\.(\d{2,3}))-(?:(?:\3)\.)?(\d{2,3})$
-  const bareRangeRe = /^(([A-Z]+)\.(\d{2,3}))-(?:(?:\2)\.)?(\d{2,3})$/;
+  // The optional alias prefix `(?:[a-z][a-z0-9-]*[a-z0-9]\/)?` mirrors
+  // ALIAS_PREFIX_RE without capturing — the captured baseRef carries
+  // the alias prefix verbatim into parseClaimAddress, which then
+  // separates it.
+  // @implements {R011.§2.AC.01} alias prefix supported in range references
+  const ALIAS_OPT = '(?:[a-z][a-z0-9-]*[a-z0-9]\\/)?';
+  const bareRangeRe = new RegExp(`^(${ALIAS_OPT}([A-Z]+)\\.(\\d{2,3}))-(?:(?:\\2)\\.)?(\\d{2,3})$`);
   const bareMatch = refPart.match(bareRangeRe);
   if (bareMatch) {
     return { baseRef: bareMatch[1], endNumber: parseInt(bareMatch[4], 10) };
   }
 
-  const qualifiedRangeRe = /^((.+)\.([A-Z]+)\.(\d{2,3}))-(?:(?:\3)\.)?(\d{2,3})$/;
+  const qualifiedRangeRe = new RegExp(`^(${ALIAS_OPT}(.+)\\.([A-Z]+)\\.(\\d{2,3}))-(?:(?:\\3)\\.)?(\\d{2,3})$`);
   const qualifiedMatch = refPart.match(qualifiedRangeRe);
   if (qualifiedMatch) {
     return { baseRef: qualifiedMatch[1], endNumber: parseInt(qualifiedMatch[5], 10) };
@@ -311,7 +368,12 @@ export function expandClaimRange(
       rawParts.push(...baseAddress.sectionPath.map(String));
     }
     rawParts.push(`${baseAddress.claimPrefix}.${paddedNum}`);
-    const raw = rawParts.join('.');
+    let raw = rawParts.join('.');
+    // Preserve cross-project alias prefix in expanded range items.
+    // @implements {R011.§2.AC.01} alias prefix preserved through ranges
+    if (baseAddress.aliasPrefix !== undefined) {
+      raw = `${baseAddress.aliasPrefix}/${raw}`;
+    }
 
     const addr: ClaimAddress = { raw };
     if (baseAddress.noteId !== undefined) addr.noteId = baseAddress.noteId;
@@ -320,6 +382,7 @@ export function expandClaimRange(
     addr.claimNumber = n;
     // Sub-letters are not supported in ranges — omitted intentionally
     if (baseAddress.metadata !== undefined) addr.metadata = [...baseAddress.metadata];
+    if (baseAddress.aliasPrefix !== undefined) addr.aliasPrefix = baseAddress.aliasPrefix;
 
     results.push(addr);
   }

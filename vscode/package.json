@@ -129,6 +129,15 @@
         "command": "scepter.selectProject",
         "title": "SCEpter: Select Project",
         "icon": "$(folder-library)"
+      },
+      {
+        "command": "scepter.openConfig",
+        "title": "SCEpter: Open Configuration",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "scepter.openCrossProject",
+        "title": "SCEpter: Open Cross-Project Reference"
       }
     ],
     "menus": {

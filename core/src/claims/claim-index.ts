@@ -32,6 +32,17 @@ import type { IngestClaimEntry } from './metadata-ingest.js';
 import type { MetadataEvent, MetadataStore } from './metadata-event.js';
 import type { MetadataStorage } from '../storage/storage-backend.js';
 
+/**
+ * Detects an alias-prefixed cross-project target in a metadata value.
+ * Matches the same kebab-case alias-name shape as the parser's
+ * `ALIAS_PREFIX_RE` (lowercase letters, digits, internal hyphens; ≥2
+ * chars; no leading or trailing hyphen) followed by `/`.
+ *
+ * Used to reject `derives=<alias>/<id>` and `superseded=<alias>/<id>`
+ * per R011.§2.AC.03 / R011.§2.AC.04.
+ */
+const CROSS_PROJECT_TARGET_RE = /^[a-z][a-z0-9-]*[a-z0-9]\//;
+
 // ---------------------------------------------------------------------------
 // Interfaces
 // ---------------------------------------------------------------------------
@@ -78,11 +89,35 @@ export interface ClaimCrossReference {
   unresolved?: boolean;      // true when the target claim could not be resolved in the index
 }
 
+/**
+ * A cross-project (alias-prefixed) reference encountered in a local
+ * note. These are tracked separately from local `crossRefs` because
+ * they MUST NOT enter the local trace matrix or gap report per
+ * R011.§3.AC.03/.AC.04. They are read-only citations resolved at
+ * lookup time, not edges in the local reference graph.
+ *
+ * @implements {R011.§3.AC.03} cross-project citations rendered separately
+ * @implements {R011.§3.AC.04} cross-project refs not in local gap analysis
+ */
+export interface ClaimCrossProjectReference {
+  /** The alias name (e.g., `vendor-lib`). */
+  aliasPrefix: string;
+  /** The parsed claim address — note id, section, claim, etc.,
+   * with `aliasPrefix` set. */
+  address: import('../parsers/claim/claim-parser').ClaimAddress;
+  fromNoteId: string;
+  line: number;
+  filePath: string;
+}
+
 export interface ClaimIndexData {
   entries: Map<string, ClaimIndexEntry>;  // keyed by fullyQualified
   trees: Map<string, ClaimNode[]>;        // keyed by noteId
   noteTypes: Map<string, string>;         // noteId -> noteType for ALL scanned notes
   crossRefs: ClaimCrossReference[];
+  /** Cross-project (alias-prefixed) references — kept SEPARATE from
+   * `crossRefs` per R011.§3.AC.04. */
+  crossProjectRefs: ClaimCrossProjectReference[];
   errors: ClaimTreeError[];
 }
 
@@ -224,6 +259,7 @@ export class ClaimIndex {
     trees: new Map(),
     noteTypes: new Map(),
     crossRefs: [],
+    crossProjectRefs: [],
     errors: [],
   };
 
@@ -250,6 +286,7 @@ export class ClaimIndex {
       trees: new Map(),
       noteTypes: new Map(),
       crossRefs: [],
+      crossProjectRefs: [],
       errors: [],
     };
     // @implements {R006.§2.AC.04} Reset derivation reverse index
@@ -330,6 +367,22 @@ export class ClaimIndex {
 
       const resolved: string[] = [];
       for (const target of entry.derivedFrom) {
+        // Cross-project derives= is rejected per R011.§2.AC.03 / R006 §Non-Goals.
+        // The derivation graph is per-project; an alias-prefixed target would
+        // create a hidden federation that breaks the per-project invariant.
+        // Emit a distinct error and skip resolution.
+        // @implements {R011.§2.AC.03} cross-project derives= rejected
+        if (CROSS_PROJECT_TARGET_RE.test(target)) {
+          this.data.errors.push({
+            type: 'cross-project-derives',
+            claimId: entry.fullyQualified,
+            line: entry.line,
+            message: `Claim "${entry.fullyQualified}" declares derives=${target}, but cross-project derivation is rejected. The derivation graph is per-project (R006.§Non-Goals). R011.§2.AC.03 permits reconsideration via a future requirement that relaxes both R006 and R011.§2.AC.03 together; in this version, derives= MUST point at a local claim.`,
+            noteId: entry.noteId,
+            noteFilePath: entry.noteFilePath,
+          });
+          continue;
+        }
         // Normalize: strip § for index lookup
         const normalized = target.replace(/§/g, '');
         const resolvedId = resolveClaimAddress(normalized, this.data.entries, entry.noteId);
@@ -356,6 +409,25 @@ export class ClaimIndex {
       entry.derivedFrom = resolved;
     }
 
+    // Phase 1.6: Cross-project supersession rejection.
+    // @implements {R011.§2.AC.04} cross-project superseded= rejected (permanent)
+    // The local project lacks authority to assert lifecycle facts about a
+    // peer's claims. This boundary is permanent — see R011.§2.AC.04.
+    for (const entry of this.data.entries.values()) {
+      if (entry.lifecycle?.type !== 'superseded') continue;
+      const target = entry.lifecycle.target;
+      if (typeof target === 'string' && CROSS_PROJECT_TARGET_RE.test(target)) {
+        this.data.errors.push({
+          type: 'cross-project-superseded',
+          claimId: entry.fullyQualified,
+          line: entry.line,
+          message: `Claim "${entry.fullyQualified}" declares superseded=${target}, but cross-project supersession is permanently rejected. Supersession asserts that the target is the authoritative replacement for the asserting claim — the local project has no authority to make lifecycle assertions on a peer project's claims (R011.§2.AC.04).`,
+          noteId: entry.noteId,
+          noteFilePath: entry.noteFilePath,
+        });
+      }
+    }
+
     // Phase 2: Scan content for cross-references
     for (const note of notes) {
       const parseOptions: ClaimParseOptions = {
@@ -368,6 +440,25 @@ export class ClaimIndex {
 
       for (const ref of refs) {
         const addr = ref.address;
+
+        // Cross-project alias-prefixed references are read-only citations
+        // and MUST NOT enter the local cross-reference graph, gap report,
+        // or trace matrix per R011.§3.AC.03 / R011.§3.AC.04. They are
+        // captured in a separate list (`crossProjectRefs`) so the lint
+        // command can validate them against the resolver without polluting
+        // the local index.
+        // @implements {R011.§3.AC.03} cross-project citations rendered separately
+        // @implements {R011.§3.AC.04} cross-project refs not in local gap analysis
+        if (addr.aliasPrefix) {
+          this.data.crossProjectRefs.push({
+            aliasPrefix: addr.aliasPrefix,
+            address: addr,
+            fromNoteId: note.id,
+            line: ref.line,
+            filePath: note.filePath,
+          });
+          continue;
+        }
 
         // Section-only references (e.g., §10, §3.1) are structural navigation
         // markers, not claim cross-references. Skip them to prevent false matches

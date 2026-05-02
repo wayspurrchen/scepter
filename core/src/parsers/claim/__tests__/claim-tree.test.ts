@@ -275,6 +275,246 @@ describe('Claim Tree', () => {
       const s1 = result.sections.get('1')!;
       expect(s1.endLine).toBe(5);
     });
+
+    // The following five tests cover the structural patterns identified in
+    // a claim boundary audit.
+    // 
+    // Each pattern asserts the exact expected endLine for the affected
+    // claims so the boundary cap can't silently regress.
+
+    it('Pattern A: clean paragraph siblings under a section heading', () => {
+      // DD050:96-99 shape — paragraph claims separated by a single blank.
+      // The first claim's body ends at the blank line immediately before
+      // the next sibling — i.e., the line of its own definition since
+      // there's no body content between them.
+      const content = [
+        '## §1 Schema',                                              // 1
+        '',                                                          // 2
+        '### Schema Configuration',                                  // 3
+        '',                                                          // 4
+        '§1.DC.01:5 The schema MUST be configured with directMode.', // 5
+        '',                                                          // 6
+        '§1.DC.02:4 The schema MUST allow external composition.',   // 7
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const dc01 = result.claims.get('1.DC.01')!;
+      const dc02 = result.claims.get('1.DC.02')!;
+      // DC.01: paragraph rule terminates at the blank on line 6.
+      expect(dc01.line).toBe(5);
+      expect(dc01.endLine).toBe(5);
+      // DC.02: no further structural sibling, no further blank — runs to EOF.
+      expect(dc02.line).toBe(7);
+      expect(dc02.endLine).toBe(7);
+    });
+
+    it('Pattern B: paragraph-claim with intervening plain sub-heading', () => {
+      // DD050:96-102 shape — `### Identity TypeDefinition` (a plain heading,
+      // not a claim or section) sits between two sibling claims. Without
+      // the paragraph-claim termination rule, DC.01's body would extend
+      // through the plain heading and the blank line beneath it, so the
+      // hover excerpt for DC.01 would include the *next* subsection's
+      // heading. With the fix, DC.01 ends at the first blank line.
+      const content = [
+        '## §1 Schema',                                              // 1
+        '',                                                          // 2
+        '### Schema Configuration',                                  // 3
+        '',                                                          // 4
+        '§1.DC.01:5 The schema MUST be configured with directMode.', // 5
+        '',                                                          // 6
+        '### Identity TypeDefinition',                               // 7
+        '',                                                          // 8
+        '§1.DC.03 The Identity TypeDefinition MUST define fields.', // 9
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const dc01 = result.claims.get('1.DC.01')!;
+      const dc03 = result.claims.get('1.DC.03')!;
+      // DC.01 must NOT include line 7 (`### Identity TypeDefinition`) or
+      // line 8 (the blank beneath it) — those belong to DC.03.
+      expect(dc01.line).toBe(5);
+      expect(dc01.endLine).toBe(5);
+      // DC.03 starts at line 9. The plain heading on line 7 already opened
+      // the next sub-region; no blank follows DC.03 so it runs to EOF.
+      expect(dc03.line).toBe(9);
+      expect(dc03.endLine).toBe(9);
+    });
+
+    it('Pattern C: paragraph-claim embedded inside a heading-claim body', () => {
+      // DD006 §1.PERF.01 shape — a paragraph-claim sits inside a heading-
+      // claim's body, sandwiched between cypher fences. Without the
+      // paragraph-claim termination rule, PERF.01 attributes ~18 lines of
+      // unrelated cypher to itself because there is no further structural
+      // node before the next heading-claim. With the fix, PERF.01 ends at
+      // the first blank line — its single sentence — and DC.01 still owns
+      // the full body up to DC.02.
+      const content = [
+        '## §1 Graph Mode',                                          // 1
+        '',                                                          // 2
+        '### §1.DC.01 Field node schema change',                    // 3
+        '',                                                          // 4
+        'The Field node gains a `fieldDefId` property.',            // 5
+        '',                                                          // 6
+        '§1.PERF.01:derives=R051.§2.PERF.03 The fieldDefId lookup MUST NOT degrade read-path latency.', // 7
+        '',                                                          // 8
+        '**Current Field creation** (FieldEngine.addField):',        // 9
+        '```cypher',                                                 // 10
+        'MATCH (n:Node {id: $nodeId})',                              // 11
+        'CREATE (f:Field {id: $fieldId})',                           // 12
+        'CREATE (n)-[:HAS_FIELD]->(f)',                              // 13
+        'CREATE (f)-[:INSTANCE_OF]->(fd)',                           // 14
+        '```',                                                       // 15
+        '',                                                          // 16
+        '### §1.DC.02 Index on Field.fieldDefId',                   // 17
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const dc01 = result.claims.get('1.DC.01')!;
+      const perf01 = result.claims.get('1.PERF.01')!;
+      const dc02 = result.claims.get('1.DC.02')!;
+
+      // DC.01 (heading-claim, level 3) must own its full body — through the
+      // cypher fences — up to but not including DC.02's heading at line 17.
+      expect(dc01.line).toBe(3);
+      expect(dc01.endLine).toBe(16);
+
+      // PERF.01 (paragraph-claim) must end at the first blank line on
+      // line 8 — its body is just the one-sentence claim. It must NOT
+      // extend through the cypher fences (lines 9-15) which semantically
+      // belong to DC.01.
+      expect(perf01.line).toBe(7);
+      expect(perf01.endLine).toBe(7);
+
+      // DC.02 starts where DC.01 ends.
+      expect(dc02.line).toBe(17);
+    });
+
+    it('Pattern D: sub-lettered claims with intervening plain sub-headings', () => {
+      // DD050:165-201 shape — DC.06, DC.06a, DC.07, DC.08, DC.08a interleaved
+      // with plain `### TypeDefinition` headings. Pattern D's overshoot is
+      // the same mechanism as Pattern B (intervening plain heading), now
+      // with sub-lettered claims that share heading levels with their base
+      // claims. The paragraph-claim termination rule fixes both.
+      const content = [
+        '## §1 Schema',                                              // 1
+        '',                                                          // 2
+        '### EmailLink TypeDefinition',                              // 3
+        '',                                                          // 4
+        '§1.DC.06 The EmailLink MUST define fields.',               // 5
+        '',                                                          // 6
+        '### PasswordCredential TypeDefinition',                    // 7
+        '',                                                          // 8
+        '§1.DC.06a:5 The schema MUST define a PasswordCredential.', // 9
+        '',                                                          // 10
+        '### ExternalIdentity TypeDefinition',                       // 11
+        '',                                                          // 12
+        '§1.DC.07 The ExternalIdentity MUST define fields.',        // 13
+        '',                                                          // 14
+        '### Relationship Definitions',                              // 15
+        '',                                                          // 16
+        '§1.DC.08 The schema MUST define a OWNED_BY relationship.', // 17
+        '- Handle to Identity (outgoing).',                          // 18
+        '- Identity to Handle (incoming).',                          // 19
+        '',                                                          // 20
+        '§1.DC.08a:5 The schema MUST define a HAS_CREDENTIAL relationship.', // 21
+        '- EmailLink to PasswordCredential (outgoing).',             // 22
+        '- PasswordCredential to EmailLink (incoming).',             // 23
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const dc06 = result.claims.get('1.DC.06')!;
+      const dc06a = result.claims.get('1.DC.06a')!;
+      const dc07 = result.claims.get('1.DC.07')!;
+      const dc08 = result.claims.get('1.DC.08')!;
+      const dc08a = result.claims.get('1.DC.08a')!;
+
+      // DC.06: the plain `### PasswordCredential TypeDefinition` on line 7
+      // belongs to DC.06a, not DC.06. With the paragraph-claim rule, DC.06
+      // ends at the first blank line on line 6.
+      expect(dc06.endLine).toBe(5);
+
+      // DC.06a: same — the plain `### ExternalIdentity TypeDefinition` on
+      // line 11 belongs to DC.07. DC.06a ends at the first blank on line 10.
+      expect(dc06a.endLine).toBe(9);
+
+      // DC.07: the plain `### Relationship Definitions` on line 15 belongs
+      // to DC.08, not DC.07. DC.07 ends at the first blank on line 14.
+      expect(dc07.endLine).toBe(13);
+
+      // DC.08: bullet-list body extends through line 19; the blank on line
+      // 20 terminates the paragraph.
+      expect(dc08.endLine).toBe(19);
+
+      // DC.08a: bullet-list body extends through line 23 (EOF, no trailing
+      // blank). With no blank line found, it runs to end of document.
+      expect(dc08a.endLine).toBe(23);
+    });
+
+    it('Pattern E: heading-claim with metadata in heading text', () => {
+      // DD057 §3 shape — `### §3.DC.NN:derives=...` where each claim is its
+      // own heading. The claim ID and metadata are both in the heading text.
+      // Each heading-claim is a same-level sibling of the next, so each
+      // body extends cleanly from its line to the line before the next
+      // sibling. This pattern was already correct in the prior parser and
+      // must remain correct after the fix.
+      const content = [
+        '## §3 registerSchema detection',                            // 1
+        '',                                                          // 2
+        '### §3.DC.01:derives=DEF015.§1.FC.01',                     // 3
+        '',                                                          // 4
+        '`registerSchema(schema, options)` MUST invoke a detection step.', // 5
+        '',                                                          // 6
+        'Subsequent body paragraph for DC.01.',                     // 7
+        '',                                                          // 8
+        '### §3.DC.02:derives=DEF015.§1.FC.02',                     // 9
+        '',                                                          // 10
+        'If the changeset contains any change of kind X, ...',      // 11
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const dc01 = result.claims.get('3.DC.01')!;
+      const dc02 = result.claims.get('3.DC.02')!;
+
+      // DC.01 (heading-claim, level 3) ends at the line before DC.02's
+      // heading. The metadata in the heading text is preserved on the
+      // claim's `metadata` field.
+      expect(dc01.line).toBe(3);
+      expect(dc01.endLine).toBe(8);
+      expect(dc01.metadata).toContain('derives=DEF015.§1.FC.01');
+
+      // DC.02 runs to EOF.
+      expect(dc02.line).toBe(9);
+      expect(dc02.endLine).toBe(11);
+      expect(dc02.metadata).toContain('derives=DEF015.§1.FC.02');
+    });
+
+    it('heading-claim ignores deeper plain headings (does not over-tighten)', () => {
+      // Negative case: a plain heading at a level *deeper* than the
+      // heading-claim's own level must NOT terminate the body. Only
+      // same-or-shallower headings cap a heading-claim. Without this guard,
+      // a `#### Sub-detail` heading would prematurely end a `### §1.DC.01`
+      // claim's body.
+      const content = [
+        '## §1 Section',                                             // 1
+        '',                                                          // 2
+        '### §1.DC.01 First claim',                                  // 3
+        '',                                                          // 4
+        'Body paragraph.',                                           // 5
+        '',                                                          // 6
+        '#### Sub-detail (plain h4, deeper than DC.01)',            // 7
+        '',                                                          // 8
+        'More body for DC.01.',                                      // 9
+        '',                                                          // 10
+        '### §1.DC.02 Second claim',                                 // 11
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      const dc01 = result.claims.get('1.DC.01')!;
+      // DC.01 (level 3) must include its level-4 sub-heading and the prose
+      // beneath it. It only terminates at DC.02 (level 3) on line 11.
+      expect(dc01.line).toBe(3);
+      expect(dc01.endLine).toBe(10);
+    });
   });
 
   describe('buildClaimTree — documents without claim markup', () => {

@@ -18,6 +18,12 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
 
     const contextNoteId = noteIdFromPath(document.uri.fsPath);
 
+    // Cross-project goto: resolve the alias to a peer file path.
+    // @implements {R011.§4.AC.04} cross-project go-to-definition opens peer file
+    if (match.aliasPrefix) {
+      return await this.provideCrossProjectDefinition(match);
+    }
+
     // Try claim-level resolve (handles FQID, bare claims, section-prefixed)
     if (match.kind === 'claim' || match.kind === 'bare-claim') {
       const entry = this.index.resolve(match.normalizedId, contextNoteId ?? undefined);
@@ -56,4 +62,66 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
 
     return null;
   }
+
+  /**
+   * Resolve an alias-prefixed reference to a peer file location.
+   *
+   * @implements {R011.§4.AC.04} cross-project go-to-definition
+   */
+  private async provideCrossProjectDefinition(match: {
+    aliasPrefix?: string;
+    normalizedId: string;
+    kind: string;
+  }): Promise<vscode.Location | null> {
+    const aliasName = match.aliasPrefix!;
+    const aliasEntry = this.index.getAlias(aliasName);
+    if (!aliasEntry?.resolved) return null;
+
+    const address = parseNormalizedAddressForGoto(match.normalizedId);
+    if (!address) return null;
+    const result = await this.index.resolveCrossProject(aliasName, address);
+    if (!result.ok) return null;
+
+    if ('entry' in result) {
+      // Claim — navigate to the peer file at the claim's line.
+      const peerFile = result.entry.noteFilePath;
+      if (!peerFile) return null;
+      return new vscode.Location(
+        vscode.Uri.file(peerFile),
+        new vscode.Position(Math.max(0, (result.entry.line ?? 1) - 1), 0),
+      );
+    }
+    if ('note' in result) {
+      const peerFile = result.note.noteFilePath;
+      if (!peerFile) return null;
+      return new vscode.Location(vscode.Uri.file(peerFile), new vscode.Position(0, 0));
+    }
+    return null;
+  }
+}
+
+function parseNormalizedAddressForGoto(
+  normalized: string,
+): { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number } | null {
+  const parts = normalized.split('.');
+  if (parts.length === 0) return null;
+  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return null;
+  const noteId = parts[0];
+  if (parts.length === 1) return { noteId };
+  const sectionParts: number[] = [];
+  let i = 1;
+  for (; i < parts.length; i++) {
+    if (/^\d+$/.test(parts[i])) sectionParts.push(parseInt(parts[i], 10));
+    else break;
+  }
+  if (i < parts.length - 1 && /^[A-Z]+$/.test(parts[i]) && /^\d{2,3}[a-z]?$/.test(parts[i + 1])) {
+    const claimNumMatch = parts[i + 1].match(/^(\d{2,3})([a-z])?$/)!;
+    return {
+      noteId,
+      sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
+      claimPrefix: parts[i],
+      claimNumber: parseInt(claimNumMatch[1], 10),
+    };
+  }
+  return { noteId, sectionPath: sectionParts.length > 0 ? sectionParts : undefined };
 }

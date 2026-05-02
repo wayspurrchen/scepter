@@ -4,6 +4,7 @@ import type { Note } from '../../../types/note';
 import type { ContextHints, GatheredNote } from '../../../types/context';
 import type { GatherOptions } from '../../../context/context-gatherer';
 import { formatGatheredNotes, type GatherFormatOptions } from '../../formatters/gather-formatter';
+import { parseClaimReferences } from '../../../parsers/claim/claim-parser';
 import chalk from 'chalk';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -59,6 +60,24 @@ export interface FolderContentInfo {
   }>;
 }
 
+/**
+ * Stub representation of an alias-prefixed reference encountered in
+ * the origin note's content. Per R011.§3.AC.02 and DD015 DC.03, gather
+ * does NOT load peer content; it lists each cross-project citation as
+ * a one-line stub so the user can see the reference exists without
+ * paying the load cost.
+ *
+ * @implements {R011.§3.AC.02} cross-project gather stub-only
+ * @implements {DD015.§1.DC.03} stub-only by default, no peer content loaded
+ */
+export interface CrossProjectStub {
+  aliasName: string;
+  peerNoteId: string;
+  /** The full raw reference (e.g., `vendor-lib/R005.§1.AC.01`). */
+  raw: string;
+  line: number;
+}
+
 export interface GatherResult {
   origin: Note;
   gathered: GatheredNote[];
@@ -69,6 +88,12 @@ export interface GatherResult {
     gatherTimeMs: number;
   };
   folderInfo?: FolderContentInfo; // Information about folder contents if origin is folder-based
+  /**
+   * Cross-project (alias-prefixed) citations encountered in the origin
+   * note's content, listed as stubs. NOT included in `stats.totalNotes`
+   * or any aggregate count per R011.§3.AC.02.
+   */
+  crossProjectStubs?: CrossProjectStub[];
   output: string;
 }
 
@@ -299,6 +324,12 @@ export async function gatherContext(
   // Analyze folder contents if origin is folder-based
   const folderInfo = await analyzeFolderContents(origin, !!options.includeFolderContents, projectManager);
 
+  // Detect cross-project (alias-prefixed) references in the origin's content.
+  // Per R011.§3.AC.02 / DD015 DC.03 these are rendered as stubs only and
+  // do NOT enter `stats.totalNotes` or any aggregate count.
+  // @implements {R011.§3.AC.02} cross-project gather stub-only
+  const crossProjectStubs = await collectCrossProjectStubs(origin, projectManager);
+
   // Format output
   const formatOptions: GatherFormatOptions = {
     includeTree: options.includeTree,
@@ -308,7 +339,10 @@ export async function gatherContext(
     folderInfo, // Pass folder info to formatter
   };
 
-  const output = formatGatheredNotes(origin, filteredGathered, formatOptions);
+  const baseOutput = formatGatheredNotes(origin, filteredGathered, formatOptions);
+  const output = crossProjectStubs.length > 0
+    ? `${baseOutput}\n\n${formatCrossProjectStubs(crossProjectStubs)}`
+    : baseOutput;
 
   // Build result
   const result: GatherResult = {
@@ -321,10 +355,60 @@ export async function gatherContext(
       gatherTimeMs: Date.now() - startTime,
     },
     folderInfo,
+    crossProjectStubs: crossProjectStubs.length > 0 ? crossProjectStubs : undefined,
     output,
   };
 
   return result;
+}
+
+/**
+ * Collect cross-project (alias-prefixed) reference stubs from the
+ * origin note's content. The origin's content is read fresh (rather
+ * than relying on the claim index) because gather may be called on a
+ * note that hasn't been indexed yet, and we want stubs to appear even
+ * when the note is non-claim-bearing.
+ *
+ * @implements {R011.§3.AC.02} stub-only cross-project gather
+ */
+async function collectCrossProjectStubs(
+  origin: Note,
+  projectManager: ProjectManager,
+): Promise<CrossProjectStub[]> {
+  const noteFileManager = projectManager.noteFileManager;
+  const content = (await noteFileManager.getAggregatedContents(origin.id)) ?? '';
+  const refs = parseClaimReferencesForGather(content);
+  const stubs: CrossProjectStub[] = [];
+  const seen = new Set<string>();
+  for (const r of refs) {
+    if (!r.address.aliasPrefix) continue;
+    const peerNoteId = r.address.noteId ?? '(unknown)';
+    const dedupKey = `${r.address.aliasPrefix}/${r.address.raw}:${r.line}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+    stubs.push({
+      aliasName: r.address.aliasPrefix,
+      peerNoteId,
+      raw: r.address.raw,
+      line: r.line,
+    });
+  }
+  return stubs;
+}
+
+/**
+ * Parse references from content using the claim parser. Wrapped to
+ * isolate the import-shape so the gather handler doesn't need to track
+ * claim-parser changes directly.
+ */
+function parseClaimReferencesForGather(content: string) {
+  return parseClaimReferences(content);
+}
+
+function formatCrossProjectStubs(stubs: CrossProjectStub[]): string {
+  const header = '## Cross-project citations (not loaded)';
+  const lines = stubs.map((s) => `  - ${s.raw} (cross-project; not loaded)`);
+  return `${header}\n${lines.join('\n')}`;
 }
 
 /**

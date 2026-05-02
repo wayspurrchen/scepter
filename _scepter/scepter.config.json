@@ -45,7 +45,7 @@
   },
   "sourceCodeIntegration": {
     "enabled": true,
-    "folders": ["core/src"],
+    "folders": ["core/src", "vscode/src"],
     "exclude": ["node_modules/**", "dist/**", "build/**", "**/*.test.ts"],
     "extensions": [".ts", ".tsx", ".js", ".jsx"]
   }
