@@ -11,6 +11,7 @@
 
 import * as fs from 'fs-extra';
 import { stat as fsStat, readdir as fsReaddir, access as fsAccess, constants as fsConstants } from 'fs/promises';
+import { readdirSync as fsReaddirSync } from 'fs';
 import * as path from 'path';
 
 /**
@@ -126,6 +127,41 @@ export async function scanFolderContents(folderPath: string): Promise<string[]> 
     return files;
   } catch (error) {
     console.error(`Error scanning folder contents: ${error}`);
+    return [];
+  }
+}
+
+/**
+ * Synchronous companion to scanFolderContents. Used on hot rendering
+ * paths (markdown preview body-map injection, sync body resolver) where
+ * awaiting an async readdir is not an option.
+ */
+export function scanFolderContentsSync(folderPath: string): string[] {
+  try {
+    const entries = fsReaddirSync(folderPath, { withFileTypes: true });
+    const files: string[] = [];
+
+    const folderName = path.basename(folderPath);
+    const idMatch = folderName.match(/^([A-Z]+\d+)/);
+    const noteId = idMatch ? idMatch[1] : null;
+
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const fileName = entry.name;
+        if (fileName.startsWith('.')) continue;
+        if (noteId && (fileName === `${folderName}.md` || fileName === `${noteId}.md`)) continue;
+        files.push(fileName);
+      } else if (entry.isDirectory()) {
+        const subDirPath = path.join(folderPath, entry.name);
+        const subFiles = scanFolderContentsSync(subDirPath);
+        for (const subFile of subFiles) {
+          files.push(path.join(entry.name, subFile));
+        }
+      }
+    }
+
+    return files;
+  } catch {
     return [];
   }
 }

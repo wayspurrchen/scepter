@@ -16,6 +16,7 @@ import {
   auditConfidence,
 } from 'scepter';
 import { noteIdFromPath } from './patterns';
+import { ClaimBodyResolver } from './claim-body-resolver';
 
 export type { ClaimIndexEntry, ClaimCrossReference, ClaimIndexData, ClaimTreeError, ClaimNode, SourceReference, TraceabilityMatrix, ConfidenceAuditResult };
 
@@ -235,22 +236,16 @@ export class ClaimIndexCache {
   private refreshDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   private isReconfiguring = false;
   private coreClaimIndex: ClaimIndex | null = null;
-  /** Pre-cached raw markdown excerpts for notes */
-  private noteExcerptCache = new Map<string, string>();
-  /** Pre-rendered HTML excerpts for the markdown preview tooltips */
-  // @implements {R012.§7.AC.01} HTML excerpt cache populated via markdown-it with SCEpter plugin attached
-  private htmlExcerptCache = new Map<string, string>();
   /**
-   * Pre-cached aggregated note contents split into lines, keyed by noteId.
-   * Used by the markdown-it plugin (synchronous, no async access in render
-   * hooks) to build citing-line snippets for the refs panel of the preview
-   * tooltip. Populated alongside the excerpt cache after Phase B.
+   * Lazy resolver for claim/note body excerpts. Replaces the prior
+   * eager `buildExcerptCache` pass — bodies are rendered on demand and
+   * cached in a bounded LRU. Constructed on first `getBodyResolver()`
+   * call so the markdown-it module load is deferred until something
+   * actually wants a rendered body.
    *
-   * @implements {R012.§7.AC.06} aggregated note-lines cache populated for every indexed note
+   * @implements {R012.§7.AC.01} HTML excerpts produced via markdown-it + SCEpter plugin (now lazy)
    */
-  private noteLinesCache = new Map<string, string[]>();
-  /** Standalone markdown-it instance for rendering excerpts (no plugins) */
-  private excerptMd: any = null;
+  private bodyResolver: ClaimBodyResolver | null = null;
   private _onDidRefresh = new vscode.EventEmitter<void>();
   readonly onDidRefresh = this._onDidRefresh.event;
   private ready: Promise<void>;
@@ -576,6 +571,35 @@ export class ClaimIndexCache {
     }
   }
 
+  /**
+   * Async aggregated note contents, by noteId. Mirrors what the
+   * indexer reads, so claim line numbers align across folder-note
+   * companions. Used by the body resolver's async path.
+   */
+  async getAggregatedContents(noteId: string): Promise<string | null> {
+    if (!this.projectManager) return null;
+    try {
+      return await this.projectManager.noteFileManager.getAggregatedContents(noteId);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Sync companion to `getAggregatedContents`. Used by the markdown
+   * preview render path and any other sync consumer that needs the
+   * same folder-note aggregation the indexer used. Returns null when
+   * the project isn't loaded yet or the note can't be read.
+   */
+  getAggregatedContentsSync(noteId: string): string | null {
+    if (!this.projectManager) return null;
+    try {
+      return this.projectManager.noteFileManager.getAggregatedContentsSync(noteId);
+    } catch {
+      return null;
+    }
+  }
+
   async readClaimContext(entry: ClaimIndexEntry, contextLinesBefore = 1, maxLines = 15): Promise<string | null> {
     try {
       let content: string | null = null;
@@ -647,174 +671,32 @@ export class ClaimIndexCache {
   }
 
   /**
-   * Get a cached excerpt for a note (sync, for use in the markdown-it plugin).
+   * Lazy accessor for the body resolver. Constructed on first call so
+   * markdown-it isn't loaded until something actually needs a
+   * rendered body excerpt. Used by the hover provider, the markdown
+   * preview plugin, and any future consumer that needs claim/note
+   * body HTML.
    */
-  getNoteExcerptSync(noteId: string): string | null {
-    return this.noteExcerptCache.get(noteId) ?? null;
-  }
-
-  /**
-   * Get a cached claim context as raw markdown.
-   */
-  getClaimContextSync(entry: ClaimIndexEntry): string | null {
-    return this.noteExcerptCache.get('claim:' + entry.fullyQualified) ?? null;
-  }
-
-  /**
-   * Get a pre-rendered HTML excerpt for a note (for preview tooltips).
-   */
-  getNoteExcerptHtml(noteId: string): string | null {
-    return this.htmlExcerptCache.get(noteId) ?? null;
-  }
-
-  /**
-   * Get a pre-rendered HTML context for a claim (for preview tooltips).
-   */
-  getClaimContextHtml(fqid: string): string | null {
-    return this.htmlExcerptCache.get('claim:' + fqid) ?? null;
-  }
-
-  /**
-   * Build the map of all claim FQIDs to their pre-rendered HTML body
-   * excerpts, suitable for embedding into the markdown preview as a
-   * global lookup. Used by the preview's webview script to render
-   * tooltip body panels at arbitrary nesting depth — each level looks
-   * up its own FQID in the map rather than relying on per-ref data
-   * attributes (which can only resolve a fixed number of levels).
-   */
-  getAllClaimBodyMap(): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const [key, html] of this.htmlExcerptCache) {
-      if (key.startsWith('claim:')) {
-        out[key.slice('claim:'.length)] = html;
-      }
+  getBodyResolver(): ClaimBodyResolver {
+    if (!this.bodyResolver) {
+      this.bodyResolver = new ClaimBodyResolver(this);
     }
-    return out;
+    return this.bodyResolver;
   }
 
   /**
-   * Synchronous accessor for the aggregated content of a note as a line
-   * array. Returns null if the cache hasn't been populated yet (e.g. during
-   * an in-flight refresh) — callers in the markdown-it plugin should
-   * tolerate this and fall back to omitting citing-line snippets rather
-   * than blocking. The async equivalent is `getAggregatedNoteLines`.
+   * Synchronous accessor for the aggregated content of a note as a
+   * line array. Used by the markdown-it preview plugin to build
+   * citing-line snippets for the refs panel. Backed by the resolver's
+   * bounded LRU; sync read of the single note file (folder-note
+   * companions are not aggregated on the sync path).
+   *
+   * The async equivalent — used by the editor hover provider — goes
+   * through `getAggregatedNoteLines` and uses the core file manager
+   * for full folder-note aggregation.
    */
   getAggregatedNoteLinesSync(noteId: string): string[] | null {
-    return this.noteLinesCache.get(noteId) ?? null;
-  }
-
-  private getExcerptRenderer(): any {
-    if (!this.excerptMd) {
-      try {
-        const MarkdownIt = require('markdown-it');
-        const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
-        // Attach the SCEpter plugin so body excerpts get the same
-        // claim-ref styling, badges, and data attributes the main
-        // preview emits. After attachment, every claim ref inside an
-        // excerpt renders as <a class="scepter-ref">…</a> and any
-        // claim definition that lands at a recognized line gets its
-        // ●N badge. The webview re-runs attachListeners after rendering
-        // so those refs become hoverable inside the tooltip itself.
-        const { createScepterPlugin } = require('./markdown-plugin');
-        md.use(createScepterPlugin(this));
-        this.excerptMd = md;
-      } catch {
-        // markdown-it not available — return null and skip HTML rendering
-        return null;
-      }
-    }
-    return this.excerptMd;
-  }
-
-  /**
-   * Render markdown to HTML through the excerpt renderer. `envExtras`
-   * is merged into the markdown-it env so the SCEpter plugin can
-   * resolve `currentDocument` (for contextNoteId) and apply the line
-   * offset (`_scepterLineOffset`) — the excerpt content is a slice of
-   * the original document, so line indices need to be shifted before
-   * comparing against the claim index's 1-indexed entry.line values.
-   */
-  private renderMarkdownToHtml(raw: string, envExtras?: any): string | null {
-    const md = this.getExcerptRenderer();
-    if (!md) return null;
-    try {
-      const env = envExtras ? { ...envExtras } : {};
-      return md.render(raw, env).trim();
-    } catch {
-      return null;
-    }
-  }
-
-  // @implements {R012.§7.AC.01} excerpt cache built by rendering each claim/note body through markdown-it + SCEpter plugin
-  // @implements {R012.§7.AC.02} env carries currentDocument.fsPath and _scepterLineOffset for badge anchor remap
-  // @implements {R012.§7.AC.05} note excerpt capped at 50 lines with `*…content continues*` truncation marker
-  private async buildExcerptCache(): Promise<void> {
-    const noteExcerpts = new Map<string, string>();
-    const htmlExcerpts = new Map<string, string>();
-    const noteLines = new Map<string, string[]>();
-
-    // ---- Phase 1: read raw text and aggregated lines for every note + claim ----
-    // No rendering yet. We need this data populated before any render runs so
-    // the plugin's citing-line snippet builder (which reads aggregated lines
-    // for OTHER notes) can resolve them sync.
-    const noteIds = Array.from(this.noteMap.keys());
-    await mapWithConcurrency(noteIds, 32, async (noteId) => {
-      const raw = await this.readNoteExcerpt(noteId, Infinity);
-      if (raw) noteExcerpts.set(noteId, raw);
-      const aggregated = await this.getAggregatedNoteLines(noteId);
-      if (aggregated) noteLines.set(noteId, aggregated);
-      return null;
-    });
-
-    const entries = Array.from(this.entries.entries());
-    const claimRawEntries: Array<{ fqid: string; entry: ClaimIndexEntry; raw: string }> = [];
-    await mapWithConcurrency(entries, 32, async ([fqid, entry]) => {
-      const raw = await this.readClaimContext(entry, 1, 200);
-      if (!raw) return null;
-      noteExcerpts.set('claim:' + fqid, raw);
-      claimRawEntries.push({ fqid, entry, raw });
-      return null;
-    });
-
-    // ---- Phase 2: assign caches before rendering ----
-    // Renders that come next look up `noteLinesCache` (for citing-line
-    // snippet building) and `htmlExcerptCache` (for nested-ref
-    // `data-claim-context` data attributes). Pointing the cache fields
-    // at the maps we're populating means each render sees other
-    // already-completed renders' data via shared state.
-    this.noteExcerptCache = noteExcerpts;
-    this.noteLinesCache = noteLines;
-    this.htmlExcerptCache = htmlExcerpts;
-
-    // ---- Phase 3: render note excerpts (capped) ----
-    await mapWithConcurrency(noteIds, 32, async (noteId) => {
-      const raw = noteExcerpts.get(noteId);
-      if (!raw) return null;
-      const lines = raw.split('\n');
-      const capped = lines.length > 50
-        ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*'
-        : raw;
-      const html = this.renderMarkdownToHtml(capped);
-      if (html) htmlExcerpts.set(noteId, html);
-      return null;
-    });
-
-    // ---- Phase 4: render claim excerpts (single pass, bare bodies) ----
-    // Each excerpt is rendered without nested `data-claim-context` —
-    // refs inside carry only `data-claim-fqid`. The webview looks up
-    // the body for any ref via `window.__scepterBodyMap[fqid]` (a
-    // single global map injected once per main-document render), so
-    // nested hovers resolve at any depth without per-ref recursion in
-    // the data attributes.
-    await mapWithConcurrency(claimRawEntries, 32, async ({ fqid, entry, raw }) => {
-      const absPath = this.resolveFilePath(entry.noteFilePath);
-      const html = this.renderMarkdownToHtml(raw, {
-        currentDocument: { fsPath: absPath },
-        _scepterLineOffset: Math.max(0, entry.line - 1),
-      });
-      if (html) htmlExcerpts.set('claim:' + fqid, html);
-      return null;
-    });
+    return this.getBodyResolver().getNoteLinesSync(noteId);
   }
 
   /**
@@ -1217,20 +1099,17 @@ export class ClaimIndexCache {
         );
       }
 
-      // Fire refresh BEFORE the excerpt cache builds so badges, hover, and
-      // decorations light up immediately. The excerpt cache feeds the rich
-      // markdown-preview tooltips and can populate in the background — when
-      // it finishes, fire refresh again so preview tooltips upgrade.
+      // Body excerpts are now rendered on-demand by the
+      // ClaimBodyResolver (see getBodyResolver) rather than eagerly
+      // batched here. Drop any per-note caches the resolver may have
+      // populated against the prior corpus so the next access sees
+      // fresh content.
+      if (this.bodyResolver) {
+        this.bodyResolver.clear();
+      }
+
       this.resolveReady();
       this._onDidRefresh.fire();
-
-      this.buildExcerptCache().then(() => {
-        this._onDidRefresh.fire();
-      }).catch((err) => {
-        this.outputChannel.appendLine(
-          `[ClaimIndex] Excerpt cache build failed: ${(err as Error).message}`,
-        );
-      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.appendLine(`[ClaimIndex] Refresh failed: ${message}`);
@@ -1293,9 +1172,20 @@ export class ClaimIndexCache {
         `${dp}/**/*.md`,
       );
       const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-      watcher.onDidChange(() => this.debouncedRefresh());
-      watcher.onDidCreate(() => this.debouncedRefresh());
-      watcher.onDidDelete(() => this.debouncedRefresh());
+      // Per-note invalidation: drop the resolver's cached body / lines
+      // for the changed note BEFORE the debounced full refresh runs,
+      // so any hover / preview render that races the refresh sees
+      // fresh content rather than the stale render.
+      const onMutate = (uri: vscode.Uri): void => {
+        const noteId = noteIdFromPath(uri.fsPath);
+        if (noteId && this.bodyResolver) {
+          this.bodyResolver.invalidate(noteId);
+        }
+        this.debouncedRefresh();
+      };
+      watcher.onDidChange(onMutate);
+      watcher.onDidCreate(onMutate);
+      watcher.onDidDelete(onMutate);
       this.fileWatchers.push(watcher);
     }
 
@@ -1516,9 +1406,10 @@ export class ClaimIndexCache {
     this.latestErrors = [];
     this.suffixIndex = new Map();
     this.knownShortcodes = new Set();
-    this.noteExcerptCache = new Map();
-    this.htmlExcerptCache = new Map();
-    this.noteLinesCache = new Map();
+    if (this.bodyResolver) {
+      this.bodyResolver.clear();
+      this.bodyResolver = null;
+    }
 
     // Reset ready gate
     this.ready = new Promise((resolve) => {

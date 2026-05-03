@@ -17,7 +17,7 @@ import { ReferencesTreeProvider } from './views/references-tree-provider';
 import { ConfidenceTreeProvider } from './views/confidence-tree-provider';
 import { TraceabilityViewProvider } from './views/traceability-view-provider';
 import { showClaimSearchQuickPick, navigateToClaim } from './views/search-command';
-import { noteIdFromPath } from './patterns';
+import { noteIdFromPath, parseNormalizedAddress } from './patterns';
 
 const SUPPORTED_LANGUAGES = [
   { language: 'typescript' },
@@ -349,7 +349,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{ exte
      * @implements {R011.§4.AC.08} markdown preview click-target dispatcher
      */
     vscode.commands.registerCommand('scepter.openCrossProject', async (aliasName: string, normalizedId: string) => {
-      const address = parseNormalizedAddressForOpen(normalizedId);
+      const address = parseNormalizedAddress(normalizedId);
       if (!address) {
         vscode.window.showWarningMessage(
           `Cannot navigate cross-project reference: malformed address '${normalizedId}'.`,
@@ -576,35 +576,3 @@ export function deactivate(): void {
   // Cleanup handled by disposables
 }
 
-/**
- * Parse a normalized claim ID (e.g. `R005.1.AC.01`) into address
- * components for `claimIndex.resolveCrossProject`. Local copy of the
- * helper that lives in hover-provider/definition-provider; inlined
- * here for the openCrossProject command rather than exporting from
- * either provider (avoids deepening the module graph for one command).
- */
-function parseNormalizedAddressForOpen(
-  normalized: string,
-): { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number } | null {
-  const parts = normalized.split('.');
-  if (parts.length === 0) return null;
-  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return null;
-  const noteId = parts[0];
-  if (parts.length === 1) return { noteId };
-  const sectionParts: number[] = [];
-  let i = 1;
-  for (; i < parts.length; i++) {
-    if (/^\d+$/.test(parts[i])) sectionParts.push(parseInt(parts[i], 10));
-    else break;
-  }
-  if (i < parts.length - 1 && /^[A-Z]+$/.test(parts[i]) && /^\d{2,3}[a-z]?$/.test(parts[i + 1])) {
-    const claimNumMatch = parts[i + 1].match(/^(\d{2,3})([a-z])?$/)!;
-    return {
-      noteId,
-      sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
-      claimPrefix: parts[i],
-      claimNumber: parseInt(claimNumMatch[1], 10),
-    };
-  }
-  return { noteId, sectionPath: sectionParts.length > 0 ? sectionParts : undefined };
-}
