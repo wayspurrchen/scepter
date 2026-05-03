@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ClaimIndexCache } from './claim-index';
-import { matchAtPosition, noteIdFromPath } from './patterns';
+import { matchAtPosition, noteIdFromPath, parseNormalizedAddress } from './patterns';
 
 export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
   constructor(private index: ClaimIndexCache) {}
@@ -77,7 +77,7 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
     const aliasEntry = this.index.getAlias(aliasName);
     if (!aliasEntry?.resolved) return null;
 
-    const address = parseNormalizedAddressForGoto(match.normalizedId);
+    const address = parseNormalizedAddress(match.normalizedId);
     if (!address) return null;
     const result = await this.index.resolveCrossProject(aliasName, address);
     if (!result.ok) return null;
@@ -100,28 +100,3 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
   }
 }
 
-function parseNormalizedAddressForGoto(
-  normalized: string,
-): { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number } | null {
-  const parts = normalized.split('.');
-  if (parts.length === 0) return null;
-  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return null;
-  const noteId = parts[0];
-  if (parts.length === 1) return { noteId };
-  const sectionParts: number[] = [];
-  let i = 1;
-  for (; i < parts.length; i++) {
-    if (/^\d+$/.test(parts[i])) sectionParts.push(parseInt(parts[i], 10));
-    else break;
-  }
-  if (i < parts.length - 1 && /^[A-Z]+$/.test(parts[i]) && /^\d{2,3}[a-z]?$/.test(parts[i + 1])) {
-    const claimNumMatch = parts[i + 1].match(/^(\d{2,3})([a-z])?$/)!;
-    return {
-      noteId,
-      sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
-      claimPrefix: parts[i],
-      claimNumber: parseInt(claimNumMatch[1], 10),
-    };
-  }
-  return { noteId, sectionPath: sectionParts.length > 0 ? sectionParts : undefined };
-}

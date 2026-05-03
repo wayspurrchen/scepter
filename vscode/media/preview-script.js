@@ -747,14 +747,50 @@
     hideTooltipsFromLevel(clickedLevel + 1);
   }, true);
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', attachListeners);
-  } else {
+  /**
+   * Read the document-scoped body map from the hidden
+   * `<div id="__scepter-body-map" data-scepter-body-map="...">` the
+   * markdown plugin injects. This replaces an earlier inline-script
+   * approach that VS Code's markdown preview content security
+   * stripped (surfacing as the "some content has been disabled"
+   * warning and leaving every nested-hover body empty).
+   *
+   * Re-runs on every mutation tick because the markdown preview
+   * re-renders the body whenever the source changes; the new render
+   * brings a fresh (and possibly larger) body map div which we merge
+   * onto whatever's already in window.__scepterBodyMap.
+   */
+  function loadBodyMap() {
+    var el = document.getElementById('__scepter-body-map');
+    if (!el) return;
+    var data = el.getAttribute('data-scepter-body-map');
+    if (!data) return;
+    try {
+      var map = JSON.parse(data);
+      if (window.__scepterBodyMap) {
+        Object.assign(window.__scepterBodyMap, map);
+      } else {
+        window.__scepterBodyMap = map;
+      }
+    } catch (e) {
+      // Malformed JSON — leave existing map untouched.
+    }
+  }
+
+  function init() {
+    loadBodyMap();
     attachListeners();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 
   var observer = new MutationObserver(function () {
     if (isTooltipMutation) return;
+    loadBodyMap();
     attachListeners();
   });
   observer.observe(document.body, { childList: true, subtree: true });

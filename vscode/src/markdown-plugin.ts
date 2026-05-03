@@ -17,6 +17,12 @@
 import * as path from 'path';
 import { ClaimIndexCache, ClaimIndexEntry } from './claim-index';
 import { findAllMatches, noteIdFromPath, type ClaimMatch } from './patterns';
+import {
+  buildRefsPanelDescriptor,
+  firstSentence,
+  RefsPanelDescriptor,
+  SnippetDescriptor,
+} from './refs-panel-builder';
 
 /**
  * Create a markdown-it plugin that has access to the claim index.
@@ -43,29 +49,55 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       }
     });
 
-    // Inject the global body map at the start of every main-document
-    // render. The webview's tooltip body panel uses `window.__scepterBodyMap[fqid]`
-    // to fetch a claim's pre-rendered body excerpt at any nesting
-    // depth — that's how deeply-nested hovers work without an
-    // exponential explosion of inlined data attributes. We skip the
-    // injection during excerpt rendering itself (signalled by
-    // `env._scepterLineOffset`), since each excerpt is rendered as a
-    // partial document and shouldn't carry the body map of the entire
-    // project.
+    // Inject a document-scoped body map at the start of every
+    // main-document render. The webview's tooltip body panel uses
+    // `window.__scepterBodyMap[fqid]` to fetch a claim's pre-rendered
+    // body excerpt at any nesting depth — that's how deeply-nested
+    // hovers work without an exponential explosion of inlined data
+    // attributes.
+    //
+    // The map is built lazily, scoped to FQIDs reachable from the
+    // current document: we walk the token stream to collect every
+    // matched FQID as a seed set, then ask the resolver to follow
+    // citations transitively (bounded by depth + total bodies). This
+    // replaces the prior approach of stringifying the entire corpus's
+    // body cache into every preview render — that ballooned to tens
+    // of megabytes on large projects and overwhelmed the webview.
+    //
+    // Excerpt renders themselves (signalled by `_scepterLineOffset`)
+    // skip the injection: each excerpt is a partial document, and its
+    // own body map gets stitched in by the parent main-document
+    // render anyway via the BFS.
     md.core.ruler.push('scepter-body-map-inject', function (state: any) {
       if (state.env && typeof state.env._scepterLineOffset === 'number') return;
-      // Avoid double-injection if a ruler chain re-runs on the same state.
       if (state.tokens.length > 0 && (state.tokens[0] as any)._scepterBodyMap) return;
-      const map = index.getAllClaimBodyMap();
-      const json = JSON.stringify(map);
-      // Use Object.assign so successive renders accumulate updates rather
-      // than blowing away the map (handy if the index rebuilds between
-      // renders during the same webview session).
-      const script =
-        '<script>(function(){var m=' + json +
-        ';if(window.__scepterBodyMap){Object.assign(window.__scepterBodyMap,m);}else{window.__scepterBodyMap=m;}})();</script>';
+
+      const seeds = collectFqidSeeds(state.tokens, index.knownShortcodes);
+      const bodyMap = index.getBodyResolver().resolveTransitive(
+        seeds,
+        /* maxDepth */ 5,
+        /* maxBodies */ 500,
+      );
+
+      const obj: Record<string, string> = {};
+      for (const [fqid, html] of bodyMap) {
+        obj[fqid] = html;
+      }
+      const json = JSON.stringify(obj);
+
+      // Inject the body map as a hidden DOM element rather than an
+      // inline <script>. VS Code's markdown preview defaults to
+      // strict content security, which strips inline scripts and
+      // surfaces a "some content has been disabled" warning. A data
+      // attribute on a regular element survives sanitization. The
+      // preview-script.js reads it on load and after every preview
+      // mutation and assigns to window.__scepterBodyMap.
+      const html =
+        '<div id="__scepter-body-map" data-scepter-body-map="' +
+        escAttr(json) +
+        '" style="display:none"></div>';
       const tok = new state.Token('html_block', '', 0);
-      tok.content = script;
+      tok.content = html;
       (tok as any)._scepterBodyMap = true;
       state.tokens.unshift(tok);
     });
@@ -211,13 +243,46 @@ const CSS_MAP: Record<ClaimMatch['kind'], string> = {
   'section': 'scepter-section',
 };
 
-// Tunable budgets for citing-line snippets — same numbers as
-// hover-provider.buildReferenceSnippet so editor and preview render the
-// same window.
-const SNIPPET_HEAD = 80;
-const SNIPPET_WINDOW_BEFORE = 50;
-const SNIPPET_WINDOW_AFTER = 70;
-const SNIPPET_SIMPLE_CAP = 200;
+/**
+ * Walk a markdown-it token stream and collect every FQID-shaped
+ * reference appearing in inline text. Used by the body-map-inject
+ * ruler to seed the document-scoped transitive body map. We use the
+ * same `findAllMatches` matcher the text renderer uses, so the seed
+ * set matches exactly what will be rendered as `<a class="scepter-ref">`.
+ *
+ * Returns deduplicated normalized IDs; FQID resolution (note vs claim
+ * vs section, alias-prefixed cross-project routing) happens later in
+ * the resolver — this just feeds candidate ids through.
+ */
+function collectFqidSeeds(tokens: any[], knownShortcodes: Set<string>): string[] {
+  const seen = new Set<string>();
+  const visit = (toks: any[]): void => {
+    for (const tok of toks) {
+      if (tok.type === 'inline' && Array.isArray(tok.children)) {
+        visit(tok.children);
+        continue;
+      }
+      if (tok.type === 'text' && typeof tok.content === 'string' && tok.content.length > 0) {
+        const matches = findAllMatches(tok.content, true, knownShortcodes);
+        for (const m of matches) {
+          // Cross-project aliases address peers, not the local body
+          // map — skip them. The local body map only contains local
+          // claim/note bodies.
+          if (m.aliasPrefix) continue;
+          if (m.rangeMembers && m.rangeMembers.length > 0) {
+            for (const member of m.rangeMembers) {
+              if (!seen.has(member)) seen.add(member);
+            }
+          } else if (!seen.has(m.normalizedId)) {
+            seen.add(m.normalizedId);
+          }
+        }
+      }
+    }
+  };
+  visit(tokens);
+  return Array.from(seen);
+}
 
 function escAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -427,7 +492,7 @@ function buildDataAttrs(
       // Encoded as a JSON array on a data attribute so the webview can
       // build the panel DOM without round-tripping back to the host.
       // @implements {R012.§4.AC.08} pre-built JSON descriptor on `data-claim-refs`; webview drops into innerHTML without re-escape
-      const refsJson = buildRefsJson(index, entry, currentDocDir);
+      const refsJson = buildRefsJson(index, entry);
       if (refsJson) {
         attrs.push(`data-claim-refs="${escAttr(refsJson)}"`);
       }
@@ -444,10 +509,15 @@ function buildDataAttrs(
       attrs.push(`data-note-file="${escAttr(noteInfo.noteFilePath)}"`);
       attrs.push(`data-claim-count="${noteInfo.claimCount}"`);
 
-      const excerptHtml = index.getNoteExcerptHtml(noteInfo.noteId);
-      if (excerptHtml) {
-        attrs.push(`data-note-excerpt="${escAttr(excerptHtml)}"`);
-      }
+      // Note excerpt is intentionally NOT eagerly rendered here. Doing
+      // so recurses without bound: rendering note A's body calls
+      // buildDataAttrs for every note B it cites, which calls
+      // resolveNoteBodySync(B), which renders B, etc. Cache doesn't
+      // help because entries land after the render returns. Note
+      // bodies belong in the body-map walk (resolveTransitive) so the
+      // webview can fetch them from window.__scepterBodyMap on demand.
+      // Until that's wired, preview note hovers omit the rich excerpt
+      // and fall back to title + claim count.
 
       attrs.push(`title="${escAttr(normalizedId)} — ${escAttr(noteInfo.noteTitle)}"`);
     } else {
@@ -517,93 +587,94 @@ function buildDataAttrs(
 function buildRefsJson(
   index: ClaimIndexCache,
   entry: ClaimIndexEntry,
-  currentDocDir: string,
 ): string | null {
-  const projectDir = index.projectDir;
-  const incoming = index.incomingRefs(entry.fullyQualified);
-  const sourceRefs = incoming.filter((r) => r.fromNoteId.startsWith('source:'));
-  const noteRefs = incoming.filter((r) => !r.fromNoteId.startsWith('source:'));
-
-  // Sources subsection — list of file:line entries with command: hrefs.
-  const sources = sourceRefs.map((r) => {
-    const abs = index.resolveFilePath(r.filePath) ?? r.filePath;
-    const rel = path.relative(projectDir, abs);
-    const href = makeOpenCommandHref(abs, r.line || 1);
-    return { rel, line: r.line, href };
+  const descriptor = buildRefsPanelDescriptor(index, entry.fullyQualified, {
+    projectDir: index.projectDir,
+    getNoteLines: (id) => index.getAggregatedNoteLinesSync(id),
   });
-
-  // Notes subsection — group by source noteId. Per-ref item carries
-  // either `derivation` (with heading excerpt) or `reference` (with
-  // citing-line snippetHtml) flag.
-  const targetFqid = entry.fullyQualified;
-  const grouped = new Map<string, typeof noteRefs>();
-  for (const r of noteRefs) {
-    const arr = grouped.get(r.fromNoteId) ?? [];
-    arr.push(r);
-    grouped.set(r.fromNoteId, arr);
-  }
-
-  const noteGroups: any[] = [];
-  for (const [noteId, refs] of grouped) {
-    const info = index.lookupNote(noteId);
-    const noteHref = info?.noteFilePath
-      ? makeOpenCommandHref(index.resolveFilePath(info.noteFilePath), 1)
-      : null;
-    const items: any[] = [];
-    const noteLines = index.getAggregatedNoteLinesSync(noteId);
-
-    for (const r of refs) {
-      const sourceEntry = index.lookup(r.fromClaim);
-      const isDerivation = sourceEntry?.derivedFrom.includes(targetFqid) ?? false;
-      const abs = index.resolveFilePath(r.filePath) ?? r.filePath;
-      const itemHref = makeOpenCommandHref(abs, r.line || 1);
-
-      if (isDerivation && sourceEntry) {
-        const localId = r.fromClaim.startsWith(`${noteId}.`)
-          ? r.fromClaim.slice(noteId.length + 1)
-          : r.fromClaim;
-        const excerpt = firstSentence(sourceEntry.heading, 80);
-        items.push({
-          kind: 'derivation',
-          localId,
-          headingExcerpt: excerpt,
-          href: itemHref,
-          line: r.line,
-        });
-      } else {
-        const linkText = sourceEntry
-          ? (r.fromClaim.startsWith(`${noteId}.`)
-              ? r.fromClaim.slice(noteId.length + 1)
-              : r.fromClaim)
-          : `line ${r.line}`;
-        const snippetHtml = buildReferenceSnippetHtml(noteLines, r.line, targetFqid, index);
-        items.push({
-          kind: 'reference',
-          localId: linkText,
-          snippetHtml,
-          href: itemHref,
-          line: r.line,
-        });
-      }
-    }
-
-    noteGroups.push({
-      noteId,
-      noteType: info?.noteType ?? '',
-      noteTitle: info?.noteTitle ?? noteId,
-      noteHref,
-      items,
-    });
-  }
 
   // Skip the attribute entirely when there are no refs at all so the
   // webview can fall back to the simple original layout (no Sources /
   // Notes sections cluttering the tooltip).
-  if (sources.length === 0 && noteGroups.length === 0) {
+  if (descriptor.sources.length === 0 && descriptor.noteGroups.length === 0) {
     return null;
   }
 
+  // Walk the descriptor into the exact JSON shape the webview reads.
+  // Field names (`rel`, `line`, `href`, `noteId`, `noteType`, `noteTitle`,
+  // `noteHref`, `items[].kind`, `items[].localId`, `items[].headingExcerpt`,
+  // `items[].snippetHtml`) match what `media/preview-script.js`
+  // (buildRefsPanelHtml) consumes — see preview-script.js:392-471.
+  const sources = descriptor.sources.map((src) => ({
+    rel: src.rel,
+    line: src.line,
+    href: makeOpenCommandHref(src.abs, src.line || 1),
+  }));
+
+  const noteGroups = descriptor.noteGroups.map((group) => {
+    const noteHref = group.noteFilePath
+      ? makeOpenCommandHref(index.resolveFilePath(group.noteFilePath), 1)
+      : null;
+    const items = group.items.map((item) => {
+      const itemHref = makeOpenCommandHref(item.abs, item.line || 1);
+      if (item.kind === 'derivation') {
+        return {
+          kind: 'derivation',
+          localId: item.localId,
+          headingExcerpt: item.headingExcerpt,
+          href: itemHref,
+          line: item.line,
+        };
+      }
+      return {
+        kind: 'reference',
+        localId: item.localId,
+        snippetHtml: renderSnippetPreviewHtml(item.snippet),
+        href: itemHref,
+        line: item.line,
+      };
+    });
+    return {
+      noteId: group.noteId,
+      noteType: group.noteType,
+      noteTitle: group.noteTitle,
+      noteHref,
+      items,
+    };
+  });
+
   return JSON.stringify({ sources, noteGroups });
+}
+
+/**
+ * Walk a SnippetDescriptor into the preview's HTML snippet form. The
+ * webview drops `snippetHtml` straight into `innerHTML` (see
+ * `media/preview-script.js` buildRefsPanelHtml at the `item.snippetHtml`
+ * site), so segments are escaped via `escHtml` and dim segments wear
+ * the `scepter-snippet-dim` class — same shape `buildReferenceSnippetHtml`
+ * used to produce inline. Hit segments are wrapped in `<b>`. Unavailable
+ * and empty markers render the same `<i>(…)</i>` text inside the dim
+ * wrapper as before.
+ */
+function renderSnippetPreviewHtml(snippet: SnippetDescriptor): string {
+  let out = '';
+  for (const seg of snippet.segments) {
+    switch (seg.kind) {
+      case 'dim':
+        out += `<span class="scepter-snippet-dim">${escHtml(seg.text)}</span>`;
+        break;
+      case 'hit':
+        out += `<b>${escHtml(seg.text)}</b>`;
+        break;
+      case 'unavailable':
+        out += `<span class="scepter-snippet-dim"><i>(snippet unavailable)</i></span>`;
+        break;
+      case 'empty':
+        out += `<span class="scepter-snippet-dim"><i>(empty line)</i></span>`;
+        break;
+    }
+  }
+  return out;
 }
 
 /**
@@ -618,71 +689,6 @@ function buildRefsJson(
 function makeOpenCommandHref(absPath: string, line: number): string {
   const args = encodeURIComponent(JSON.stringify([absPath, line || 1]));
   return `command:scepter.previewOpenAt?${args}`;
-}
-
-/**
- * Build an HTML snippet for the line containing a reference. The
- * surrounding text is dimmed; the target FQID is bolded if locatable
- * via the same matcher the decoration layer uses. Mirrors the editor
- * hover algorithm in `hover-provider.buildReferenceSnippet`.
- *
- * @implements {R012.§2.AC.07} head-budget vs window-around-hit truncation (preview-side mirror)
- */
-function buildReferenceSnippetHtml(
-  noteLines: string[] | null,
-  line: number,
-  targetFqid: string,
-  index: ClaimIndexCache,
-): string {
-  if (!noteLines || line < 1 || line > noteLines.length) {
-    return `<span class="scepter-snippet-dim"><i>(snippet unavailable)</i></span>`;
-  }
-  const raw = noteLines[line - 1].trim();
-  if (raw.length === 0) {
-    return `<span class="scepter-snippet-dim"><i>(empty line)</i></span>`;
-  }
-
-  const matches = findAllMatches(raw, true, index.knownShortcodes);
-  const hit = matches.find((m) => m.normalizedId === targetFqid);
-
-  if (!hit) {
-    const truncated = raw.length > SNIPPET_SIMPLE_CAP ? raw.slice(0, SNIPPET_SIMPLE_CAP) + '…' : raw;
-    return `<span class="scepter-snippet-dim">${escHtml(truncated)}</span>`;
-  }
-
-  if (hit.start < SNIPPET_HEAD) {
-    const tailEnd = Math.min(raw.length, Math.max(SNIPPET_SIMPLE_CAP, hit.end + SNIPPET_WINDOW_AFTER));
-    const before = raw.slice(0, hit.start);
-    const matched = raw.slice(hit.start, Math.min(hit.end, tailEnd));
-    const after = raw.slice(Math.min(hit.end, tailEnd), tailEnd);
-    const ellipsis = tailEnd < raw.length ? '…' : '';
-    return (
-      `<span class="scepter-snippet-dim">${escHtml(before)}</span>` +
-      `<b>${escHtml(matched)}</b>` +
-      `<span class="scepter-snippet-dim">${escHtml(after)}${ellipsis}</span>`
-    );
-  }
-
-  const head = raw.slice(0, SNIPPET_HEAD);
-  const winStart = Math.max(SNIPPET_HEAD, hit.start - SNIPPET_WINDOW_BEFORE);
-  const winEnd = Math.min(raw.length, hit.end + SNIPPET_WINDOW_AFTER);
-  const beforeHit = raw.slice(winStart, hit.start);
-  const matched = raw.slice(hit.start, Math.min(hit.end, winEnd));
-  const afterHit = raw.slice(Math.min(hit.end, winEnd), winEnd);
-  const trailEllipsis = winEnd < raw.length ? '…' : '';
-  return (
-    `<span class="scepter-snippet-dim">${escHtml(head)} … ${escHtml(beforeHit)}</span>` +
-    `<b>${escHtml(matched)}</b>` +
-    `<span class="scepter-snippet-dim">${escHtml(afterHit)}${trailEllipsis}</span>`
-  );
-}
-
-/** Take the first sentence (or up to maxLen characters) for ref previews. */
-function firstSentence(text: string, maxLen: number): string {
-  const trimmed = text.trim();
-  const period = trimmed.search(/[.!?](\s|$)/);
-  const cutoff = period > 0 && period < maxLen ? period + 1 : maxLen;
-  return trimmed.length <= cutoff ? trimmed : trimmed.slice(0, cutoff).trimEnd() + '…';
 }
 
 /**

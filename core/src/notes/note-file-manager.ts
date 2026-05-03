@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import fs from 'fs-extra';
+import { readFileSync } from 'fs';
 import { stat } from 'fs/promises';
 import * as chokidar from 'chokidar';
 import { glob } from 'glob';
@@ -8,7 +9,7 @@ import matter from 'gray-matter';
 import type { Note } from '../types/note';
 import type { ConfigManager } from '../config/config-manager';
 import type { NoteTypeConfig } from '../types/config';
-import { createFolderStructure, detectFolderNote, scanFolderContents } from './folder-utils';
+import { createFolderStructure, detectFolderNote, scanFolderContents, scanFolderContentsSync } from './folder-utils';
 
 export class NoteFileManager extends EventEmitter {
   private noteIndex: Map<string, string> = new Map(); // noteId -> filePath
@@ -218,6 +219,46 @@ export class NoteFileManager extends EventEmitter {
         const raw = await fs.readFile(path.join(dir, companion), 'utf-8');
         // Strip frontmatter from companions so only the main file's
         // frontmatter survives in the concatenated output.
+        const { content: body } = matter(raw);
+        aggregated += '\n\n' + body;
+      }
+      return aggregated;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Synchronous companion to getAggregatedContents. Same folder-note
+   * aggregation semantics — main file plus alphabetized companion .md
+   * files with their frontmatter stripped — but uses sync filesystem
+   * primitives so it can be called from a markdown-it render hook.
+   */
+  getAggregatedContentsSync(noteId: string): string | null {
+    const filePath = this.noteIndex.get(noteId);
+    if (!filePath) return null;
+
+    try {
+      const mainContent = readFileSync(filePath, 'utf-8');
+
+      const dir = path.dirname(filePath);
+      const dirName = path.basename(dir);
+      const idMatch = dirName.match(/^([A-Z]+\d+)/);
+
+      if (!idMatch || idMatch[1] !== noteId) {
+        return mainContent;
+      }
+
+      const companionFiles = scanFolderContentsSync(dir);
+      const mdCompanions = companionFiles
+        .filter((f) => f.endsWith('.md'))
+        .sort();
+
+      if (mdCompanions.length === 0) return mainContent;
+
+      let aggregated = mainContent;
+      for (const companion of mdCompanions) {
+        const raw = readFileSync(path.join(dir, companion), 'utf-8');
         const { content: body } = matter(raw);
         aggregated += '\n\n' + body;
       }

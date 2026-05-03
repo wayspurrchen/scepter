@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { ClaimIndexCache, ClaimIndexEntry, NoteInfo, SectionEntry } from './claim-index';
-import { matchAtPosition, findAllMatches, noteIdFromPath } from './patterns';
+import { matchAtPosition, noteIdFromPath, parseNormalizedAddress } from './patterns';
+import {
+  buildRefsPanelDescriptor,
+  firstSentence,
+  RefsPanelDescriptor,
+  SnippetDescriptor,
+} from './refs-panel-builder';
 
 function escapeHtml(s: string): string {
   return s
@@ -15,6 +20,33 @@ function escapeHtml(s: string): string {
  *  so paths like `__tests__/foo.ts` don't get rendered as **tests** bold. */
 function escapeMarkdown(s: string): string {
   return escapeHtml(s).replace(/_/g, '\\_').replace(/\*/g, '\\*');
+}
+
+/** Walk a SnippetDescriptor and produce the editor-hover HTML form:
+ *  dim segments wrapped in `<span style="opacity:0.6">…</span>`, hits
+ *  in `<b>…</b>`, escape via escapeMarkdown so paths/identifiers in
+ *  the snippet don't get treated as bold/italic by the MarkdownString
+ *  renderer. The unavailable/empty markers carry their own italic
+ *  inside the dim wrapper. */
+function renderSnippetEditorHtml(snippet: SnippetDescriptor): string {
+  let out = '';
+  for (const seg of snippet.segments) {
+    switch (seg.kind) {
+      case 'dim':
+        out += `<span style="opacity:0.6">${escapeMarkdown(seg.text)}</span>`;
+        break;
+      case 'hit':
+        out += `<b>${escapeMarkdown(seg.text)}</b>`;
+        break;
+      case 'unavailable':
+        out += `<span style="opacity:0.6"><i>(snippet unavailable)</i></span>`;
+        break;
+      case 'empty':
+        out += `<span style="opacity:0.6"><i>(empty line)</i></span>`;
+        break;
+    }
+  }
+  return out;
 }
 
 /** Inline style for a hover-cell scroll region. VS Code's hover renderer
@@ -148,11 +180,16 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     const uri = vscode.Uri.file(absPath);
     const openCmd = `command:vscode.open?${encodeURIComponent(JSON.stringify([uri, { selection: { startLineNumber: entry.line, startColumn: 1 } }]))}`;
 
-    const incoming = this.index.incomingRefs(entry.fullyQualified);
-    const sourceRefs = incoming.filter((r) => r.fromNoteId.startsWith('source:'));
-    const noteRefs = incoming.filter((r) => !r.fromNoteId.startsWith('source:'));
-
-    const refsHtml = await this.buildRefsHtml(entry.fullyQualified, sourceRefs, noteRefs, projectDir);
+    // Refs panel: build the structured descriptor synchronously through
+    // the body resolver's bounded LRU. The previous editor path awaited
+    // one filesystem read per distinct source note in parallel — which
+    // (a) stalled the hover during cold-cache renders and (b) duplicated
+    // the preview's own panel-build logic. The shared builder fixes both.
+    const descriptor = buildRefsPanelDescriptor(this.index, entry.fullyQualified, {
+      projectDir,
+      getNoteLines: (id) => this.index.getAggregatedNoteLinesSync(id),
+    });
+    const refsHtml = this.buildRefsHtml(descriptor);
 
     const badges: string[] = [];
     if (entry.importance !== undefined) badges.push(`importance: ${entry.importance}`);
@@ -172,7 +209,12 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     }
 
     // Reference-to-claim hover: 2-column layout — refs on the left,
-    // claim body / metadata on the right.
+    // claim body / metadata on the right. Body excerpt is the raw
+    // claim text rendered as preformatted+wrapped content. We tried
+    // embedding rendered HTML (markdown-it output) here, but VS Code's
+    // hover MarkdownString renderer strips most of the styling that
+    // makes that output legible, so the previous raw-text behavior is
+    // both more reliable and visually closer to what users had before.
     const contextText = await this.index.readClaimContext(entry, 1, 200);
     const bodyHtml = this.buildBodyHtml(entry, noteTitle, contextText, openCmd, badgeHtml);
 
@@ -187,97 +229,65 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
   }
 
   /**
-   * Render the refs panel: a Sources subsection (clickable file:line) and a
-   * Notes subsection grouped by source note (note id + type + title header,
-   * with each ref labeled as derivation or reference and showing a short
-   * heading excerpt). Empty subsections get an explicit "no refs" line so
-   * the user knows the absence is informative, not a missing render.
+   * Render the refs panel from a structured descriptor. Sources subsection
+   * (clickable file:line) followed by a Notes subsection grouped by source
+   * note (note id + type + title header, with each ref labeled as derivation
+   * or reference and showing a short heading excerpt or citing-line snippet).
+   * Empty subsections get an explicit "no refs" line so the user knows the
+   * absence is informative, not a missing render.
+   *
+   * Synchronous: the descriptor is built ahead of time via the shared
+   * `buildRefsPanelDescriptor`, which sources citing lines from the body
+   * resolver's bounded LRU. The previous editor path awaited one filesystem
+   * read per distinct source note in parallel — see the architectural
+   * review for the hover-stall background.
    *
    * @implements {R012.§2.AC.04} sources/notes split with counts; "No X references" lines when empty
    * @implements {R012.§2.AC.05} notes grouped by source noteId; derivation vs reference flag
    * @implements {R012.§2.AC.06} derivation: localId + heading excerpt; reference: localId + citing-line snippet
    */
-  private async buildRefsHtml(
-    targetFqid: string,
-    sourceRefs: { fromClaim: string; fromNoteId: string; filePath: string; line: number }[],
-    noteRefs: { fromClaim: string; fromNoteId: string; filePath: string; line: number }[],
-    projectDir: string,
-  ): Promise<string> {
+  private buildRefsHtml(descriptor: RefsPanelDescriptor): string {
+    const { sources, noteGroups } = descriptor;
     const lines: string[] = [];
 
-    lines.push(`<b>Sources (${sourceRefs.length})</b>`);
-    if (sourceRefs.length === 0) {
+    lines.push(`<b>Sources (${sources.length})</b>`);
+    if (sources.length === 0) {
       lines.push(`<i>No source references.</i>`);
     } else {
-      for (const r of sourceRefs) {
-        const abs = this.index.resolveFilePath(r.filePath) ?? r.filePath;
-        const rel = path.relative(projectDir, abs);
-        const u = vscode.Uri.file(abs).with({ fragment: `L${r.line || 1}` });
-        lines.push(`<a href="${u.toString()}">${escapeMarkdown(rel)}:${r.line}</a>`);
+      for (const src of sources) {
+        const u = vscode.Uri.file(src.abs).with({ fragment: `L${src.line || 1}` });
+        lines.push(`<a href="${u.toString()}">${escapeMarkdown(src.rel)}:${src.line}</a>`);
       }
     }
 
+    // Total note-ref count is the sum of items across groups (matches
+    // the previous behavior, where the count was `noteRefs.length`).
+    const totalNoteRefs = noteGroups.reduce((acc, g) => acc + g.items.length, 0);
+
     lines.push('');
-    lines.push(`<b>Notes (${noteRefs.length})</b>`);
-    if (noteRefs.length === 0) {
+    lines.push(`<b>Notes (${totalNoteRefs})</b>`);
+    if (totalNoteRefs === 0) {
       lines.push(`<i>No note references.</i>`);
     } else {
-      // Pre-read source notes (one read per distinct fromNoteId) so reference
-      // snippets can be drawn from the actual line where the citation occurs.
-      // Derivation entries don't need this — their format already conveys intent.
-      const distinctNotes = Array.from(new Set(
-        noteRefs
-          .filter((r) => {
-            const e = this.index.lookup(r.fromClaim);
-            return !(e?.derivedFrom.includes(targetFqid) ?? false);
-          })
-          .map((r) => r.fromNoteId),
-      ));
-      const noteLineMap = new Map<string, string[] | null>();
-      await Promise.all(distinctNotes.map(async (id) => {
-        noteLineMap.set(id, await this.index.getAggregatedNoteLines(id));
-      }));
-
-      // Group refs by source note id.
-      const grouped = new Map<string, typeof noteRefs>();
-      for (const r of noteRefs) {
-        const arr = grouped.get(r.fromNoteId) ?? [];
-        arr.push(r);
-        grouped.set(r.fromNoteId, arr);
-      }
-      for (const [noteId, refs] of grouped) {
-        const info = this.index.lookupNote(noteId);
-        const typeLabel = info?.noteType ? escapeHtml(info.noteType) : '';
-        const titleLabel = info?.noteTitle ? escapeMarkdown(info.noteTitle) : escapeMarkdown(noteId);
-        lines.push(`<b>${escapeHtml(noteId)}</b>${typeLabel ? ` — <i>${typeLabel}</i>` : ''}: ${titleLabel}`);
-        for (const r of refs) {
-          const sourceEntry = this.index.lookup(r.fromClaim);
-          const isDerivation = sourceEntry?.derivedFrom.includes(targetFqid) ?? false;
-          const abs = this.index.resolveFilePath(r.filePath) ?? r.filePath;
-          const u = vscode.Uri.file(abs).with({ fragment: `L${r.line || 1}` });
-
-          if (isDerivation && sourceEntry) {
-            // Derivation: show local claim id + heading excerpt (current format the user approved).
-            const localId = r.fromClaim.startsWith(`${noteId}.`)
-              ? r.fromClaim.slice(noteId.length + 1)
-              : r.fromClaim;
-            const excerpt = this.firstSentence(sourceEntry.heading, 80);
+      for (const group of noteGroups) {
+        const typeLabel = group.noteType ? escapeHtml(group.noteType) : '';
+        const titleLabel = group.noteTitle
+          ? escapeMarkdown(group.noteTitle)
+          : escapeMarkdown(group.noteId);
+        lines.push(
+          `<b>${escapeHtml(group.noteId)}</b>${typeLabel ? ` — <i>${typeLabel}</i>` : ''}: ${titleLabel}`,
+        );
+        for (const item of group.items) {
+          const u = vscode.Uri.file(item.abs).with({ fragment: `L${item.line || 1}` });
+          if (item.kind === 'derivation') {
             lines.push(
-              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(localId)}</a> — <i>derivation</i>: ${escapeMarkdown(excerpt)}`,
+              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(item.localId)}</a> — ` +
+                `<i>derivation</i>: ${escapeMarkdown(item.headingExcerpt)}`,
             );
           } else {
-            // Reference: dim excerpt of the actual citing line, with the
-            // target FQID bolded if we can locate it. The line link stays
-            // on the left as the navigation handle.
-            const noteLines = noteLineMap.get(noteId);
-            const snippet = this.buildReferenceSnippet(noteLines, r.line, targetFqid);
-            const linkText = sourceEntry
-              ? (r.fromClaim.startsWith(`${noteId}.`)
-                  ? r.fromClaim.slice(noteId.length + 1)
-                  : r.fromClaim)
-              : `line ${r.line}`;
+            const snippet = renderSnippetEditorHtml(item.snippet);
             lines.push(
-              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(linkText)}</a> — ${snippet}`,
+              `&nbsp;&nbsp;• <a href="${u.toString()}">${escapeHtml(item.localId)}</a> — ${snippet}`,
             );
           }
         }
@@ -285,77 +295,6 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     }
 
     return lines.join('<br>');
-  }
-
-  /**
-   * Return an HTML snippet for the line containing a reference. The
-   * surrounding text is dimmed; the target FQID (if locatable via the
-   * same matcher the decoration layer uses) is bolded.
-   *
-   * Long-line behavior: if the hit lives past the head budget, the
-   * snippet shows the start of the line (so the reader keeps the
-   * leading-context like "see also" or "derives from"), an ellipsis,
-   * then a window centered on the hit. Without this, a citation that
-   * appears 300 chars into a list-item line was completely cut off.
-   *
-   * @implements {R012.§2.AC.07} head-budget vs window-around-hit truncation
-   */
-  private buildReferenceSnippet(
-    noteLines: string[] | null | undefined,
-    line: number,
-    targetFqid: string,
-  ): string {
-    if (!noteLines || line < 1 || line > noteLines.length) {
-      return `<span style="opacity:0.6"><i>(snippet unavailable)</i></span>`;
-    }
-    const raw = noteLines[line - 1].trim();
-    if (raw.length === 0) {
-      return `<span style="opacity:0.6"><i>(empty line)</i></span>`;
-    }
-
-    const matches = findAllMatches(raw, true, this.index.knownShortcodes);
-    const hit = matches.find((m) => m.normalizedId === targetFqid);
-
-    // Tunable budgets — head shows leading context, window holds the hit.
-    const HEAD = 80;
-    const WINDOW_BEFORE = 50;
-    const WINDOW_AFTER = 70;
-    const SIMPLE_CAP = 200;
-
-    // No locatable hit: fall back to head-only truncation. The reader
-    // doesn't lose anything by not seeing a bolded span.
-    if (!hit) {
-      const truncated = raw.length > SIMPLE_CAP ? raw.slice(0, SIMPLE_CAP) + '…' : raw;
-      return `<span style="opacity:0.6">${escapeMarkdown(truncated)}</span>`;
-    }
-
-    // Hit is in the head budget: show start-of-line through hit-with-trail.
-    if (hit.start < HEAD) {
-      const tailEnd = Math.min(raw.length, Math.max(SIMPLE_CAP, hit.end + WINDOW_AFTER));
-      const before = raw.slice(0, hit.start);
-      const matched = raw.slice(hit.start, Math.min(hit.end, tailEnd));
-      const after = raw.slice(Math.min(hit.end, tailEnd), tailEnd);
-      const ellipsis = tailEnd < raw.length ? '…' : '';
-      return (
-        `<span style="opacity:0.6">${escapeMarkdown(before)}</span>` +
-        `<b>${escapeMarkdown(matched)}</b>` +
-        `<span style="opacity:0.6">${escapeMarkdown(after)}${ellipsis}</span>`
-      );
-    }
-
-    // Hit is past the head budget: head + ellipsis + windowed-around-hit.
-    const head = raw.slice(0, HEAD);
-    const winStart = Math.max(HEAD, hit.start - WINDOW_BEFORE);
-    const winEnd = Math.min(raw.length, hit.end + WINDOW_AFTER);
-    const beforeHit = raw.slice(winStart, hit.start);
-    const matched = raw.slice(hit.start, Math.min(hit.end, winEnd));
-    const afterHit = raw.slice(Math.min(hit.end, winEnd), winEnd);
-    const trailEllipsis = winEnd < raw.length ? '…' : '';
-    return (
-      `<span style="opacity:0.6">${escapeMarkdown(head)} … ${escapeMarkdown(beforeHit)}</span>` +
-      `<b>${escapeMarkdown(matched)}</b>` +
-      `<span style="opacity:0.6">${escapeMarkdown(afterHit)}${trailEllipsis}</span>`
-    );
   }
 
   private buildBodyHtml(
@@ -436,7 +375,7 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
       const openCmd = `command:vscode.open?${encodeURIComponent(
         JSON.stringify([uri, { selection: { startLineNumber: entry.line, startColumn: 1 } }]),
       )}`;
-      const headingPreview = this.firstSentence(entry.heading, 80);
+      const headingPreview = firstSentence(entry.heading, 80);
       const titlePart = noteTitle ? ` (${escapeMarkdown(noteTitle)})` : '';
       md.appendMarkdown(
         `- [**${escapeHtml(entry.fullyQualified)}**](${openCmd}) — *${escapeHtml(entry.noteType)}*${titlePart}: ${escapeMarkdown(headingPreview)}\n`,
@@ -444,14 +383,6 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     }
 
     return md;
-  }
-
-  /** Take the first sentence (or up to maxLen characters) for ref previews. */
-  private firstSentence(text: string, maxLen: number): string {
-    const trimmed = text.trim();
-    const period = trimmed.search(/[.!?](\s|$)/);
-    const cutoff = period > 0 && period < maxLen ? period + 1 : maxLen;
-    return trimmed.length <= cutoff ? trimmed : trimmed.slice(0, cutoff).trimEnd() + '…';
   }
 
   private async buildSectionHover(entry: SectionEntry): Promise<vscode.MarkdownString> {
@@ -593,43 +524,3 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
   }
 }
 
-/**
- * Parse a normalized-id string (e.g. `R005.1.AC.01`) into address
- * components for `resolveCrossProject`. Returns null when the string
- * doesn't contain a recognizable note ID.
- */
-function parseNormalizedAddress(
-  normalized: string,
-): { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number } | null {
-  const parts = normalized.split('.');
-  if (parts.length === 0) return null;
-  const noteIdMatch = parts[0].match(/^[A-Z]{1,5}\d{3,5}$/);
-  if (!noteIdMatch) return null;
-  const noteId = parts[0];
-  if (parts.length === 1) return { noteId };
-
-  // Trailing claim portion is `<PREFIX>.<NN>` — find the last all-uppercase
-  // letters segment that's followed by a digits-only segment.
-  const sectionParts: number[] = [];
-  let i = 1;
-  for (; i < parts.length; i++) {
-    if (/^\d+$/.test(parts[i])) {
-      sectionParts.push(parseInt(parts[i], 10));
-    } else {
-      break;
-    }
-  }
-  if (i < parts.length - 1 && /^[A-Z]+$/.test(parts[i]) && /^\d{2,3}[a-z]?$/.test(parts[i + 1])) {
-    const claimNumMatch = parts[i + 1].match(/^(\d{2,3})([a-z])?$/)!;
-    return {
-      noteId,
-      sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
-      claimPrefix: parts[i],
-      claimNumber: parseInt(claimNumMatch[1], 10),
-    };
-  }
-  return {
-    noteId,
-    sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
-  };
-}

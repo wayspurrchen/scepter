@@ -288,3 +288,45 @@ export function noteIdFromPath(filePath: string): string | null {
   const match = basename.match(/^([A-Z]{1,5}\d{3,5})\b/);
   return match ? match[1] : null;
 }
+
+/**
+ * Parse a normalized claim ID (e.g. `R005.1.AC.01`) into address
+ * components for `claimIndex.resolveCrossProject`. Single source of
+ * truth — previously copy-pasted across hover-provider, definition-provider,
+ * and extension.ts. Returns null when the string doesn't begin with a
+ * recognizable note ID.
+ */
+export function parseNormalizedAddress(
+  normalized: string,
+): { noteId: string; sectionPath?: number[]; claimPrefix?: string; claimNumber?: number } | null {
+  const parts = normalized.split('.');
+  if (parts.length === 0) return null;
+  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return null;
+  const noteId = parts[0];
+  if (parts.length === 1) return { noteId };
+
+  // Trailing claim portion is `<PREFIX>.<NN>` — find the last
+  // all-uppercase-letters segment that's followed by a digits segment.
+  const sectionParts: number[] = [];
+  let i = 1;
+  for (; i < parts.length; i++) {
+    if (/^\d+$/.test(parts[i])) {
+      sectionParts.push(parseInt(parts[i], 10));
+    } else {
+      break;
+    }
+  }
+  if (i < parts.length - 1 && /^[A-Z]+$/.test(parts[i]) && /^\d{2,3}[a-z]?$/.test(parts[i + 1])) {
+    const claimNumMatch = parts[i + 1].match(/^(\d{2,3})([a-z])?$/)!;
+    return {
+      noteId,
+      sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
+      claimPrefix: parts[i],
+      claimNumber: parseInt(claimNumMatch[1], 10),
+    };
+  }
+  return {
+    noteId,
+    sectionPath: sectionParts.length > 0 ? sectionParts : undefined,
+  };
+}
