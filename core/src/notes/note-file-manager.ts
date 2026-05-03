@@ -233,6 +233,8 @@ export class NoteFileManager extends EventEmitter {
    * aggregation semantics — main file plus alphabetized companion .md
    * files with their frontmatter stripped — but uses sync filesystem
    * primitives so it can be called from a markdown-it render hook.
+   *
+   * @implements {R012.§7.AC.05} sync aggregation mirror used by ClaimBodyResolver's sync path
    */
   getAggregatedContentsSync(noteId: string): string | null {
     const filePath = this.noteIndex.get(noteId);

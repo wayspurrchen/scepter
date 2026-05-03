@@ -1,6 +1,10 @@
 /**
  * Lazy resolver for claim body excerpts and aggregated note lines.
  *
+ * @implements {R012.§7.AC.01} ClaimBodyResolver owns body rendering; no eager corpus pass on activation/refresh
+ * @implements {R012.§7.AC.02} LRU-bounded caches with module-level constants; per-note invalidation; clear on project switch
+ * @implements {R012.§8.AC.04} caches invalidated on note file changes (per-note) and cleared on project switch
+ *
  * Replaces the eager `buildExcerptCache` pass that previously rendered
  * every claim body and every note body through markdown-it after each
  * index refresh. At ~10k+ claims that pass starved the extension host
@@ -83,6 +87,8 @@ export class ClaimBodyResolver {
    * the citation graph cycles — we must short-circuit rather than
    * blow the stack. Safe net even after call sites are made
    * non-recursive; cheap to maintain.
+   *
+   * @implements {R012.§7.AC.04} re-entrancy guard: cyclic citations short-circuit to null, no stack overflow
    */
   private renderingClaims = new Set<string>();
   private renderingNotes = new Set<string>();
@@ -248,6 +254,8 @@ export class ClaimBodyResolver {
    * The result is the document-scoped body map injected into the
    * markdown preview as `window.__scepterBodyMap`. Bounded both ways
    * so a single document with cyclic refs can't run away.
+   *
+   * @implements {R012.§8.AC.01} document-scoped body map via bounded BFS (depth + total bodies caps)
    */
   resolveTransitive(
     seedFqids: readonly string[],
@@ -287,6 +295,7 @@ export class ClaimBodyResolver {
 
   // -------- internals --------
 
+  // @implements {R012.§7.AC.03} resolver render env carries currentDocument.fsPath and _scepterLineOffset
   private renderClaimContext(entry: ClaimIndexEntry, content: string): string | null {
     const lines = content.split('\n');
 
@@ -345,6 +354,8 @@ export class ClaimBodyResolver {
    * Falls back to a raw single-file read if the aggregator returns
    * null (e.g. project not yet loaded), so we still produce a body
    * for non-folder notes during edge cases.
+   *
+   * @implements {R012.§7.AC.05} folder-note aggregation routes through noteFileManager (sync mirror)
    */
   private readAggregatedSync(noteId: string, noteFilePath: string): string | null {
     const aggregated = this.index.getAggregatedContentsSync(noteId);

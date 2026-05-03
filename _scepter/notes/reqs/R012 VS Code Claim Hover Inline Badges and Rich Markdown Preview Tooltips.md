@@ -98,11 +98,13 @@ The markdown preview's webview MUST display a rich hover tooltip when the user h
 
 §3.AC.04 Tooltip positioning MUST use `position: absolute` with document-relative coordinates (page scroll offsets included) so the tooltip moves with its anchor as the page scrolls. The tooltip MUST clamp to viewport bounds (max-width, max-height, transform-translate when near the bottom edge) so it never escapes the visible area.
 
-§3.AC.05 The tooltip MUST handle `command:` URI navigation explicitly: clicking an `<a href="command:...">` inside the tooltip MUST dispatch the command via `window.location.href` assignment. The markdown preview's built-in click delegator only watches the `.markdown-body` area, so tooltips appended to `document.body` need their own dispatcher.
+§3.AC.05 The tooltip MUST dispatch link clicks by trampolining through `.markdown-body`. Tooltips are appended to `document.body`, OUTSIDE `.markdown-body`, so VS Code's built-in link delegator (which watches `.markdown-body`) cannot see tooltip-internal clicks otherwise. The handler MUST: detect any link with a non-fragment href, `preventDefault` and `stopPropagation`, then briefly insert a hidden `<a>` with the same href into `.markdown-body` and synthesize a click on it. The synthesized click bubbles through the preview's natural dispatch path. (An earlier `window.location.href = href` mechanism failed: it bypassed VS Code's link interception, attempting raw webview navigation which the CSP rejected — see §9.)
 
 §3.AC.06 The tooltip's wheel-event handler MUST scroll the inner two-column scrollable region (when the cursor is over it) instead of the outer page, and MUST NOT propagate the wheel event to the page when the inner region is at scroll bounds.
 
 §3.AC.07 When the markdown preview is open and the user hovers refs, the tooltip MUST NOT be torn down by claim index refresh events. The extension MUST NOT automatically dispatch `markdown.preview.refresh` on every `index.onDidRefresh` — only at activation. The trade-off is that data attributes go briefly stale until the user manually refreshes the preview; this is the accepted cost of preserving hover stability during background-agent file writes.
+
+§3.AC.08 The body map (FQID → pre-rendered HTML) that drives nested-hover rendering MUST be carried into the preview as a hidden `<div id="__scepter-body-map" data-scepter-body-map="...">` element with the JSON map as a data attribute on the div. Inline `<script>` tags MUST NOT be used for this purpose — VS Code's default markdown preview content security strips inline scripts and surfaces a "some content has been disabled" warning, leaving every nested-hover body empty. The preview script MUST read the data attribute on `DOMContentLoaded` and on every preview mutation tick, parse the JSON, and merge into `window.__scepterBodyMap`.
 
 ### §4 Refs Panel Content Layout
 
@@ -125,6 +127,8 @@ The refs panel — surfaced inside both the editor hover and the preview tooltip
 §4.AC.08 The preview's snippet rendering MUST emit pre-built, server-side-escaped HTML on the data attribute (`data-claim-refs` JSON descriptor), so the webview script can drop the snippet into innerHTML without re-escaping. The webview MUST NOT round-trip back to the extension host to compute snippets.
 
 §4.AC.09 When a claim has neither source-code refs nor note-to-note refs, the preview tooltip MUST omit the refs panel entirely (rather than showing two empty subsections). The editor hover MAY show empty subsections with explicit "No X references" lines because its hover style is more text-dense.
+
+§4.AC.10 The refs panel MUST be constructed via a shared `RefsPanelDescriptor` builder consumed by both the editor hover and the markdown preview. Snippet truncation constants (`HEAD`, `WINDOW_BEFORE`, `WINDOW_AFTER`, `SIMPLE_CAP`), the head-budget snippet algorithm, sources/notes split, per-note grouping, derivation/reference classification, and the `firstSentence` heading-excerpt helper MUST live in exactly one module and MUST NOT be duplicated across surfaces. Each surface MUST apply its own escape function (`escapeMarkdown` for the editor's MarkdownString, HTML-escape for the preview's JSON `snippetHtml`) and its own wrapper (table cells vs DOM elements) at the rendering boundary, not inside the builder.
 
 ### §5 Range-Syntax Expansion
 
@@ -158,19 +162,53 @@ The claim parser MUST recognize the common authoring shape where a note id and a
 
 ### §7 Excerpt Rendering Pipeline
 
-The body excerpt that appears inside a claim hover (in the right column of reference-to-claim mode) and the note excerpt that appears inside a note hover MUST be rendered through the SCEpter markdown-it plugin, not as raw text. This makes claim references inside the excerpt themselves stylable, hoverable, and badge-bearing.
+Body excerpts that appear inside hover tooltips (editor MarkdownString hover and preview webview tooltip) MUST be rendered through the SCEpter markdown-it plugin so claim references inside excerpts are themselves stylable, hoverable, and badge-bearing — except where the rendering surface cannot faithfully render the produced HTML, in which case raw-text fallback is mandatory. Rendering MUST be lazy (on-demand, never eager-batched across the corpus) and bounded (LRU caches with hard caps).
 
-§7.AC.01 The claim index MUST maintain an HTML excerpt cache (`htmlExcerptCache`) populated by rendering each claim's body and each note's excerpt through a markdown-it instance that has the SCEpter plugin attached.
+§7.AC.01 A `ClaimBodyResolver` module MUST own all body rendering. It MUST expose: `resolveBody(fqid)` (async — used by the editor hover provider), `resolveBodySync(fqid)` (sync — used by the markdown plugin during a render pass), `resolveNoteBodySync(noteId)`, `getNoteLinesSync(noteId)`, and `resolveTransitive(seedFqids, maxDepth, maxBodies)`. The claim index MUST NOT eagerly render or cache rendered HTML for any body on initialization or refresh — eager corpus passes starve the extension host event loop on large projects (10k+ claims observed empirically).
 
-§7.AC.02 When rendering a claim body excerpt through the plugin, the markdown-it env MUST carry (a) `currentDocument.fsPath` set to the parent note's absolute path (so the plugin can resolve `contextNoteId` for badge emission), and (b) `_scepterLineOffset` set to the claim's start line minus 1 (so excerpt-local line indices shift onto the original document's coordinates).
+§7.AC.02 The resolver's caches MUST be LRU-bounded with module-level constants (default: 1000 claim bodies, 500 note bodies, 500 note-lines arrays). On overflow MUST evict the oldest entry. The resolver MUST be invalidated per-note when a discovery-path file changes (so the next access sees fresh content), and MUST be cleared in full on project switch and at the end of an index refresh.
 
-§7.AC.03 The preview tooltip's body panel MUST prefer the pre-rendered HTML excerpt (`data-claim-context`) over a raw text excerpt (`data-claim-context-raw`) when both are available. The HTML excerpt MUST be injected into the tooltip via innerHTML, and `attachListeners` MUST re-run after injection so any nested `.scepter-ref` spans pick up hover behavior.
+§7.AC.03 When the resolver renders a body, the markdown-it env MUST carry (a) `currentDocument.fsPath` set to the rendered note's absolute path (so the plugin can resolve `contextNoteId` for badge emission), and (b) `_scepterLineOffset` set to the body's start line offset (so excerpt-local line indices shift onto the original document's coordinates and so the body-map injection ruler skips itself during this nested render). Setting `_scepterLineOffset = 0` MUST also be sufficient to skip the ruler — any defined number, including zero, signals a resolver render.
 
-§7.AC.04 When only the raw text excerpt is available (HTML render failed or is unavailable), the preview tooltip MUST fall back to a text excerpt with show-more-above and show-more-below buttons that expand the visible window in 12-line increments.
+§7.AC.04 The resolver MUST guard against re-entrancy via "currently rendering" sets (`renderingClaims`, `renderingNotes`). If a body's render encounters a citation back to a body already being rendered earlier in the same call stack, the inner resolve MUST return null rather than recurse. Cyclic citation graphs and self-citations MUST NOT crash the renderer or produce a stack overflow. (Direct recursion through `data-note-excerpt` emission is also forbidden — see §7.AC.07 — and the guard is the defensive net for both this case and any future call sites that may inadvertently re-enter.)
 
-§7.AC.05 The note excerpt cache MUST cap excerpts at a reasonable line count (e.g., 50 lines) with a `*…content continues*` truncation marker, so a hover over a long note doesn't render the entire body.
+§7.AC.05 Body resolution MUST route file reads through the project's `noteFileManager` for folder-note aggregation: companion `.md` files MUST be concatenated alphabetically with their frontmatter stripped, matching the indexer's view of the same content. The async path MUST use `noteFileManager.getAggregatedContents`; the sync path (used inside markdown-it render hooks where `await` is impossible) MUST use `noteFileManager.getAggregatedContentsSync` — a sync mirror in core that uses `fs.readFileSync` and a sync directory scan but produces byte-equivalent output.
 
-§7.AC.06 The aggregated note-lines cache (`noteLinesCache`) MUST be populated for every indexed note so the citing-line snippet builder (used by the refs panel) can read the actual line text without re-reading from disk per snippet.
+§7.AC.06 The note excerpt MUST be capped at a reasonable line count (default: 50 lines) with a `*…content continues*` truncation marker. Hovering a long note MUST NOT render the entire body.
+
+§7.AC.07 The markdown plugin's `buildDataAttrs` MUST NOT emit a `data-note-excerpt` attribute by eagerly calling `resolveNoteBodySync` during render. Doing so recurses without bound: rendering note A's body invokes `buildDataAttrs` for every note B it cites, which calls `resolveNoteBodySync(B)`, which renders B's body, which cites more notes, etc. The cache populates only AFTER each render returns, so it provides no recursion break. Note bodies for nested-hover rendering MUST instead reach the webview via the body-map walk (§8.AC.01); the webview MAY look them up by note id in `window.__scepterBodyMap` when one is keyed there.
+
+§7.AC.08 The editor hover's body excerpt MUST be raw text (from `index.readClaimContext`) wrapped with `escapeMarkdown` and rendered inside `<div style="white-space: pre-wrap; word-break: break-word;">`. Embedding rendered HTML directly into a `MarkdownString` is unreliable — VS Code's hover renderer strips much of the styling that would make it legible, and complex nested table layouts collapse visually. The preview tooltip's body excerpt MAY use the resolver's rendered HTML (via `window.__scepterBodyMap`) because its webview can render it faithfully.
+
+### §8 Performance and Bounded Resource Usage
+
+The hover and preview surfaces MUST scale to projects with 10k+ claims and 1k+ notes without starving the extension host event loop, overwhelming the markdown preview webview, or causing repeated multi-second hangs on tab switches. Eager corpus-wide passes are forbidden; bounded, lazy resolution is mandatory.
+
+§8.AC.01 The preview's body map MUST be document-scoped, not corpus-scoped. The markdown plugin's body-map injection ruler MUST collect FQID seeds by walking the rendered token stream, then call `resolver.resolveTransitive(seeds, maxDepth, maxBodies)` to follow citations transitively (the BFS scans rendered HTML for `data-claim-fqid` / `data-scepter-id` attributes to discover next-hop FQIDs). The traversal MUST be bounded by both depth (default 5) and total bodies (default 500). Closure size MUST scale with the document's actual reference graph, not with corpus size.
+
+§8.AC.02 The body map MUST be carried into the preview via the data-attribute-on-hidden-div mechanism specified in §3.AC.08. Inline `<script>` injection MUST NOT be used.
+
+§8.AC.03 The editor hover's refs panel MUST be constructed synchronously through the resolver's note-lines LRU. The hover provider MUST NOT issue parallel `getAggregatedContents` reads per distinct citing note — that pattern stalls under load (verified empirically: a heavily-cited claim with N citing notes triggers N concurrent core-library file reads that the hover awaits before returning, and observed claim-index queries serialize behind it). The sync path uses the resolver's bounded LRU and produces snippets in milliseconds.
+
+§8.AC.04 Caches and resolvers MUST be invalidated on note file changes (per-note) and cleared on project switch (full). Stale cache reads MUST NOT survive a content change to the underlying note. The discovery-path watcher MUST drop the resolver's cached body / lines / note-body entries for the changed note BEFORE the debounced full index refresh runs, so any hover or preview render racing the refresh sees fresh content rather than the stale render.
+
+§8.AC.05 The markdown plugin's render error path MUST be defensive: `try`/`catch` MUST wrap the render output so that a single ill-formed body excerpt or a transient resolver miss MUST NOT crash the entire preview render. Errors MUST be logged to the extension's error channel and the affected span MUST fall back to escaped raw text rather than disappearing.
+
+### §9 Click Navigation Across Surfaces
+
+Click navigation on claim/note/section refs MUST open the target file at the target line where supported, and MUST navigate to the file (lacking line precision) where not supported. The two surfaces have different dispatch capabilities; this section names the structural difference and the implementation that follows from it.
+
+§9.AC.01 The editor hover (rendered via VS Code's `MarkdownString` hover with `isTrusted = true`) MUST emit `command:vscode.open?[uri, {selection: {startLineNumber, startColumn}}]` URIs for navigation links. This surface DOES support `command:` URI dispatch and provides exact-line jump.
+
+§9.AC.02 The markdown preview's webview CSP blocks `command:` URI navigation entirely, including built-in commands like `vscode.open`. Native clicks on `<a href="command:...">` are not prevented by user JS but the webview's navigation attempt is rejected at the CSP layer ("Framing '' violates the following Content Security Policy directive: frame-src 'self'"), leaving the webview blank. Preview-side click navigation MUST therefore use plain relative paths or absolute `file://` URIs — NOT `command:` URIs. Verified empirically via diagnostic webview logs: bubble-phase `defaultPrevented` is `false` after all our handlers, then the browser navigation attempt fails at CSP.
+
+§9.AC.03 In the main preview body (rendered in the same context the link is viewed), claim/note/section refs MUST emit relative-path hrefs (`./relative/path.md[#L<line>]`). The browser resolves the relative path against the preview's current document URL, navigating the editor to the linked file. The `#L<line>` fragment is NOT honored on this dispatch path — the editor lands at the top of the target file. Line precision in preview-body clicks is unsupported and is an acknowledged limitation; users who want exact-line jump from the preview MUST fall back to cmd-clicking via the editor hover.
+
+§9.AC.04 Resolver-rendered body excerpts (used in tooltip body panes and the body-map walk) MUST emit absolute `file:///abs/path[#L<line>]` URIs rather than relative paths. The body excerpt for a single claim is cached by FQID and shown in tooltips across many different documents' previews; relative paths break in this nested context because the browser resolves them against the *viewer's* current URL, not the renderer's. The signal for "use absolute" is `env._scepterLineOffset` being set (the resolver's render marker — same one that suppresses recursive body-map injection).
+
+§9.AC.05 Tooltip-internal clicks MUST be trampolined through `.markdown-body` per §3.AC.05. The mechanism MUST work for both relative-path and absolute-`file://` hrefs since the resolver-rendered body inside tooltips uses the latter (§9.AC.04) and the refs panel inside tooltips uses the former (built against the current preview's `currentDocDir`).
+
+§9.AC.06 Diagnostic logging MAY remain available in the preview script under a `SCEPTER_DEBUG` flag. When enabled, every anchor click MUST log the click target's classes, href, the `inMarkdownBody` and `inTooltip` predicates, and the `defaultPrevented` value at both capture and bubble phases. Webview console diagnostics are the primary tool for chasing dispatch regressions because the affected behavior is invisible from the extension host.
 
 ## Edge Cases
 
@@ -203,6 +241,26 @@ The body excerpt that appears inside a claim hover (in the right column of refer
 
 **Detection:** `index.onDidRefresh` fires while the user has an open preview tooltip.
 **Behavior:** The extension MUST NOT auto-refresh the markdown preview. The tooltip's data attributes go briefly stale; the user manually refreshes (`Cmd+Shift+P → Markdown: Refresh Preview`) when ready. Editor decorations and editor hovers refresh normally — only the preview is preserved.
+
+### Cyclic Note-to-Note Citations During Body Render
+
+**Detection:** Note A's body cites note B; note B's body cites note A. A naive recursive resolver walks A → B → A → B → … until stack overflow.
+**Behavior:** The resolver's `renderingClaims` / `renderingNotes` re-entrancy guard short-circuits to null on the second entry for the same id. The render of A completes, and the cited B inside A renders without B's own body excerpt — but the user can still hover B to see its content fresh from the resolver. Matches §7.AC.04.
+
+### Tooltip Body Pane Link Followed From a Different Document's Preview
+
+**Detection:** The user opens DD009 in the preview, hovers a citation to R054, and clicks a link inside R054's body pane (e.g., a ref to S017 inside R054's body excerpt).
+**Behavior:** The link MUST be an absolute `file://` URI per §9.AC.04, because the resolver rendered R054's body using R054's directory as a relative-path base — but the click is being followed from DD009's preview URL. A relative path would resolve incorrectly against DD009's directory and produce a wrong target (a real failure mode observed: `_scepter/specs/...` instead of `_scepter/notes/specs/...`).
+
+### Markdown Preview Default Content Security Strips Inline Scripts
+
+**Detection:** The preview shows a "some content has been disabled in this document" warning in the upper-right after rendering.
+**Behavior:** This is the surface symptom of inline-script stripping. The body map MUST be carried via a hidden `<div data-scepter-body-map>` not via `<script>` (§3.AC.08). Hidden-div data attributes survive the default content security level; users do NOT need to relax their preview security to use SCEpter.
+
+### Document With a Large Reference Graph
+
+**Detection:** The user opens a document whose reference closure to depth 5 exceeds the body-map cap (500 bodies).
+**Behavior:** The BFS in `resolveTransitive` stops growing the closure once `maxBodies` is reached; further FQIDs are unreachable from `window.__scepterBodyMap` and the preview tooltip's body pane shows empty for those refs. The user can still click through to navigate; nested-hover depth is bounded by the closure rather than by the corpus.
 
 ## Non-Goals
 
@@ -237,12 +295,14 @@ A future test plan derived from this requirement may add scripted manual test ca
 |---------|-------|
 | §1 Inline Crossref-Count Badge | 8 |
 | §2 Editor Hover (Raw Markdown) | 9 |
-| §3 Markdown Preview Tooltip | 7 |
-| §4 Refs Panel Content Layout | 9 |
+| §3 Markdown Preview Tooltip | 8 |
+| §4 Refs Panel Content Layout | 10 |
 | §5 Range-Syntax Expansion | 6 |
 | §6 Adjacent-Section Binding | 5 |
-| §7 Excerpt Rendering Pipeline | 6 |
-| **Total** | **50** |
+| §7 Excerpt Rendering Pipeline | 8 |
+| §8 Performance and Bounded Resource Usage | 5 |
+| §9 Click Navigation Across Surfaces | 6 |
+| **Total** | **65** |
 
 ## References
 
@@ -253,8 +313,10 @@ A future test plan derived from this requirement may add scripted manual test ca
 - {R005} — Claim Metadata, Verification, and Lifecycle. The metadata grammar (`importance`, `lifecycle`, `derives=`) that hover and tooltip surfaces display in the badge row.
 - {R006} — Claim Derivation Tracing. The derivation-vs-reference distinction in §4.AC.05 — `derives=TARGET` metadata is what the refs panel reads to flag a citation as a derivation rather than a plain reference.
 - {R011} — Cross-Project Note and Claim References via Path Aliases. Source of the `aliasPrefix` field on the parser address that §5.AC.06 (cross-project range fallback) consumes; also defines the cross-project routing in decorations and hover (handled by R011 §4 directly, not this requirement).
-- Implementation files (binding scope of this requirement): `vscode/src/markdown-plugin.ts`, `vscode/src/hover-provider.ts`, `vscode/src/decoration-provider.ts`, `vscode/src/claim-index.ts`, `vscode/src/patterns.ts`, `vscode/src/extension.ts`, `vscode/media/preview-script.js`, `vscode/media/markdown-claims.css`, `core/src/parsers/claim/claim-parser.ts` (adjacent-section binding only).
+- Implementation files (binding scope of this requirement): `vscode/src/markdown-plugin.ts`, `vscode/src/hover-provider.ts`, `vscode/src/decoration-provider.ts`, `vscode/src/claim-index.ts`, `vscode/src/claim-body-resolver.ts`, `vscode/src/refs-panel-builder.ts`, `vscode/src/patterns.ts`, `vscode/src/extension.ts`, `vscode/src/definition-provider.ts`, `vscode/media/preview-script.js`, `vscode/media/markdown-claims.css`, `core/src/parsers/claim/claim-parser.ts` (adjacent-section binding only), `core/src/notes/note-file-manager.ts` (sync aggregation accessor for §7.AC.05), `core/src/notes/folder-utils.ts` (sync companion scanner).
 
 ## Status
 
 - 2026-05-02: Authored. Captures the user-facing capability surface delivered by the recent VS Code work (commits `5b9bafc`..`781cf03`). The follow-up task is a backfill pass adding `@implements {R012.§N.AC.NN}` annotations across the listed implementation files; this requirement is the binding spec for that pass. Verification is manual visual inspection — no hover-snapshot test infrastructure exists yet.
+
+- 2026-05-03: Major expansion. The `htmlExcerptCache` eager pass that the original §7 specified turned out to starve the extension host event loop on a 11200-claim project, surfacing as indefinite "Loading…" hovers, multi-megabyte preview script blobs, and a content-disabled warning in the preview. §7 was rewritten to specify lazy resolution via `ClaimBodyResolver` with bounded LRUs, recursion guards, and folder-note-aware aggregation routing through core. §8 was added to capture the bounded-resource invariants (document-scoped body map, sync refs panel construction, no eager corpus passes) that a future implementor must preserve. §9 was added to document the click-navigation findings from this session: the markdown preview's webview CSP blocks `command:` URI dispatch entirely, so preview-side links must use relative paths (main body) or absolute `file://` URIs (resolver-rendered body cache content); the editor hover's MarkdownString continues to use `command:vscode.open` because it dispatches through a different surface. §3.AC.05 was rewritten — the prior `window.location.href = href` mechanism was the wrong fix for tooltip dispatch and is replaced with the `.markdown-body` trampoline. §4.AC.10 was added for the shared `RefsPanelDescriptor` builder. New implementation files: `vscode/src/claim-body-resolver.ts` and `vscode/src/refs-panel-builder.ts`. Core additions: `noteFileManager.getAggregatedContentsSync` and `folderUtils.scanFolderContentsSync`. Commit landed at `83c5d6c` plus subsequent fixes for stack-overflow on cyclic note refs (recursion guards), CSP-stripped script injection (data-attribute carrier), and click navigation (relative + absolute URI scheme by context).

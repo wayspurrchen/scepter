@@ -22,6 +22,7 @@
  * @implements {R012.§2.AC.05} notes grouped by source noteId; derivation vs reference flag
  * @implements {R012.§2.AC.06} derivation: localId + heading excerpt; reference: localId + citing-line snippet
  * @implements {R012.§2.AC.07} head-budget vs window-around-hit truncation
+ * @implements {R012.§4.AC.10} single source of truth: snippet algorithm and constants live in one module
  */
 
 import * as path from 'path';
