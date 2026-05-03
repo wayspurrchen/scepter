@@ -245,8 +245,12 @@
     var importance = el.getAttribute('data-importance');
     var lifecycle = el.getAttribute('data-lifecycle');
     var derivesFrom = el.getAttribute('data-derives-from');
-    var contextHtml = el.getAttribute('data-claim-context');
-    var rawContext = el.getAttribute('data-claim-context-raw');
+    // Body excerpt comes from the global body map (populated by the
+    // markdown plugin's body-map-inject ruler), keyed by FQID. This
+    // decouples nesting depth from data-attribute embedding — the body
+    // for a deeply-nested ref is just window.__scepterBodyMap[fqid],
+    // resolved on demand at hover time, recursively to any depth.
+    var contextHtml = (window.__scepterBodyMap && window.__scepterBodyMap[fqid]) || null;
     var refsJson = el.getAttribute('data-claim-refs');
     var linkHref = el.tagName === 'A' ? el.getAttribute('href') : null;
     var sourceLine = el.getAttribute('data-scepter-source-line');
@@ -306,7 +310,6 @@
       linkHref: linkHref,
       badges: badges,
       contextHtml: contextHtml,
-      rawContext: rawContext,
       refsJson: refsJson,
     });
 
@@ -352,35 +355,17 @@
     if (args.badges) {
       html += '<div style="font-size:11px;opacity:0.7;margin-bottom:6px">' + args.badges + '</div>';
     }
-    // Body excerpt — prefer the pre-rendered HTML (which has gone
-    // through the SCEpter plugin, so claim refs render as `.scepter-ref`
-    // links and definitions get badges) over the raw text. After the
-    // tooltip is injected into the DOM the caller re-runs attachListeners
-    // so any nested `.scepter-ref` spans pick up hover behavior.
-    if (args.contextHtml || args.rawContext) {
-      html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;margin-top:4px">';
-      if (args.contextHtml) {
-        html += '<div class="scepter-tooltip-excerpt scepter-body-rich" style="font-size:12px;opacity:0.95">' +
-          args.contextHtml + '</div>';
-      } else if (args.rawContext) {
-        var initialSlice = sliceBody(args.rawContext, 0, 12);
-        html += '<div class="scepter-tooltip-excerpt scepter-body-excerpt" ' +
-          'data-scepter-raw="' + escAttr(args.rawContext) + '" ' +
-          'data-scepter-start="' + initialSlice.start + '" ' +
-          'data-scepter-end="' + initialSlice.end + '" ' +
-          'style="white-space: pre-wrap; word-break: break-word; opacity: 0.95; font-size:12px">';
-        if (initialSlice.canShowMoreAbove) {
-          html += '<div class="scepter-show-more" data-direction="above" style="text-align:center;margin-bottom:4px">' +
-            '<button class="scepter-show-more-btn" data-direction="above">↑ show 12 more lines above</button></div>';
-        }
-        html += '<div class="scepter-body-text">' + escMarkdownLike(initialSlice.text) + '</div>';
-        if (initialSlice.canShowMoreBelow) {
-          html += '<div class="scepter-show-more" data-direction="below" style="text-align:center;margin-top:4px">' +
-            '<button class="scepter-show-more-btn" data-direction="below">↓ show 12 more lines below</button></div>';
-        }
-        html += '</div>';
-      }
-      html += '</div>';
+    // Body excerpt — pulled from the global `window.__scepterBodyMap`
+    // by FQID. The pre-rendered HTML went through the SCEpter plugin,
+    // so claim refs inside it render as `.scepter-ref` links and any
+    // definitions land their `●N` badges. After tooltip injection the
+    // caller re-runs `attachListeners` so nested refs pick up hover
+    // behavior — and because each level looks up *its* FQID in the
+    // same map, nesting works to arbitrary depth.
+    if (args.contextHtml) {
+      html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;margin-top:4px">' +
+        '<div class="scepter-tooltip-excerpt scepter-body-rich" style="font-size:12px;opacity:0.95">' +
+        args.contextHtml + '</div></div>';
     }
     return html;
   }

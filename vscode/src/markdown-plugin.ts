@@ -43,6 +43,33 @@ export function createScepterPlugin(index: ClaimIndexCache) {
       }
     });
 
+    // Inject the global body map at the start of every main-document
+    // render. The webview's tooltip body panel uses `window.__scepterBodyMap[fqid]`
+    // to fetch a claim's pre-rendered body excerpt at any nesting
+    // depth — that's how deeply-nested hovers work without an
+    // exponential explosion of inlined data attributes. We skip the
+    // injection during excerpt rendering itself (signalled by
+    // `env._scepterLineOffset`), since each excerpt is rendered as a
+    // partial document and shouldn't carry the body map of the entire
+    // project.
+    md.core.ruler.push('scepter-body-map-inject', function (state: any) {
+      if (state.env && typeof state.env._scepterLineOffset === 'number') return;
+      // Avoid double-injection if a ruler chain re-runs on the same state.
+      if (state.tokens.length > 0 && (state.tokens[0] as any)._scepterBodyMap) return;
+      const map = index.getAllClaimBodyMap();
+      const json = JSON.stringify(map);
+      // Use Object.assign so successive renders accumulate updates rather
+      // than blowing away the map (handy if the index rebuilds between
+      // renders during the same webview session).
+      const script =
+        '<script>(function(){var m=' + json +
+        ';if(window.__scepterBodyMap){Object.assign(window.__scepterBodyMap,m);}else{window.__scepterBodyMap=m;}})();</script>';
+      const tok = new state.Token('html_block', '', 0);
+      tok.content = script;
+      (tok as any)._scepterBodyMap = true;
+      state.tokens.unshift(tok);
+    });
+
     // Build the crossref-count badge for a block whose source line we
     // know. Returns '' when no claim of the current note is defined at
     // that line, or when the claim has no inbound refs. Same color
@@ -386,19 +413,14 @@ function buildDataAttrs(
         attrs.push(`data-derives-from="${escAttr(entry.derivedFrom.join(','))}"`);
       }
 
-      // Pre-rendered HTML context for the preview tooltip body panel
-      // @implements {R012.§7.AC.03} HTML excerpt emitted on `data-claim-context` for tooltip body panel
-      const contextHtml = index.getClaimContextHtml(entry.fullyQualified);
-      if (contextHtml) {
-        attrs.push(`data-claim-context="${escAttr(contextHtml)}"`);
-      }
-      // Raw claim body excerpt — used for "show more" expansion in the
-      // body panel where the rendered HTML excerpt is too eager.
-      // @implements {R012.§7.AC.04} raw text excerpt emitted on `data-claim-context-raw` for show-more fallback
-      const rawContext = index.getClaimContextSync(entry);
-      if (rawContext) {
-        attrs.push(`data-claim-context-raw="${escAttr(rawContext)}"`);
-      }
+      // Body excerpt is no longer emitted as a per-ref data attribute.
+      // Each claim's pre-rendered body HTML lives in the global
+      // `window.__scepterBodyMap` (injected at the start of every
+      // main-document render — see the body-map injection ruler);
+      // the webview's tooltip body panel looks up by FQID at any
+      // nesting depth so deeply-nested hovers work without exponential
+      // data-attribute embedding.
+      // @implements {R012.§7.AC.03} HTML excerpt available to webview via window.__scepterBodyMap[fqid]
 
       // Pre-built refs panel data — sources + grouped notes with
       // derivation/reference distinction and citing-line snippets.
