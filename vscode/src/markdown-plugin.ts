@@ -68,6 +68,9 @@ export function createScepterPlugin(index: ClaimIndexCache) {
     // skip the injection: each excerpt is a partial document, and its
     // own body map gets stitched in by the parent main-document
     // render anyway via the BFS.
+    // @implements {R012.§3.AC.08} body map carried via hidden div data attribute (not inline script)
+    // @implements {R012.§8.AC.01} document-scoped body map via resolveTransitive(seeds, depth=5, maxBodies=500)
+    // @implements {R012.§8.AC.02} hidden-div carrier survives default markdown preview content security
     md.core.ruler.push('scepter-body-map-inject', function (state: any) {
       if (state.env && typeof state.env._scepterLineOffset === 'number') return;
       if (state.tokens.length > 0 && (state.tokens[0] as any)._scepterBodyMap) return;
@@ -318,6 +321,15 @@ function highlightWithData(
   const currentDocPath = env?.currentDocument?.fsPath ?? env?.docUri?.fsPath ?? null;
   const contextNoteId = currentDocPath ? noteIdFromPath(currentDocPath) : null;
 
+  // `_scepterLineOffset` is set by the resolver when it pre-renders
+  // a body excerpt for the body cache. Body cache content is reused
+  // across viewing contexts (a single claim's body shown in any
+  // document's tooltip), so relative-path links — which the browser
+  // resolves against the *viewer's* current URL, not the renderer's
+  // — produce wrong targets when followed from a different document.
+  // Switch to absolute file:// URIs in that case.
+  const useAbsoluteHrefs = typeof env?._scepterLineOffset === 'number';
+
   // Sort by position (should already be ordered, but be safe)
   matches.sort((a, b) => a.start - b.start);
 
@@ -360,8 +372,9 @@ function highlightWithData(
       contextNoteId,
       sourceLine,
       currentDocDir,
+      useAbsoluteHrefs,
     );
-    const linkTarget = buildLinkTarget(match.normalizedId, match.kind, index, currentDocDir, contextNoteId);
+    const linkTarget = buildLinkTarget(match.normalizedId, match.kind, index, currentDocDir, contextNoteId, useAbsoluteHrefs);
     const escaped = escapeHtml(match.raw);
 
     if (linkTarget) {
@@ -438,6 +451,7 @@ function buildDataAttrs(
   contextNoteId: string | null,
   sourceLine: number | null,
   currentDocDir: string,
+  useAbsolute = false,
 ): string {
   const attrs: string[] = [];
   const normalizedId = match.normalizedId;
@@ -492,7 +506,7 @@ function buildDataAttrs(
       // Encoded as a JSON array on a data attribute so the webview can
       // build the panel DOM without round-tripping back to the host.
       // @implements {R012.§4.AC.08} pre-built JSON descriptor on `data-claim-refs`; webview drops into innerHTML without re-escape
-      const refsJson = buildRefsJson(index, entry);
+      const refsJson = buildRefsJson(index, entry, currentDocDir, useAbsolute);
       if (refsJson) {
         attrs.push(`data-claim-refs="${escAttr(refsJson)}"`);
       }
@@ -518,6 +532,7 @@ function buildDataAttrs(
       // webview can fetch them from window.__scepterBodyMap on demand.
       // Until that's wired, preview note hovers omit the rich excerpt
       // and fall back to title + claim count.
+      // @implements {R012.§7.AC.07} no eager resolveNoteBodySync in buildDataAttrs (recursion break)
 
       attrs.push(`title="${escAttr(normalizedId)} — ${escAttr(noteInfo.noteTitle)}"`);
     } else {
@@ -587,6 +602,8 @@ function buildDataAttrs(
 function buildRefsJson(
   index: ClaimIndexCache,
   entry: ClaimIndexEntry,
+  currentDocDir: string,
+  useAbsolute = false,
 ): string | null {
   const descriptor = buildRefsPanelDescriptor(index, entry.fullyQualified, {
     projectDir: index.projectDir,
@@ -608,15 +625,15 @@ function buildRefsJson(
   const sources = descriptor.sources.map((src) => ({
     rel: src.rel,
     line: src.line,
-    href: makeOpenCommandHref(src.abs, src.line || 1),
+    href: buildPreviewHref(src.abs, currentDocDir, src.line || 1, useAbsolute),
   }));
 
   const noteGroups = descriptor.noteGroups.map((group) => {
     const noteHref = group.noteFilePath
-      ? makeOpenCommandHref(index.resolveFilePath(group.noteFilePath), 1)
+      ? buildPreviewHref(index.resolveFilePath(group.noteFilePath), currentDocDir, undefined, useAbsolute)
       : null;
     const items = group.items.map((item) => {
-      const itemHref = makeOpenCommandHref(item.abs, item.line || 1);
+      const itemHref = buildPreviewHref(item.abs, currentDocDir, item.line || 1, useAbsolute);
       if (item.kind === 'derivation') {
         return {
           kind: 'derivation',
@@ -678,26 +695,64 @@ function renderSnippetPreviewHtml(snippet: SnippetDescriptor): string {
 }
 
 /**
- * Build a `command:scepter.previewOpenAt?...` href that opens a file at a
- * given line. The markdown preview dispatches this URI the same way it
- * dispatches our cross-project alias links. We use a thin SCEpter-owned
- * command (registered in extension.ts) instead of `vscode.open` directly
- * because plain string args round-trip through the preview's CSP more
- * reliably than the `[vscode.Uri, options]` shape required by
- * `vscode.open`.
+ * Build a click-target href for the markdown preview, given an
+ * absolute target file path, a current-document directory to
+ * relativize against, and an optional 1-indexed line number.
+ *
+ * We use plain relative paths rather than `command:` URIs because VS
+ * Code's markdown preview webview blocks `command:` schemes at its
+ * CSP level — clicks on `<a href="command:...">` don't dispatch
+ * (verified empirically: the bubble-phase listener sees
+ * `defaultPrevented: false` and the browser then attempts to
+ * navigate to the URL, which the CSP rejects with a "Framing ''
+ * violates frame-src 'self'" error and a blank webview).
+ *
+ * Plain relative paths navigate correctly: VS Code's preview opens
+ * the linked markdown in the editor. The `#L<line>` fragment is
+ * NOT honored on this path, so the editor lands at the top of the
+ * target file rather than at the cited claim. Exact-line jump from
+ * the preview would require a webview message protocol the markdown
+ * extension owns; for now, users who want line precision can
+ * cmd-click via the editor hover (which uses a separate hover
+ * renderer that DOES dispatch command URIs reliably).
  */
-function makeOpenCommandHref(absPath: string, line: number): string {
-  const args = encodeURIComponent(JSON.stringify([absPath, line || 1]));
-  return `command:scepter.previewOpenAt?${args}`;
+// @implements {R012.§9.AC.02} preview webview CSP blocks command: URI dispatch — use plain hrefs
+// @implements {R012.§9.AC.03} main preview body uses relative paths (line fragment unsupported on this dispatch)
+// @implements {R012.§9.AC.04} resolver-rendered body cache content uses absolute file:// URIs (cross-context safe)
+function buildPreviewHref(
+  absPath: string,
+  currentDocDir: string,
+  line?: number,
+  useAbsolute = false,
+): string {
+  if (useAbsolute) {
+    // file:///abs/path with each segment URL-encoded, preserving slashes.
+    // Used for resolver-rendered content (body cache) where the link
+    // is viewed in a context whose base URL differs from the renderer's.
+    const encodedSegments = absPath.split('/').map((seg, i) => i === 0 ? seg : encodeURIComponent(seg));
+    let href = 'file://' + encodedSegments.join('/');
+    if (line && line > 1) href += '#L' + line;
+    return href;
+  }
+  let rel = path.relative(currentDocDir, absPath);
+  if (!rel.startsWith('.')) rel = './' + rel;
+  rel = rel.split('/').map(encodeURIComponent).join('/');
+  if (line && line > 1) rel += '#L' + line;
+  return rel;
 }
 
 /**
- * Build a relative path link for the markdown preview.
+ * Build a click-target href for a claim/note/section ref in the
+ * markdown preview.
  *
- * The preview's built-in click handler resolves relative hrefs against the
- * current document's directory — the same way regular markdown links work.
- * We compute a relative path from the current document to the target note file.
- * No special URI schemes needed.
+ * Routes through `command:scepter.previewOpenAt?[absPath,line]` — the
+ * same SCEpter-owned command the refs panel uses. The earlier
+ * approach emitted relative paths with `#Lnnn` fragments; the
+ * preview's built-in handler navigated to the file but ignored the
+ * line fragment, dropping the user at the top of the target rather
+ * than at the cited claim. The command form opens the file AND
+ * reveals + selects the exact line, matching the editor hover's
+ * cmd-click behavior.
  */
 function buildLinkTarget(
   normalizedId: string,
@@ -705,36 +760,29 @@ function buildLinkTarget(
   index: ClaimIndexCache,
   currentDocDir: string,
   contextNoteId: string | null,
+  useAbsolute = false,
 ): string | null {
-  function toRelativeHref(filePath: string, line?: number): string {
+  function open(filePath: string, line?: number): string {
     const abs = path.isAbsolute(filePath)
       ? filePath
       : path.join(index.projectDir, filePath);
-    let rel = path.relative(currentDocDir, abs);
-    if (!rel.startsWith('.')) {
-      rel = './' + rel;
-    }
-    rel = rel.split('/').map(encodeURIComponent).join('/');
-    if (line && line > 1) {
-      rel += '#L' + line;
-    }
-    return rel;
+    return buildPreviewHref(abs, currentDocDir, line, useAbsolute);
   }
 
   if (kind === 'claim' || kind === 'bare-claim') {
     const entry = index.resolve(normalizedId, contextNoteId ?? undefined);
     if (entry?.noteFilePath) {
-      return toRelativeHref(entry.noteFilePath, entry.line);
+      return open(entry.noteFilePath, entry.line);
     }
   } else if (kind === 'note') {
     const noteInfo = index.lookupNote(normalizedId);
     if (noteInfo?.noteFilePath) {
-      return toRelativeHref(noteInfo.noteFilePath);
+      return open(noteInfo.noteFilePath);
     }
   } else if (kind === 'section') {
     const sectionEntry = index.lookupSection(normalizedId, contextNoteId ?? undefined);
     if (sectionEntry?.noteFilePath) {
-      return toRelativeHref(sectionEntry.noteFilePath, sectionEntry.line);
+      return open(sectionEntry.noteFilePath, sectionEntry.line);
     }
   }
 

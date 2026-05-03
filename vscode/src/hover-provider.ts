@@ -185,6 +185,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     // one filesystem read per distinct source note in parallel — which
     // (a) stalled the hover during cold-cache renders and (b) duplicated
     // the preview's own panel-build logic. The shared builder fixes both.
+    // @implements {R012.§4.AC.10} shared RefsPanelDescriptor builder consumed by editor and preview
+    // @implements {R012.§8.AC.03} editor refs panel built sync via resolver's note-lines LRU (no async storm)
     const descriptor = buildRefsPanelDescriptor(this.index, entry.fullyQualified, {
       projectDir,
       getNoteLines: (id) => this.index.getAggregatedNoteLinesSync(id),
@@ -215,6 +217,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     // hover MarkdownString renderer strips most of the styling that
     // makes that output legible, so the previous raw-text behavior is
     // both more reliable and visually closer to what users had before.
+    // @implements {R012.§7.AC.08} editor hover body uses raw text + escapeMarkdown + white-space:pre-wrap
+    // @implements {R012.§9.AC.01} editor hover metadata link uses command:vscode.open (different surface from preview)
     const contextText = await this.index.readClaimContext(entry, 1, 200);
     const bodyHtml = this.buildBodyHtml(entry, noteTitle, contextText, openCmd, badgeHtml);
 

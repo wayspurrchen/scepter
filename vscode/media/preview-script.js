@@ -23,7 +23,89 @@
 (function () {
   'use strict';
 
+  // ─── Diagnostic logging ─────────────────────────────────────────────
+  // Set via the URL hash, the data attribute on the body, or just leave
+  // on while we're chasing dispatch bugs. To turn off, change the
+  // initializer to `false` and reload the extension.
+  // @implements {R012.§9.AC.06} optional click-path diagnostic logging behind SCEPTER_DEBUG flag
+  var SCEPTER_DEBUG = true;
+  function dlog() {
+    if (!SCEPTER_DEBUG) return;
+    var args = ['[SCEpter]'];
+    for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
+    try { console.log.apply(console, args); } catch (_) {}
+  }
+
+  // Log every anchor click that happens anywhere in the document. This
+  // tells us whether the click reaches us at all, whether anyone has
+  // preventDefault'd it before our handlers run, and what href was
+  // actually clicked.
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var a = e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href');
+    var classes = (a.className && a.className.split) ? a.className : String(a.className || '');
+    var inMarkdownBody = !!a.closest('.markdown-body');
+    var inTooltip = !!a.closest('.scepter-tooltip');
+    dlog('click(capture):', {
+      href: href,
+      classes: classes,
+      inMarkdownBody: inMarkdownBody,
+      inTooltip: inTooltip,
+      defaultPrevented: e.defaultPrevented,
+      target: e.target.tagName + (e.target.className ? '.' + e.target.className : ''),
+    });
+  }, true);
+
+  // Same logger but in bubble phase, to see whether the click survived
+  // capture-phase listeners (ours and any third-party).
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var a = e.target.closest('a');
+    if (!a) return;
+    dlog('click(bubble):', {
+      href: a.getAttribute('href'),
+      defaultPrevented: e.defaultPrevented,
+    });
+  }, false);
+
   var isTooltipMutation = false;
+
+  /**
+   * Dispatch a link click by synthesizing a click on a hidden
+   * anchor inside `.markdown-body`. VS Code's markdown preview only
+   * dispatches link clicks (relative paths, file:// URIs, etc) when
+   * the click bubbles up through `.markdown-body` — its own click
+   * delegator is bound there. Tooltip-internal clicks live outside
+   * `.markdown-body`, so they need this trampoline.
+   *
+   * Returns true on dispatch, false if `.markdown-body` is missing.
+   *
+   * @implements {R012.§3.AC.05} tooltip click trampoline through .markdown-body
+   * @implements {R012.§9.AC.05} works for both relative-path and file:// URIs used inside tooltips
+   */
+  function dispatchCommandUri(href) {
+    var host = document.querySelector('.markdown-body') || document.body;
+    dlog('dispatchCommandUri:', { href: href, host: host && host.className, hostExists: !!host });
+    if (!host) return false;
+    var a = document.createElement('a');
+    a.href = href;
+    a.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden';
+    isTooltipMutation = true;
+    host.appendChild(a);
+    try {
+      dlog('dispatchCommandUri: synthesizing click on', a, 'href=', a.getAttribute('href'));
+      a.click();
+      dlog('dispatchCommandUri: click() returned without throw');
+    } catch (err) {
+      dlog('dispatchCommandUri: click() threw', err);
+    } finally {
+      if (a.parentNode) a.parentNode.removeChild(a);
+      setTimeout(function () { isTooltipMutation = false; }, 0);
+    }
+    return true;
+  }
 
   /**
    * Stack of active tooltips. Each entry is `{tip, anchor, level, hideTimer}`
@@ -81,24 +163,36 @@
       scheduleHideFromLevel(level);
     });
 
-    // Dispatch `command:` links by setting `window.location.href`. The
-    // markdown preview's built-in click delegator only watches the
-    // `.markdown-body` area, and our tooltip is appended to document.body
-    // outside that area; navigation via window.location triggers the
-    // webview's will-navigate interception which dispatches the command.
-    // @implements {R012.§3.AC.05} command URI dispatch via window.location.href assignment (own dispatcher, body-attached)
+    // Tooltips are appended to document.body, OUTSIDE `.markdown-body`,
+    // so the preview's built-in link delegator (which watches
+    // `.markdown-body`) never sees clicks here. We trampoline the
+    // click through `.markdown-body` by synthesizing a click on a
+    // hidden anchor briefly inserted there — VS Code's preview then
+    // dispatches the link the same way it does for native clicks in
+    // the rendered body.
+    //
+    // Hrefs in the tooltip are plain relative paths (the markdown
+    // preview's webview CSP rejects `command:` URI clicks at the
+    // navigation layer; verified via diagnostic logging). Relative
+    // paths land the user on the linked file in an editor — line
+    // jump from the preview is currently not supported and would
+    // require a webview message protocol the markdown extension owns.
     tip.addEventListener('click', function (e) {
-      var a = e.target && e.target.closest ? e.target.closest('a[href^="command:"]') : null;
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      dlog('tip.click:', {
+        targetTag: e.target && e.target.tagName,
+        targetClasses: e.target && e.target.className,
+        anchorFound: !!a,
+        href: a ? a.getAttribute('href') : null,
+      });
       if (!a) return;
       var href = a.getAttribute('href');
       if (!href) return;
+      // Skip pure-fragment links (`#foo`) and our own data: schemes.
+      if (href.charAt(0) === '#') return;
       e.preventDefault();
       e.stopPropagation();
-      try {
-        window.location.href = href;
-      } catch (_) {
-        /* fall through */
-      }
+      dispatchCommandUri(href);
     });
 
     // @implements {R012.§3.AC.06} wheel handler scrolls inner two-column scrollable region; no propagation at bounds
@@ -696,30 +790,18 @@
   // mouseleave on the anchor (which fires when the cursor's no longer
   // over it after scrolling) triggers the normal hide path.
 
-  // Document-level click delegator for `command:` URIs on .scepter-ref
-  // anchors (the main markdown body, NOT just the tooltip — the in-tooltip
-  // delegator handles those). VS Code's preview installs a click delegator
-  // on `.markdown-body` that normally forwards command: clicks to the
-  // extension host, but third-party markdown extensions (Markdown All In
-  // One, etc.) sometimes intercept clicks first and break that path. We
-  // bind in capture phase so we own clicks on our refs unconditionally
-  // and dispatch via window.location.href, which the webview's
-  // will-navigate hook resolves to a command execution regardless of
-  // who else is on the bubble path.
-  document.addEventListener('click', function (e) {
-    var a = e.target && e.target.closest ? e.target.closest('a[href^="command:"]') : null;
-    if (!a) return;
-    if (!a.classList || !a.classList.contains('scepter-ref')) return;
-    var href = a.getAttribute('href');
-    if (!href) return;
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      window.location.href = href;
-    } catch (_) {
-      /* fall through to natural click handling */
-    }
-  }, true);
+  // Note: an earlier version of this script intercepted `.scepter-ref`
+  // clicks with `command:` URIs in capture phase and tried to
+  // dispatch them via `window.location.href = href`. That worked
+  // when the FQID `<a>` tags carried relative-path hrefs (the
+  // handler never matched, native click won) but broke once we
+  // routed claim/note/section links through
+  // `command:scepter.previewOpenAt?...`. Setting `window.location.href`
+  // to a `command:` URL navigates the webview to a non-existent page
+  // (no will-navigate intercept), wiping the body. The refs panel
+  // already proves the natural click path works for command URIs, so
+  // we let `.scepter-ref` clicks bubble to VS Code's built-in
+  // dispatcher exactly like refs panel links.
 
   // Document-level click delegator for nesting-aware tooltip dismissal.
   // Click inside tooltip at level N → close everything deeper than N
@@ -759,21 +841,31 @@
    * re-renders the body whenever the source changes; the new render
    * brings a fresh (and possibly larger) body map div which we merge
    * onto whatever's already in window.__scepterBodyMap.
+   *
+   * @implements {R012.§3.AC.08} body map data-attribute carrier (read on load and on mutation)
    */
   function loadBodyMap() {
     var el = document.getElementById('__scepter-body-map');
-    if (!el) return;
+    if (!el) {
+      dlog('loadBodyMap: no #__scepter-body-map element found');
+      return;
+    }
     var data = el.getAttribute('data-scepter-body-map');
-    if (!data) return;
+    if (!data) {
+      dlog('loadBodyMap: data-scepter-body-map attribute empty');
+      return;
+    }
     try {
       var map = JSON.parse(data);
+      var keys = Object.keys(map);
+      dlog('loadBodyMap: loaded', keys.length, 'bodies; sample keys=', keys.slice(0, 5));
       if (window.__scepterBodyMap) {
         Object.assign(window.__scepterBodyMap, map);
       } else {
         window.__scepterBodyMap = map;
       }
     } catch (e) {
-      // Malformed JSON — leave existing map untouched.
+      dlog('loadBodyMap: JSON.parse threw', e);
     }
   }
 
