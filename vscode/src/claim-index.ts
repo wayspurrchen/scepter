@@ -735,46 +735,81 @@ export class ClaimIndexCache {
     const htmlExcerpts = new Map<string, string>();
     const noteLines = new Map<string, string[]>();
 
+    // ---- Phase 1: read raw text and aggregated lines for every note + claim ----
+    // No rendering yet. We need this data populated before any render runs so
+    // the plugin's citing-line snippet builder (which reads aggregated lines
+    // for OTHER notes) can resolve them sync.
     const noteIds = Array.from(this.noteMap.keys());
     await mapWithConcurrency(noteIds, 32, async (noteId) => {
       const raw = await this.readNoteExcerpt(noteId, Infinity);
-      if (raw) {
-        noteExcerpts.set(noteId, raw);
-        const lines = raw.split('\n');
-        const capped = lines.length > 50
-          ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*'
-          : raw;
-        const html = this.renderMarkdownToHtml(capped);
-        if (html) htmlExcerpts.set(noteId, html);
-      }
-      // Cache aggregated full-content lines (frontmatter and headings
-      // included). The markdown-it plugin needs these to build citing-line
-      // snippets at line offsets reported by the cross-ref index.
+      if (raw) noteExcerpts.set(noteId, raw);
       const aggregated = await this.getAggregatedNoteLines(noteId);
       if (aggregated) noteLines.set(noteId, aggregated);
       return null;
     });
 
     const entries = Array.from(this.entries.entries());
+    const claimRawEntries: Array<{ fqid: string; entry: ClaimIndexEntry; raw: string }> = [];
     await mapWithConcurrency(entries, 32, async ([fqid, entry]) => {
       const raw = await this.readClaimContext(entry, 1, 200);
       if (!raw) return null;
       noteExcerpts.set('claim:' + fqid, raw);
-      // Render through the SCEpter plugin with env carrying the parent
-      // note's path (for contextNoteId) and the line offset so badge-
-      // line comparisons map onto the original document's coordinates.
+      claimRawEntries.push({ fqid, entry, raw });
+      return null;
+    });
+
+    // ---- Phase 2: assign caches before rendering ----
+    // Renders that come next look up `noteLinesCache` (for citing-line
+    // snippet building) and `htmlExcerptCache` (for nested-ref
+    // `data-claim-context` data attributes). Pointing the cache fields
+    // at the maps we're populating means each render sees other
+    // already-completed renders' data via shared state.
+    this.noteExcerptCache = noteExcerpts;
+    this.noteLinesCache = noteLines;
+    this.htmlExcerptCache = htmlExcerpts;
+
+    // ---- Phase 3: render note excerpts (capped) ----
+    await mapWithConcurrency(noteIds, 32, async (noteId) => {
+      const raw = noteExcerpts.get(noteId);
+      if (!raw) return null;
+      const lines = raw.split('\n');
+      const capped = lines.length > 50
+        ? lines.slice(0, 50).join('\n') + '\n\n---\n\n*…content continues*'
+        : raw;
+      const html = this.renderMarkdownToHtml(capped);
+      if (html) htmlExcerpts.set(noteId, html);
+      return null;
+    });
+
+    // ---- Phase 4: first pass over claim excerpts ----
+    // After this pass, every claim has SOME pre-rendered HTML in the cache.
+    // Nested refs in those bodies may still have empty data-claim-context
+    // because the ref might point to a claim whose render hadn't started
+    // yet at the moment this ref was rendered (parallel race).
+    const renderClaim = async (fqid: string, entry: ClaimIndexEntry, raw: string) => {
       const absPath = this.resolveFilePath(entry.noteFilePath);
       const html = this.renderMarkdownToHtml(raw, {
         currentDocument: { fsPath: absPath },
         _scepterLineOffset: Math.max(0, entry.line - 1),
       });
       if (html) htmlExcerpts.set('claim:' + fqid, html);
+    };
+    await mapWithConcurrency(claimRawEntries, 32, async ({ fqid, entry, raw }) => {
+      await renderClaim(fqid, entry, raw);
       return null;
     });
 
-    this.noteExcerptCache = noteExcerpts;
-    this.htmlExcerptCache = htmlExcerpts;
-    this.noteLinesCache = noteLines;
+    // ---- Phase 5: second pass over claim excerpts ----
+    // Now every nested ref's data-claim-context resolves against the
+    // fully-populated cache from phase 4, so a one-level nested hover
+    // (the user-visible case) gets a populated body excerpt. Two-level
+    // nesting still has an empty inner body — the inner-inner hover's
+    // data attrs were baked into phase-4 HTML which was rendered with
+    // a partial cache. That's an acceptable limit for the hover surface.
+    await mapWithConcurrency(claimRawEntries, 32, async ({ fqid, entry, raw }) => {
+      await renderClaim(fqid, entry, raw);
+      return null;
+    });
   }
 
   /**
