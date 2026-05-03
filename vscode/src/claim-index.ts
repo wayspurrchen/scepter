@@ -675,6 +675,24 @@ export class ClaimIndexCache {
   }
 
   /**
+   * Build the map of all claim FQIDs to their pre-rendered HTML body
+   * excerpts, suitable for embedding into the markdown preview as a
+   * global lookup. Used by the preview's webview script to render
+   * tooltip body panels at arbitrary nesting depth — each level looks
+   * up its own FQID in the map rather than relying on per-ref data
+   * attributes (which can only resolve a fixed number of levels).
+   */
+  getAllClaimBodyMap(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [key, html] of this.htmlExcerptCache) {
+      if (key.startsWith('claim:')) {
+        out[key.slice('claim:'.length)] = html;
+      }
+    }
+    return out;
+  }
+
+  /**
    * Synchronous accessor for the aggregated content of a note as a line
    * array. Returns null if the cache hasn't been populated yet (e.g. during
    * an in-flight refresh) — callers in the markdown-it plugin should
@@ -781,33 +799,20 @@ export class ClaimIndexCache {
       return null;
     });
 
-    // ---- Phase 4: first pass over claim excerpts ----
-    // After this pass, every claim has SOME pre-rendered HTML in the cache.
-    // Nested refs in those bodies may still have empty data-claim-context
-    // because the ref might point to a claim whose render hadn't started
-    // yet at the moment this ref was rendered (parallel race).
-    const renderClaim = async (fqid: string, entry: ClaimIndexEntry, raw: string) => {
+    // ---- Phase 4: render claim excerpts (single pass, bare bodies) ----
+    // Each excerpt is rendered without nested `data-claim-context` —
+    // refs inside carry only `data-claim-fqid`. The webview looks up
+    // the body for any ref via `window.__scepterBodyMap[fqid]` (a
+    // single global map injected once per main-document render), so
+    // nested hovers resolve at any depth without per-ref recursion in
+    // the data attributes.
+    await mapWithConcurrency(claimRawEntries, 32, async ({ fqid, entry, raw }) => {
       const absPath = this.resolveFilePath(entry.noteFilePath);
       const html = this.renderMarkdownToHtml(raw, {
         currentDocument: { fsPath: absPath },
         _scepterLineOffset: Math.max(0, entry.line - 1),
       });
       if (html) htmlExcerpts.set('claim:' + fqid, html);
-    };
-    await mapWithConcurrency(claimRawEntries, 32, async ({ fqid, entry, raw }) => {
-      await renderClaim(fqid, entry, raw);
-      return null;
-    });
-
-    // ---- Phase 5: second pass over claim excerpts ----
-    // Now every nested ref's data-claim-context resolves against the
-    // fully-populated cache from phase 4, so a one-level nested hover
-    // (the user-visible case) gets a populated body excerpt. Two-level
-    // nesting still has an empty inner body — the inner-inner hover's
-    // data attrs were baked into phase-4 HTML which was rendered with
-    // a partial cache. That's an acceptable limit for the hover surface.
-    await mapWithConcurrency(claimRawEntries, 32, async ({ fqid, entry, raw }) => {
-      await renderClaim(fqid, entry, raw);
       return null;
     });
   }
