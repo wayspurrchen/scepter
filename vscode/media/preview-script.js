@@ -736,6 +736,32 @@
     }
   }, true);
 
+  // Document-level click delegator for nesting-aware tooltip dismissal.
+  // Click inside tooltip at level N → close everything deeper than N
+  // (siblings/grandchildren go away, the clicked tooltip and its
+  // ancestors stay visible). Click anywhere else → close the entire
+  // stack. Capture phase so it runs regardless of stopPropagation in
+  // bubble-phase listeners; runs alongside the command-URI handler
+  // above (their selectors don't overlap meaningfully — both can fire
+  // on the same click without conflict).
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var enclosing = e.target.closest('.scepter-tooltip');
+    var clickedLevel = -1;
+    if (enclosing) {
+      for (var i = 0; i < tooltipStack.length; i++) {
+        if (tooltipStack[i].tip === enclosing) {
+          clickedLevel = i;
+          break;
+        }
+      }
+    }
+    // Close everything strictly deeper than the clicked level. clickedLevel
+    // = -1 (clicked outside any tooltip) → close all tooltips. clickedLevel
+    // = 0 → keep level 0, close levels 1+. And so on.
+    hideTooltipsFromLevel(clickedLevel + 1);
+  }, true);
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attachListeners);
   } else {
