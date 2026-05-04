@@ -25,6 +25,12 @@ __debug*
 .codecontext/cache/
 .codecontext/logs/
 
+# ZK-prefixed files (YYYYMMDDHHmm timestamp prefix) — never commit without explicit user permission
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9] *
+
+# Local-only agent instructions
+CLAUDE.local.md
+
 # Lock files for non-npm package managers
 pnpm-lock.yaml
 pnpm-workspace.yaml
