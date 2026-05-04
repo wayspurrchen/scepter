@@ -16,6 +16,10 @@ When creating analysis/exploration documents (architectural analysis, research, 
 - Put these supporting documents in @docs/
 - These are supplementary materials, not tracked development work
 
+## Local Overrides
+
+If `CLAUDE.local.md` exists at the project root, you **MUST** read it immediately after this file.
+
 ## Development Commands
 
 You DO NOT NEED to build this project when testing functionality manually. You can exercise arbitrary files with `pnpm tsx`. For typechecks, use `pnpm tsc`.
