@@ -3018,5 +3018,1857 @@
       "date": "2026-05-01T02:51:50.242Z",
       "note": "inline"
     }
+  ],
+  "S002.1.AC.02": [
+    {
+      "id": "nliumf8bwfqthb25nn9ffqxh",
+      "claimId": "S002.1.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "fqse6kwc31203hq7erk0uuvo",
+      "claimId": "S002.1.AC.02",
+      "key": "derives",
+      "value": "R004.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.03": [
+    {
+      "id": "xjutnkfh3jmw7i40bnyfk262",
+      "claimId": "S002.1.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "xd35q5oemuhavz3ddl41itak",
+      "claimId": "S002.1.AC.03",
+      "key": "derives",
+      "value": "R004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.04": [
+    {
+      "id": "ixp00ytpznokoale6lruh2s7",
+      "claimId": "S002.1.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "q7t19cu1v00f9u90ipr2qqv0",
+      "claimId": "S002.1.AC.04",
+      "key": "derives",
+      "value": "R004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.05": [
+    {
+      "id": "d0grpdl04porvlajj08h0up3",
+      "claimId": "S002.1.AC.05",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "aoetdpaj8yibxqlb6neljud8",
+      "claimId": "S002.1.AC.05",
+      "key": "derives",
+      "value": "R004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.06": [
+    {
+      "id": "nc7av4wrk0vddpnszqkh2jj2",
+      "claimId": "S002.1.AC.06",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "zjevc3cwwhw7bdh5ln8h1fl4",
+      "claimId": "S002.1.AC.06",
+      "key": "derives",
+      "value": "R004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.07": [
+    {
+      "id": "qiou4ymhgswoczzyfj65hdng",
+      "claimId": "S002.1.AC.07",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "vxpl8dbuu3pl1twf6dgowr5y",
+      "claimId": "S002.1.AC.07",
+      "key": "derives",
+      "value": "R004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.08": [
+    {
+      "id": "i17h3qyum3f7s0i4fb3aa9kc",
+      "claimId": "S002.1.AC.08",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "e3a41x65ge0p5or50v717jup",
+      "claimId": "S002.1.AC.08",
+      "key": "derives",
+      "value": "R004.§1.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.09": [
+    {
+      "id": "ixuwu4uqd31esihysm79p75v",
+      "claimId": "S002.1.AC.09",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "e5oj4hq7heusmdt9x80t4l69",
+      "claimId": "S002.1.AC.09",
+      "key": "derives",
+      "value": "R012.§5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "efwj8p9dlre9xp1as4pdc430",
+      "claimId": "S002.1.AC.09",
+      "key": "derives",
+      "value": "R012.§5.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    },
+    {
+      "id": "sdovu0dsmq0u676afrefoiy7",
+      "claimId": "S002.1.AC.09",
+      "key": "derives",
+      "value": "R012.§5",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.10": [
+    {
+      "id": "t426fgvtz5vrf4g06p1hsci8",
+      "claimId": "S002.1.AC.10",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "sb37ryi8vlpqdvimnfnv0wqd",
+      "claimId": "S002.1.AC.10",
+      "key": "derives",
+      "value": "R011.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.11": [
+    {
+      "id": "h1ux7ywh1t8xfdcl1jit4exb",
+      "claimId": "S002.1.AC.11",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "psvr32frzzcpvu9q3r5udk6l",
+      "claimId": "S002.1.AC.11",
+      "key": "derives",
+      "value": "R005.§2.AC.04a",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.12": [
+    {
+      "id": "tw9jls34utftzehad9vrs91z",
+      "claimId": "S002.1.AC.12",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "mtndfwlr511ubd1noc2vv4oa",
+      "claimId": "S002.1.AC.12",
+      "key": "derives",
+      "value": "R012.§6.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.13": [
+    {
+      "id": "n3ta8zae4gzmzzf7uhj7o701",
+      "claimId": "S002.1.AC.13",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "y1xm1r6wgnt1xzcalodboyhc",
+      "claimId": "S002.1.AC.13",
+      "key": "derives",
+      "value": "R012.§6.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.14": [
+    {
+      "id": "rk0dwi1smoc42dn2f3tyq523",
+      "claimId": "S002.1.AC.14",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "nley6ujb1tjqg5j2juybi6ez",
+      "claimId": "S002.1.AC.14",
+      "key": "derives",
+      "value": "R012.§6.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.01": [
+    {
+      "id": "ua0x1thwlrjedsqaf7jrz5du",
+      "claimId": "S002.2.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "ph8c9hrb6g7soedz0bq7cm1w",
+      "claimId": "S002.2.AC.01",
+      "key": "derives",
+      "value": "R004.§3.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.02": [
+    {
+      "id": "owflb5uf3sdez9pj9ya42ist",
+      "claimId": "S002.2.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "vu577ulp0889wn66iivajqc1",
+      "claimId": "S002.2.AC.02",
+      "key": "derives",
+      "value": "R004.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.03": [
+    {
+      "id": "zviy9j97ba742xb2bvsizojg",
+      "claimId": "S002.2.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.04": [
+    {
+      "id": "b4x8lrocs0pwzhd7dgmnkvqn",
+      "claimId": "S002.2.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "ml6110faf4jzwcqkfehxhau8",
+      "claimId": "S002.2.AC.04",
+      "key": "derives",
+      "value": "R004.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.05": [
+    {
+      "id": "puoix4izre7jqchouqh99yr8",
+      "claimId": "S002.2.AC.05",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "ahs25rqdyxu1rqoycdp26bqq",
+      "claimId": "S002.2.AC.05",
+      "key": "derives",
+      "value": "R004.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.06": [
+    {
+      "id": "wqs7uswcxb67bl299342lg8k",
+      "claimId": "S002.2.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "pxjwlv7ohzlpjyqjaeypjekp",
+      "claimId": "S002.2.AC.06",
+      "key": "derives",
+      "value": "R004.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.07": [
+    {
+      "id": "vrkh8pw2vdsbqy680tindvy3",
+      "claimId": "S002.2.AC.07",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "lbr4uc3q7vy4w2dbrfe1xt8m",
+      "claimId": "S002.2.AC.07",
+      "key": "derives",
+      "value": "R004.§3.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.08": [
+    {
+      "id": "r7k95xomzdprzhjvwh4miuqi",
+      "claimId": "S002.2.AC.08",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.09": [
+    {
+      "id": "lg1r73q1ba5n4qjyuchst541",
+      "claimId": "S002.2.AC.09",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.10": [
+    {
+      "id": "sref756jnru6wntrfioaz233",
+      "claimId": "S002.2.AC.10",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.11": [
+    {
+      "id": "crcyeude4wwpe9u8nkcrgkl0",
+      "claimId": "S002.2.AC.11",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.12": [
+    {
+      "id": "r6eugo3wu5ab6tv5xjzzfpdl",
+      "claimId": "S002.2.AC.12",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.2.AC.13": [
+    {
+      "id": "fvo53kyhpan0fqmufrynqie7",
+      "claimId": "S002.2.AC.13",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "khnysl9zpfrelzr1h3nc2r4f",
+      "claimId": "S002.2.AC.13",
+      "key": "derives",
+      "value": "R004.§1.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.1.AC.01": [
+    {
+      "id": "mi4612j5f3p24wit627dqgau",
+      "claimId": "S002.3.1.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.1.AC.02": [
+    {
+      "id": "zwibosefktt9qxee5jgby6vn",
+      "claimId": "S002.3.1.AC.02",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.1.AC.03": [
+    {
+      "id": "kwoaiz57im2nwk64cit0n8x4",
+      "claimId": "S002.3.1.AC.03",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "avgx3j517fbjdxurqm3evyzt",
+      "claimId": "S002.3.1.AC.03",
+      "key": "derives",
+      "value": "R004.§1.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.1.AC.04": [
+    {
+      "id": "x27c63c1dye2gpmuc192134n",
+      "claimId": "S002.3.1.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.2.AC.01": [
+    {
+      "id": "u4pdc644ybr5zw7km6squzgl",
+      "claimId": "S002.3.2.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "rz31j64ohs9twe3q9hrsj59u",
+      "claimId": "S002.3.2.AC.01",
+      "key": "derives",
+      "value": "R004.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.2.AC.02": [
+    {
+      "id": "av1iuwlebvimk2kaddun0ahb",
+      "claimId": "S002.3.2.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "zniilrk7z4ckk6ze2d0kpbxs",
+      "claimId": "S002.3.2.AC.02",
+      "key": "derives",
+      "value": "R004.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.2.AC.03": [
+    {
+      "id": "yn93cfrnyii3mpzvybtwe06d",
+      "claimId": "S002.3.2.AC.03",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.2.AC.04": [
+    {
+      "id": "qsqq6wbliewj7vqkiomojbbm",
+      "claimId": "S002.3.2.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.2.AC.05": [
+    {
+      "id": "vxke6puippxhe80akrpobe94",
+      "claimId": "S002.3.2.AC.05",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "wbsd4v0l6sks76j15rhe5q15",
+      "claimId": "S002.3.2.AC.05",
+      "key": "derives",
+      "value": "R012.§6.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.3.AC.01": [
+    {
+      "id": "wuhmz8jmrqvt1vegm79y8165",
+      "claimId": "S002.3.3.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.3.AC.02": [
+    {
+      "id": "po3ie8qptgb3q01lyhl6sir4",
+      "claimId": "S002.3.3.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.3.AC.03": [
+    {
+      "id": "vv9x06px39d9llfxodqiznng",
+      "claimId": "S002.3.3.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.3.AC.04": [
+    {
+      "id": "qqpikbci0xb7a11186gza6el",
+      "claimId": "S002.3.3.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.3.AC.05": [
+    {
+      "id": "xxsnay6yzcyz12kgmwdecdc8",
+      "claimId": "S002.3.3.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.3.AC.06": [
+    {
+      "id": "zalxqvl2hxwflyma4s9lqg79",
+      "claimId": "S002.3.3.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "x5bygvtmcnvszc59278n4i4k",
+      "claimId": "S002.3.3.AC.06",
+      "key": "derives",
+      "value": "R008",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "sudx4nixa4qbz6fqnhifzcoe",
+      "claimId": "S002.3.3.AC.06",
+      "key": "derives",
+      "value": "R008.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    },
+    {
+      "id": "av93i9mviygq7wlojm9zk9df",
+      "claimId": "S002.3.3.AC.06",
+      "key": "derives",
+      "value": "R008",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.4.AC.01": [
+    {
+      "id": "c4kz0j77kd2r8uo5l89dhgx9",
+      "claimId": "S002.3.4.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.4.AC.02": [
+    {
+      "id": "h9dzxds79hj24yglehhe17qh",
+      "claimId": "S002.3.4.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.4.AC.03": [
+    {
+      "id": "fw0n2go1nzarda5p9qbwi38k",
+      "claimId": "S002.3.4.AC.03",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.4.AC.04": [
+    {
+      "id": "nf339rtz4lfocg6gtkgwobyl",
+      "claimId": "S002.3.4.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "o7at51skxuku03t4vawlkl67",
+      "claimId": "S002.3.4.AC.04",
+      "key": "derives",
+      "value": "R005.§2.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.4.AC.05": [
+    {
+      "id": "nhsaw0639wnkgj3vzotct01s",
+      "claimId": "S002.3.4.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "fd9n8i92un10xg82f0bmo5iw",
+      "claimId": "S002.3.4.AC.05",
+      "key": "derives",
+      "value": "R005.§2.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.5.AC.01": [
+    {
+      "id": "f4gin9t45tfqksotyjz7h8zk",
+      "claimId": "S002.3.5.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.5.AC.02": [
+    {
+      "id": "mo80ct7gvmpccz7tssnzu6l1",
+      "claimId": "S002.3.5.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.5.AC.03": [
+    {
+      "id": "nph0saiqbe41ma77r32o3tr0",
+      "claimId": "S002.3.5.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.5.AC.04": [
+    {
+      "id": "bxkbypyip8feag2podsnfkcd",
+      "claimId": "S002.3.5.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.5.AC.05": [
+    {
+      "id": "sn4idxp77c5g7kam4rpd843r",
+      "claimId": "S002.3.5.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.5.AC.06": [
+    {
+      "id": "gq5hwjcm8ovc7ggrnyv8qhhp",
+      "claimId": "S002.3.5.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "qxtnk5sb7fiwlclmab93zycv",
+      "claimId": "S002.3.5.AC.06",
+      "key": "derives",
+      "value": "R007",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "u84qkoqguiff3u0lwx65nu04",
+      "claimId": "S002.3.5.AC.06",
+      "key": "derives",
+      "value": "R007.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    },
+    {
+      "id": "tg1stndqfmbwv2yb6645yrhd",
+      "claimId": "S002.3.5.AC.06",
+      "key": "derives",
+      "value": "R007",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.6.AC.01": [
+    {
+      "id": "x37nckyw4cjva72sa8kc2fa8",
+      "claimId": "S002.3.6.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "oddsyfqj4tb8nzvs1d8rrfix",
+      "claimId": "S002.3.6.AC.01",
+      "key": "derives",
+      "value": "R012.§1",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "vkylhjcxhb1t7livbt1uz7fu",
+      "claimId": "S002.3.6.AC.01",
+      "key": "derives",
+      "value": "R012.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    },
+    {
+      "id": "vhfenmwwbuc2z142xx920dzq",
+      "claimId": "S002.3.6.AC.01",
+      "key": "derives",
+      "value": "R012.§1",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:19:06.600Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.6.AC.02": [
+    {
+      "id": "ks9fhbjhnork8cy3ctqa6gw7",
+      "claimId": "S002.3.6.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "jsgc2riz38vhvinqabjmk3a9",
+      "claimId": "S002.3.6.AC.02",
+      "key": "derives",
+      "value": "R012.§1.AC.06",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.6.AC.03": [
+    {
+      "id": "x8qswagu643poeqqkm88iza7",
+      "claimId": "S002.3.6.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "doh6tjsht311ps7kdsu5brxh",
+      "claimId": "S002.3.6.AC.03",
+      "key": "derives",
+      "value": "R012.§2",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "dlf9tp76sj8xdgtlo0dxqztt",
+      "claimId": "S002.3.6.AC.03",
+      "key": "derives",
+      "value": "R012.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    },
+    {
+      "id": "hyx26xmqq2lqk2a9o0xz9vql",
+      "claimId": "S002.3.6.AC.03",
+      "key": "derives",
+      "value": "R012.§2",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.6.AC.04": [
+    {
+      "id": "hfsjpftppjx3re2b6gqoesr5",
+      "claimId": "S002.3.6.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "czdezqipba80w56hlc3lt6eo",
+      "claimId": "S002.3.6.AC.04",
+      "key": "derives",
+      "value": "R012.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.6.AC.05": [
+    {
+      "id": "nz4yce6k2c0d4n3xivlyq9ym",
+      "claimId": "S002.3.6.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "cj0dxw71b6epnt3mk41kl5j2",
+      "claimId": "S002.3.6.AC.05",
+      "key": "derives",
+      "value": "R012.§3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "zp6hj02yynqxx0pi2bwu0a2l",
+      "claimId": "S002.3.6.AC.05",
+      "key": "derives",
+      "value": "R012.§3.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    },
+    {
+      "id": "oddsfpg8nuhwzvxf16vtvps3",
+      "claimId": "S002.3.6.AC.05",
+      "key": "derives",
+      "value": "R012.§3",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.6.AC.06": [
+    {
+      "id": "xg65busmmcmvuzfkjia5rln2",
+      "claimId": "S002.3.6.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.7.AC.01": [
+    {
+      "id": "e77ple7lfv6e186j65alel14",
+      "claimId": "S002.3.7.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.7.AC.02": [
+    {
+      "id": "l29e3j17jaymkf7lt99j65kk",
+      "claimId": "S002.3.7.AC.02",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.3.7.AC.03": [
+    {
+      "id": "othl5wp0s1od8b1jb6qhxvj3",
+      "claimId": "S002.3.7.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.01": [
+    {
+      "id": "wroklg1mpxf4tb2j85oluyp9",
+      "claimId": "S002.4.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "uhukdeqybckp8kajmdw7qtys",
+      "claimId": "S002.4.AC.01",
+      "key": "derives",
+      "value": "R005.§2.AC.04a",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.02": [
+    {
+      "id": "jdz2fa3yf8m0oziopycmmzwv",
+      "claimId": "S002.4.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "zkrwlzavo04qndphou425hxl",
+      "claimId": "S002.4.AC.02",
+      "key": "derives",
+      "value": "R005.§2.AC.04b",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.03": [
+    {
+      "id": "dgfroeu2go8bjlq92d35k2nk",
+      "claimId": "S002.4.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "z4sejpza2mxlz3kckpc0uwep",
+      "claimId": "S002.4.AC.03",
+      "key": "derives",
+      "value": "R005.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.04": [
+    {
+      "id": "xtmgi9awh7qz46w3pl3siznq",
+      "claimId": "S002.4.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.05": [
+    {
+      "id": "py45zvn5r4c11plrohnn0s6v",
+      "claimId": "S002.4.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.06": [
+    {
+      "id": "yqy347sv33i0nrpiju81z4bz",
+      "claimId": "S002.4.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.07": [
+    {
+      "id": "wfu5asruc4gqutha0r202j0w",
+      "claimId": "S002.4.AC.07",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.5.AC.01": [
+    {
+      "id": "x8w9bigdaa6oa6k4devnmj1n",
+      "claimId": "S002.5.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.5.AC.02": [
+    {
+      "id": "s3mqitongrzlo8ujvoptdoi5",
+      "claimId": "S002.5.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.5.AC.03": [
+    {
+      "id": "t1j90t6n23e7rl5sqpvyslba",
+      "claimId": "S002.5.AC.03",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.5.AC.04": [
+    {
+      "id": "n474foocgbmu8uagwhu3f4cj",
+      "claimId": "S002.5.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.5.AC.05": [
+    {
+      "id": "hgd28miqq70nk3svz8wru0uk",
+      "claimId": "S002.5.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.5.AC.06": [
+    {
+      "id": "makcbry9flf9uhja9n4875o4",
+      "claimId": "S002.5.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.6.AC.01": [
+    {
+      "id": "jlgoiwccgwokwbpijzbgyxpv",
+      "claimId": "S002.6.AC.01",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "bdu3291j7lb4envept5nkgtu",
+      "claimId": "S002.6.AC.01",
+      "key": "derives",
+      "value": "R012.§6.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.6.AC.02": [
+    {
+      "id": "vru6uvgfshgto71a9fahph0b",
+      "claimId": "S002.6.AC.02",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "tpck1q0bkaxye67mqt7mi819",
+      "claimId": "S002.6.AC.02",
+      "key": "derives",
+      "value": "R012.§6.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.6.AC.03": [
+    {
+      "id": "vpsc0s9p28sdsrj0h5c4oe47",
+      "claimId": "S002.6.AC.03",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "euec1c638jk0jk894tflg60s",
+      "claimId": "S002.6.AC.03",
+      "key": "derives",
+      "value": "R012.§6.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.6.AC.04": [
+    {
+      "id": "x4qeilvqgz1exu01ruu25q3f",
+      "claimId": "S002.6.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "thrvwzajp7b31xcgx4srkp4q",
+      "claimId": "S002.6.AC.04",
+      "key": "derives",
+      "value": "R012.§6.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.6.AC.05": [
+    {
+      "id": "d6abylnagce1r3eht8lgvtlv",
+      "claimId": "S002.6.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.01": [
+    {
+      "id": "sajy5ucijk7vth2ajv5b4t16",
+      "claimId": "S002.7.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "yj9u0yoquwaif9d7ckbb6msm",
+      "claimId": "S002.7.AC.01",
+      "key": "derives",
+      "value": "R011.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.02": [
+    {
+      "id": "rhhj2t6qr52pbrrbdbft8b0h",
+      "claimId": "S002.7.AC.02",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "w2wydjgq4uok4o8k0vvcj71b",
+      "claimId": "S002.7.AC.02",
+      "key": "derives",
+      "value": "R011.§2.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.03": [
+    {
+      "id": "t3z16zito5cpqqaqkqhqkidx",
+      "claimId": "S002.7.AC.03",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.04": [
+    {
+      "id": "yamkez7e9cpolfg1zm5t28df",
+      "claimId": "S002.7.AC.04",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "bok7531lw9yie04fe9xuts1t",
+      "claimId": "S002.7.AC.04",
+      "key": "derives",
+      "value": "R011.§2.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.05": [
+    {
+      "id": "ui1y4ca1nzhm9xdpqjmg5wdj",
+      "claimId": "S002.7.AC.05",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "twbl5dkuibjmhn0qeacctit2",
+      "claimId": "S002.7.AC.05",
+      "key": "derives",
+      "value": "R011.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.06": [
+    {
+      "id": "k7to5f73q8x2f4co86o74zf3",
+      "claimId": "S002.7.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.7.AC.07": [
+    {
+      "id": "rhn6fclcnn88yhu5ms00zgyw",
+      "claimId": "S002.7.AC.07",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.01": [
+    {
+      "id": "vffv6dreve1uw2r942rwhlcc",
+      "claimId": "S002.8.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.02": [
+    {
+      "id": "omyb0buel4zi0zns3uxr28jv",
+      "claimId": "S002.8.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.03": [
+    {
+      "id": "huxt5jj75ba8dfuavmcigfmj",
+      "claimId": "S002.8.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.04": [
+    {
+      "id": "vo88j2ituqqzrr94k4ila2xw",
+      "claimId": "S002.8.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.05": [
+    {
+      "id": "hpf9phpxuayxsf20i1jx7zfm",
+      "claimId": "S002.8.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.06": [
+    {
+      "id": "exlf8r5a07n9bhvjn9d2nwcz",
+      "claimId": "S002.8.AC.06",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.07": [
+    {
+      "id": "ekiepg840hau6dm3kvzpyo0v",
+      "claimId": "S002.8.AC.07",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.8.AC.08": [
+    {
+      "id": "ww0e4lfkv01pjkznwa75jcmt",
+      "claimId": "S002.8.AC.08",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.9.AC.01": [
+    {
+      "id": "ex2f9e5xa05aruja8nbbuxx6",
+      "claimId": "S002.9.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "z035pdhohn6rukln1qhuj7b9",
+      "claimId": "S002.9.AC.01",
+      "key": "derives",
+      "value": "R008",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "d0o0sf11j2c54xlskpgzri7d",
+      "claimId": "S002.9.AC.01",
+      "key": "derives",
+      "value": "R008.§1.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    },
+    {
+      "id": "jkmelp6eqzdo8zmd1z4laj65",
+      "claimId": "S002.9.AC.01",
+      "key": "derives",
+      "value": "R008",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    }
+  ],
+  "S002.9.AC.02": [
+    {
+      "id": "u4kfi7iwi6edzd2tttpyjd16",
+      "claimId": "S002.9.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "fxnnw9c5a0ovwun5caxtolpg",
+      "claimId": "S002.9.AC.02",
+      "key": "derives",
+      "value": "R008",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "ds4o11rkgr4daom0j08ptok0",
+      "claimId": "S002.9.AC.02",
+      "key": "derives",
+      "value": "R008.§1.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    },
+    {
+      "id": "wzwp4084hslwkepv2nxgy0s2",
+      "claimId": "S002.9.AC.02",
+      "key": "derives",
+      "value": "R008",
+      "op": "retract",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:16:55.178Z",
+      "note": "inline"
+    }
+  ],
+  "S002.9.AC.03": [
+    {
+      "id": "i57hn7m8lz1oe6t2tqpr0stk",
+      "claimId": "S002.9.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.9.AC.04": [
+    {
+      "id": "ivdess5tyt1nj5xs8sxspn0r",
+      "claimId": "S002.9.AC.04",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.9.AC.05": [
+    {
+      "id": "lv1tye6owsulm0lwj1pjj524",
+      "claimId": "S002.9.AC.05",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.AC.02": [
+    {
+      "id": "eednlwh9391ci6kosy9h4hsb",
+      "claimId": "S002.AC.02",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "kv8zappubh2jrn8j6fjmalft",
+      "claimId": "S002.AC.02",
+      "key": "derives",
+      "value": "R048.§2.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    }
+  ],
+  "S002.1.AC.01": [
+    {
+      "id": "tvguuey3vj5lu9hl6q77iale",
+      "claimId": "S002.1.AC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:20:01.216Z",
+      "note": "inline"
+    },
+    {
+      "id": "osuz3cru11dew3o7q1pmnzfm",
+      "claimId": "S002.1.AC.01",
+      "key": "derives",
+      "value": "R004.§2.AC.02",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T14:20:01.216Z",
+      "note": "inline"
+    }
   ]
 }
