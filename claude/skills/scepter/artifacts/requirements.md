@@ -1,5 +1,19 @@
 # Requirements Document Guide
 
+## Before You Draft (READ FIRST)
+
+A requirement is a testable MUST/SHOULD claim about what the system must do or guarantee, expressed at a level abstract enough to permit design freedom. Three rules are absolute. **Apply them prospectively to every numbered claim as you write it, not retrospectively when you review.**
+
+1. **Litmus.** Can a tester write a pass/fail test from this statement alone, without knowing the system's internal design? If yes, it's a requirement. If they need implementation details, it's a specification — move it. If they can't test it at all, it's a goal — move it to design principles.
+
+2. **Modal character.** Every numbered claim asserts existence, behavior, integration, constraint, ordering, or invariant. Claims of the form "MUST distinguish A from B," "MUST handle X gracefully," "MUST be possible during {workflow context}," or "MUST integrate with Y" do not fit any of these — they are goals, authorial framings, or process steps, not claims. See `claims.md` § Authoring Litmus for the full character table.
+
+3. **Layer.** Requirements describe effects in the world (what the system promises). Specifications describe contracts at the machine boundary (how it promises). The Requirements/Specification boundary table at § Step 5 below is the rule. Whenever an AC starts naming method signatures, parameter lists, per-backend realizations, or option-trichotomy enumerations, it has crossed into specification — relocate.
+
+**Brief-vs-guide rule.** If a dispatch brief specifies a section template that would force you to author non-claim content as a numbered MUST (e.g., a "Distinction from {adjacent concepts}" section as numbered ACs, a workflow-list section as ACs, an option-enumeration section as ACs), the brief is wrong about claim grain. The guide is authoritative. Stop, surface the conflict to the orchestrator, and resolve before authoring — do not silently render structure into invalid claims to satisfy the brief.
+
+---
+
 A requirements document is the bridge between a problem domain and a specification. It answers: what must the system do, why, under what constraints, and how will we know it's done. Requirements are the first formal commitment — upstream of them is intent (needs, goals, problems); downstream is specification (contracts, interfaces, invariants). This document defines both the output format for requirements and the process for producing one.
 
 **Core Problem**: Requirements sit between two failure modes. Too vague and they don't constrain the solution — the implementer fills the gap with assumptions. Too specific and they embed design decisions — the solution space collapses prematurely, and the "requirement" is actually a specification wearing the wrong label. The discipline is finding the right level: precise enough to be testable, abstract enough to permit design freedom.

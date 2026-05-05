@@ -4,11 +4,9 @@
 
 Ensure you have loaded `@scepter` (the main skill) first — it contains the non-negotiable rules, CLI reference, and core concepts.
 
-## STRICT: Git Staging Discipline
+## Git Discipline
 
-- **Only stage files YOUR task created or modified.** Nothing else. Ever.
-- **Never stage pre-existing untracked files.** The working tree contains research docs, config files, and artifacts from prior sessions. They are not yours to stage.
-- **Never run `git add -A`, `git add .`, or `git add --all`.** Always add specific files by name. This is as disruptive as a broken build.
+**MUST-load `~/.claude/skills/scepter/git-discipline.md` before any git operation.** The full rules — only stage what YOU touched, never use `git stash`, never wipe the working tree, never skip hooks — and the cross-agent destruction history that motivates them live there.
 
 ## Pre-Implementation Workflow
 
@@ -298,52 +296,7 @@ This preserves the original claim while adding the implementation-level detail t
 
 ## Status Updates
 
-### Frontmatter First Rule
-
-All status changes MUST be in frontmatter `status` key BEFORE adding progress notes:
-
-```yaml
----
-status: in_progress  # ← UPDATE THIS FIRST
----
-
-## Status Updates
-- 2025-11-12: Changed status to in_progress
-```
-
-### Completion Rule
-
-**NEVER mark tasks as `completed` or `done`** without explicit user verification.
-
-Safe transitions: `pending` → `in_progress` → `blocked` → `in_progress` → `ready_for_review`
-
-User-only transitions: → `completed`, → `done`, → `approved`
-
-### Artifact Authoring Status (Producers)
-
-When authoring a SCEpter artifact note (Requirement, Specification, TestSpec, DetailedDesign, Architecture) for the first time, leave the frontmatter `status` at the project's pending-equivalent default — typically `pending`, `proposed`, or `draft`; check `scepter config` for the project's allowed statuses. **Producers MUST NOT set `status: accepted` (or any post-review status) at initial authoring** — the trace matrix would then assert a review-pass that has not happened, and the artifact's `§Status Log` (when it exists) would contradict the frontmatter.
-
-The status flip to `accepted` is an **orchestrator action after the reviewer returns APPROVED**. The orchestrator updates frontmatter and adds a Status Log entry:
-
-```yaml
-status: accepted  # post-review flip
-```
-
-```markdown
-- YYYY-MM-DD: Reviewer pass APPROVED; status pending → accepted.
-```
-
-If a producer set `accepted` prematurely and the review subsequently passed, the orchestrator MAY leave the status alone (no ceremonial walk-back to `pending`) but MUST add the explicit Status Log entry so the artifact's lifecycle is honestly recorded. Going forward, the producer should not author with the post-review status set.
-
-### Progress Notes
-
-Always date with exact `date` command output:
-```markdown
-## Progress
-- 2025-11-12: Started implementation of auth module
-- 2025-11-12: Completed token generation (src/services/auth.ts)
-- 2025-11-12: All unit tests passing
-```
+**MUST-load `~/.claude/skills/scepter/status-management.md` whenever you flip a status, author a new artifact, or record a lifecycle transition.** It covers the frontmatter-first rule, the completion-authority hierarchy (USER-ONLY transitions vs agent-permitted), the artifact-authoring discipline (producers leave new artifacts at the pending-equivalent default; never `accepted` at initial authoring), and progress-note formatting. Do not improvise status transitions.
 
 ## Implementation Checklist
 

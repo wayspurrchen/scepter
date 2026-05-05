@@ -13,6 +13,8 @@ This requirement captures the user-facing capability surface that the recent VS 
 
 **Core Principle:** **Information at the point of reference, with cross-surface consistency.** A user hovering `{R005.§1.AC.01}` in either the editor or the preview MUST see the same essential information — body, refs, badges, range members — without leaving the current document. The two surfaces use different rendering technologies (VS Code's `MarkdownString` hover vs an HTML/CSS webview tooltip), so they cannot be pixel-identical, but they MUST be informationally equivalent, visually coherent, and interactionally analogous.
 
+**Spec coverage:** The reference shapes this requirement consumes — range tokens at {S002.§1.AC.09}, adjacent-section binding shapes at {S002.§1.AC.12}-{S002.§1.AC.14} — and the behaviors layered on top — Range Expansion at {S002.§5}, Adjacent-Section Binding at {S002.§6}, and the VS Code consumer surfaces at {S002.§3.6} — are all consolidated in S002 as the authoritative cross-tab spec. This requirement is the primary upstream input for the VS Code consumer rows of S002 and for the range/adjacent-section grammar rows.
+
 ## Problem Statement
 
 Before this work, the VS Code extension had a baseline hover provider that surfaced claim metadata and a flat list of incoming references, and a markdown preview with claim references rendered as styled spans but no on-hover surfacing of any kind. A user reading a note in either surface had three concrete problems:
@@ -132,7 +134,9 @@ The refs panel — surfaced inside both the editor hover and the preview tooltip
 
 ### §5 Range-Syntax Expansion
 
-A range reference like `{R004.§1.AC.01-06}` or `{AC.01-AC.06}` MUST be treated as a single semantic token but rendered as N separately-resolvable claims when surfaced. The user reads the source as one expression but interacts with each member individually.
+Range expansion grammar specified in {S002.§1.AC.09} and {S002.§5}; this section asserts the parser-level requirements that S002 §5 makes contractual.
+
+A range reference like `{R004.§1.AC.01-06}` or `{AC.01-AC.06}` MUST be treated as a single semantic token but rendered as N separately-resolvable claims when surfaced.
 
 §5.AC.01 The pattern matcher MUST return a single match for a range token, with all expanded member FQIDs carried as `rangeMembers` on the match in source order. The first member MUST equal the match's `normalizedId` for backward compatibility with single-claim consumers.
 
@@ -148,7 +152,9 @@ A range reference like `{R004.§1.AC.01-06}` or `{AC.01-AC.06}` MUST be treated 
 
 ### §6 Adjacent-Section Binding (Parser-Level)
 
-The claim parser MUST recognize the common authoring shape where a note id and a section reference are written as separate tokens but logically form one address: `R005 §1.AC.01`, `{R005} §1.AC.01`, `T057's §1.AC.01-02`. This is a parser-level concern but its effect surfaces in every consumer: hover, decoration, preview, diagnostics, claim index. Without it, every adjacent-section authoring shape produces an unresolved-section diagnostic and a broken navigation target.
+Adjacent-section binding specified in {S002.§6}; consumer effects in {S002.§3.2.AC.05}.
+
+The claim parser MUST recognize the common authoring shape where a note id and a section reference are written as separate tokens but logically form one address (`R005 §1.AC.01`, `{R005} §1.AC.01`, `T057's §1.AC.01-02`). This is a parser-level concern whose effect surfaces in every consumer.
 
 §6.AC.01 The parser MUST bind a bare section reference (no `noteId`, has `sectionPath`) to an immediately-preceding bare note reference (note id only — no section, no claim) when the source text places them adjacent. Binding MUST mutate `address.noteId` (and `aliasPrefix` if the prev ref carried one) on the bound section ref; `address.raw` MUST stay as the literal source text so consumers that surface raw in messages echo what the author wrote.
 
@@ -306,6 +312,11 @@ A future test plan derived from this requirement may add scripted manual test ca
 
 ## References
 
+- {S002.§5} — Range Expansion Behavior (consolidated spec for the range surface §5 of this requirement consumes)
+- {S002.§6} — Adjacent-Section Binding Behavior (consolidated spec for the binding surface §6 of this requirement consumes)
+- {S002.§3.6} — VS Code consumer contract (the cross-tab spec for hover, decoration, preview, and click-navigation surfaces this requirement defines)
+- {S002.§1.AC.09} — Range token shape in the canonical reference grammar
+- {S002.§1.AC.12} through {S002.§1.AC.14} — Adjacent-section binding reference shapes in the canonical grammar
 - {DD012} — VS Code Extension Migration: CLI to Library API. The migration this work builds on; gives the extension direct access to core parsers and the claim index for plugin-time resolution and pre-rendering.
 - {DD013} — VS Code Rich Views: Sidebar TreeViews, Traceability, and Search. Provides the trace and notes views that anchor the broader "rich VS Code surface" agenda; the hover and tooltip work in this requirement is the in-document complement to those side-panel views.
 - {DD015} — Cross-Project Reference Resolution: Implementation Across Core, VS Code, and Agent Documentation. The cross-project decoration and hover work referenced in §2.AC.03 (cross-project range fallback) and elsewhere; this requirement leaves cross-project rendering scope to DD015 and only specifies the fallback shape where ranges intersect cross-project.

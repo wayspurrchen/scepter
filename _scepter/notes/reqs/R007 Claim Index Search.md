@@ -16,6 +16,8 @@ This requirement defines `scepter claims search`, a command that queries the com
 
 **Core Principle:** The claim index is an in-memory data structure computed from source documents. Search operates on this computed structure, not on raw file content. This means search results are always consistent with the index -- same claim IDs, same metadata, same derivation graph. It also means search is fast: once the index is built, queries are pure in-memory operations with no additional file I/O.
 
+**Spec coverage:** The CLI search consumer's contract (how `scepter claims search` consumes the reference grammar and the claim index) is consolidated in {S002.§3.5.AC.06} as part of the cross-tab specification of every reference shape and every consumer's expectations.
+
 ## Problem Statement
 
 | Scenario | Current Behavior | Correct Behavior |
@@ -169,6 +171,7 @@ The command MUST be registered under the `scepter claims` command group and foll
 ## References
 
 - {R004} -- Claim-Level Addressability and Traceability System (claim index infrastructure, addressing syntax)
+- {S002.§3.5.AC.06} -- CLI search consumer contract (the consolidated spec covering this requirement's search surface)
 - {R004.§4.AC.01} -- Index scanning and queryable index (the data source this command queries)
 - {R005} -- Claim Metadata, Verification, and Lifecycle (importance and lifecycle filters)
 - {R005.§1.AC.01} -- Importance digit recognition (metadata available in index entries)

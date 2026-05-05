@@ -24,6 +24,8 @@ Large notes benefit from being split across multiple files within a folder note.
 
 The claim system must treat all markdown content within a folder note as a single logical document.
 
+**Spec coverage:** The aggregation behavior — how companion files are concatenated, how their frontmatter is stripped, how their claim IDs share a single namespace under the parent note — is consolidated in {S002.§9} (Folder-Note Aggregation Behavior). The claim-index consumer's expectations for aggregated content are formalized at {S002.§3.3.AC.06}.
+
 ## Design Principles
 
 **Folder notes are single logical documents.** From the claim system's perspective, a folder note with three companion markdown files is one note with one claim namespace. Section IDs and claim IDs must be unique across all files in the folder, just as they would be in a single file.
@@ -38,7 +40,9 @@ The claim system must treat all markdown content within a folder note as a singl
 
 ### §1 Content Aggregation
 
-The system MUST provide a method for retrieving the full logical content of a note by aggregating the main file with all companion markdown files in a folder note. For non-folder notes, this method MUST behave identically to reading the single file.
+Aggregation behavior specified in {S002.§9.AC.01}.
+
+The system MUST provide a method for retrieving the full logical content of a folder note by aggregating its main file with all companion markdown files; for non-folder notes the method MUST behave identically to reading the single file.
 
 §1.AC.01:4 For folder-based notes, `getAggregatedContents()` MUST read the main file and all companion `.md` files, returning their content concatenated into a single string.
 
@@ -56,7 +60,9 @@ The system MUST provide a method for retrieving the full logical content of a no
 
 ### §2 Claim Namespace Unification
 
-Claims from all files within a folder note MUST be indexed under the parent note's ID, forming a single unified namespace. Existing validation rules (duplicate detection, monotonicity) apply across the full aggregated content.
+Specified in {S002.§9.AC.02–03}.
+
+Claims from all files within a folder note MUST be indexed under the parent note's ID as a single unified namespace; validation rules apply across the full aggregated content.
 
 §2.AC.01:4 The claim index MUST use aggregated content when building the index, so that claims defined in any companion file within a folder note are indexed under the parent note's ID.
 
@@ -70,7 +76,9 @@ Claims from all files within a folder note MUST be indexed under the parent note
 
 ### §3 Referencing
 
-Sub-files within a folder note are not independently addressable in the SCEpter reference system. The folder note is the atomic unit of identity.
+Specified in {S002.§9.AC.04}.
+
+Sub-files within a folder note are not independently addressable; the folder note is the atomic unit of identity.
 
 §3.AC.01 The brace reference `{R001}` MUST reference the folder note as a whole. There is no syntax for referencing a specific companion file within a folder note.
 
@@ -92,8 +100,7 @@ Sub-files within a folder note are not independently addressable in the SCEpter 
 
 ### Claim ID Collisions Across Sub-Files
 
-**Detection:** Two companion files define the same section or claim ID (e.g., both have `§2` or both have `§1.AC.01`).
-**Behavior:** The aggregated content is parsed as a single document. The claim tree builder's existing duplicate detection fires and reports the collision at the appropriate line numbers. The error message does not distinguish which sub-file the duplicate came from -- it reports line numbers within the aggregated text.
+Specified in {S002.§9.AC.03} — collisions are tolerated under the same-note repeat rule (first occurrence in alphabetical filename order wins; subsequent occurrences silently dropped).
 
 ### Companion Files in Subdirectories
 
@@ -118,6 +125,8 @@ Sub-files within a folder note are not independently addressable in the SCEpter 
 
 ## References
 
+- {S002.§9} -- Folder-Note Aggregation Behavior (consolidated spec for aggregation semantics this requirement defines)
+- {S002.§3.3.AC.06} -- Claim-index consumer contract for aggregated content
 - `core/src/notes/note-file-manager.ts` -- `getAggregatedContents()` implementation
 - `core/src/notes/folder-utils.ts` -- `scanFolderContents()`, `detectFolderNote()` infrastructure
 - `core/src/cli/commands/claims/ensure-index.ts` -- Claim index build using aggregated content

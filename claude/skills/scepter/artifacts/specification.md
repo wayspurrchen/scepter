@@ -1,5 +1,19 @@
 # Specification Document Guide
 
+## Before You Draft (READ FIRST)
+
+A specification claim is a behavioral contract — what the system promises at its observable boundary, expressed precisely enough to be verified without specifying internal mechanism. Three rules are absolute. **Apply them prospectively to every numbered claim as you write it, not retrospectively when you review.**
+
+1. **Black-box litmus.** Can a tester verify this contract holds at the machine boundary, without knowing the internal mechanism? If yes, it's a spec claim. If verification requires inspecting specific data structures, library calls, or algorithm choices, the claim has crossed into implementation territory — relocate to a DD.
+
+2. **Modal character.** Every numbered claim asserts existence, behavior, integration, constraint, ordering, or invariant. Specs lean heavily on **Behavior** ("X must do Y when Z"), **Constraint** ("X must NOT do Y"), **Ordering** ("X before Y"), and **Invariant** ("P must always hold"). The same non-claim patterns rejected by `claims.md` § Authoring Litmus apply here: "MUST distinguish concept A from concept B," "MUST handle X gracefully," "MUST be possible during {workflow context}," and authorial scope statements are NOT claims.
+
+3. **Layer.** Specs sit between requirements and implementation. They describe **what** is contractually true at the boundary, not **how** it is internally achieved. Specifying "rate limiting MUST reject the 11th request in a 1-second window" is a spec claim. Specifying "the rate limiter MUST use a token-bucket algorithm with bucket size 10" is a DD claim — the algorithm choice is mechanism, not contract. Type interfaces and data shapes that define the contract surface are appropriate; full method bodies and library-specific call sequences are not.
+
+**Brief-vs-guide rule.** If a dispatch brief specifies a section template that would force you to author non-claim content as a numbered MUST (e.g., a "Distinction from {adjacent specs}" section as numbered ACs, an option-enumeration section as ACs, a workflow-list section as ACs), the brief is wrong about claim grain. The guide is authoritative. Stop, surface the conflict to the orchestrator, and resolve before authoring — do not silently render structure into invalid claims to satisfy the brief.
+
+---
+
 A specification is the **behavioral contract** — the projection between requirements and detailed design that defines what a system does, what it guarantees, what data it operates on, and what it explicitly does not do. It answers the contractual questions: given these inputs and this state, what outputs and state transitions are promised? Requirements state intent (the system SHOULD do X). Code implements mechanisms (function f calls g with argument h). Between them is a translation gap where behavioral ambiguity lives. Requirements are deliberately abstract — they describe the "what and why" without committing to precise interfaces, state transitions, or data shapes. Code is maximally concrete but reveals nothing about what it promises versus what it happens to do. The specification closes this gap by expressing intent as testable contracts before any code is written. It takes requirements as upstream input and feeds the detailed design downstream.
 
 **Methodological Lineage**:

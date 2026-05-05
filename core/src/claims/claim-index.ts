@@ -316,6 +316,32 @@ export class ClaimIndex {
       collectClaims(treeResult.roots, claimNodes);
 
       for (const node of claimNodes) {
+        // Self-prefix validation: a self-prefixed claim definition (e.g.,
+        // `**R049.LOCK.03**: ...`) carries `node.selfPrefix` set by the
+        // parser. The prefix MUST match the containing note ID — anything
+        // else is a likely copy/paste mistake or stale rename, and silently
+        // registering the claim under the wrong note would create
+        // hard-to-diagnose unresolved references downstream. Emit a
+        // diagnostic and skip registration.
+        // @implements {R004.§3.AC.05} self-prefix validated against containing note
+        // @implements {S002.§8.AC.03} mismatch emits error AND skips registration
+        // @implements {S002.§8.AC.04} mismatched-self-prefix surfaced through diagnostic pipelines
+        // @implements {S002.§8.AC.06} folder-note variant uses parent note ID via aggregated content
+        if (node.selfPrefix !== undefined && node.selfPrefix !== note.id) {
+          this.data.errors.push({
+            type: 'mismatched-self-prefix',
+            claimId: node.id,
+            line: node.line,
+            message:
+              `Self-prefix "${node.selfPrefix}" does not match containing note "${note.id}". ` +
+              `Definition not registered. Check for a copy/paste error or stale rename — ` +
+              `self-prefixed claim definitions MUST use the containing note's ID.`,
+            noteId: note.id,
+            noteFilePath: note.filePath,
+          });
+          continue;
+        }
+
         const fullyQualified = buildFullyQualified(note.id, node);
         const sectionPath = extractSectionPath(node.id);
 

@@ -13,6 +13,8 @@ The shape borrows from TypeScript's `paths` aliasing: a small map from short nam
 
 **Core Principle:** Cross-project references are **read-only resolution**, not federation. The peer project's claims do not enter the current project's derivation graph, metadata store, gap report, or trace matrix as first-class entries. An alias-prefixed reference is a citation pointer the CLI can dereference for display; it is not a shared address space. This preserves the invariants stated in {R006.§Non-Goals} and {R009.§Non-Goals} that derivation and metadata are per-project — those constraints continue to hold and are not relaxed by this requirement.
 
+**Spec coverage:** The alias-prefixed reference shape (`<alias>/<normal-reference>`) is canonicalized at {S002.§1.AC.10} as one of the reference forms in the consolidated grammar; the cross-project resolution semantics, prohibitions on `derives=`/`superseded=` against peer claims, and consumer-side behavior are consolidated in {S002.§7} (Cross-Project Behavior). S002 is the authoritative cross-tab spec for every reference shape and every consumer's contract; this requirement is its primary upstream input for the cross-project surface.
+
 ## Problem Statement
 
 Today, when a project legitimately needs to refer to a claim or note in a peer SCEpter project, the only options are:
@@ -56,15 +58,17 @@ The project's configuration MUST allow declaring a map of alias names to peer SC
 
 ### §2 Reference Syntax and Resolution
 
-The reference parser MUST accept an alias prefix on note IDs and claim references; the resolver MUST dereference the prefix against the configured alias map and look up the remainder in the peer project's index.
+Alias-prefixed reference grammar specified in {S002.§1.AC.10} and {S002.§7}; {S002.§7.AC.01–07} carries the consumer contracts.
+
+The reference parser accepts an alias prefix on note IDs and claim references; the resolver dereferences the prefix against the configured alias map and looks up the remainder in the peer project's index. Cross-project derivation and supersession are rejected: the citation-not-federation invariant ({R006.§Non-Goals}, {R009.§Non-Goals}) holds — peer claims do not enter the local index, derivation graph, or metadata store. Transitive aliasing is rejected.
 
 §2.AC.01 The parser MUST accept references of the shape `<alias>/<normal-reference>` where `<normal-reference>` is any reference form already accepted by the existing parser ({R004.§1} grammar) — bare note ID, note + section, note + claim, note + section + claim, ranges. The separator is the forward slash `/`. Concrete shapes: `vendor-lib/R042`, `vendor-lib/R005.§1`, `vendor-lib/R005.§1.AC.01`, `vendor-lib/R005.§1.AC.01-06`.
 
 §2.AC.02 An alias-prefixed reference MUST be valid in both braced contexts (e.g., inside `{...}` in note prose) and in code-comment annotations (`@implements`, `@see`, `@validates`, `@depends-on`, `@addresses`).
 
-§2.AC.03 An alias-prefixed reference MUST NOT be valid as a `derives=TARGET` value. Per {R006.§Non-Goals}, derivation is per-project; this requirement does not change that. The linter MUST reject `derives=<alias>/<id>` with a clear error pointing at the {R006} constraint. **Reconsideration is permitted.** A real downstream-deriving-from-upstream use case (e.g., a consumer's spec genuinely deriving from a vendored library's claim, with the user accepting the upstream-drift risk) can motivate a future requirement that relaxes both R006 and this AC together. This requirement keeps it rejected by default; it is not a permanent invariant the way §2.AC.04 is.
+§2.AC.03 An alias-prefixed reference MUST NOT be valid as a `derives=TARGET` value. Per {R006.§Non-Goals}, derivation is per-project. The linter MUST reject `derives=<alias>/<id>` with a clear error pointing at the {R006} constraint. **Reconsideration is permitted** — a real downstream-deriving-from-upstream use case can motivate a future requirement that relaxes both R006 and this AC together. This is the default-rejected boundary, not a permanent invariant like §2.AC.04.
 
-§2.AC.04 An alias-prefixed reference MUST NOT be valid as a `superseded=TARGET` value. The rationale is stronger than for §2.AC.03 and is permanent: supersession is an assertion *about the target's lifecycle* — it states that the target is the authoritative replacement for the asserting claim. The local project has no authority to make lifecycle assertions on a peer project's claims; the peer project is unaware of, and unaffected by, what the local project records about it. Allowing `superseded=<alias>/<id>` would let a local note unilaterally annotate a peer's claim as the "supersession target of" something the peer never opted into. This boundary is not a "for now" choice and SHOULD NOT be revisited without first establishing a federation contract that gives peer projects opt-in awareness of incoming supersession claims.
+§2.AC.04 An alias-prefixed reference MUST NOT be valid as a `superseded=TARGET` value. The rationale is permanent and stronger than for §2.AC.03: supersession is an assertion *about the target's lifecycle*, and the local project has no authority to make lifecycle assertions on a peer project's claims. Allowing `superseded=<alias>/<id>` would let a local note unilaterally annotate a peer's claim as the "supersession target of" something the peer never opted into. This boundary SHOULD NOT be revisited without first establishing a federation contract that gives peer projects opt-in awareness of incoming supersession claims.
 
 §2.AC.05 The resolver MUST resolve the alias prefix to a peer project, load that peer project's claim index (via the same mechanism the local CLI uses for itself), and then resolve the remainder of the reference against the peer's index. Resolution failures (alias not found, peer project absent, note not found in peer, claim not found in peer) MUST produce distinct, actionable error messages.
 
@@ -280,6 +284,8 @@ The Claude Code skills, agent instructions, and CLI documentation read by AI age
 ## References
 
 - {R004} — Claim-Level Addressability and Traceability System (the reference grammar this requirement extends; OQ.01's resolution introduces a forward constraint on future {R004.§1} grammar work — see "Forward constraint introduced by this resolution")
+- {S002.§7} — Cross-Project Behavior (consolidated spec for cross-project resolution and consumer contracts)
+- {S002.§1.AC.10} — Alias-prefixed reference shape (canonical form in the cross-tab grammar)
 - {R005.§2.AC.06} — `:superseded=TARGET` lifecycle primitive (the underlying primitive whose cross-project use §2.AC.04 permanently rejects on authority grounds)
 - {R006.§Non-Goals — Cross-project derivation} — Per-project derivation invariant (preserved by §2.AC.03; reconsideration permitted per the same AC, but only via a future requirement that relaxes both R006 and §2.AC.03 together)
 - {R009.§Non-Goals — No cross-project metadata} — Per-project metadata invariant (preserved by this requirement's Non-Goals section)

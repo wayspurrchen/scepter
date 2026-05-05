@@ -1179,4 +1179,165 @@ describe('ClaimIndex', () => {
       expect(dc01!.derivedFrom).toEqual(['R005.1.AC.01']);
     });
   });
+
+  describe('Self-prefixed claim definitions', () => {
+    // @validates {R004.§3.AC.05} matching self-prefix registers normally
+    // @validates {S002.§8.AC.03} match → register normally
+    it('should register self-prefixed definition when prefix matches containing note', () => {
+      const note: NoteWithContent = {
+        id: 'R049',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R049.md',
+        content: [
+          '# R049 Lock Authority',
+          '',
+          '## §1 Locks',
+          '',
+          '**R049.LOCK.03**: The lock MUST hold for the duration of the operation.',
+        ].join('\n'),
+      };
+
+      const data = index.build([note]);
+      const entry = index.getClaim('R049.1.LOCK.03');
+      expect(entry).not.toBeNull();
+      expect(entry!.claimPrefix).toBe('LOCK');
+      expect(entry!.fullyQualified).toBe('R049.1.LOCK.03');
+
+      // No mismatched-self-prefix errors
+      const mismatchErrors = data.errors.filter((e) => e.type === 'mismatched-self-prefix');
+      expect(mismatchErrors).toHaveLength(0);
+    });
+
+    // @validates {R004.§3.AC.05} mismatched self-prefix is rejected
+    // @validates {S002.§8.AC.03} mismatch → emit error AND skip registration
+    // @validates {S002.§8.AC.04} mismatched-self-prefix surfaced through diagnostic stream
+    it('should emit mismatched-self-prefix error and skip registration on prefix mismatch', () => {
+      const note: NoteWithContent = {
+        id: 'R049',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R049.md',
+        content: [
+          '# R049 Lock Authority',
+          '',
+          '## §1 Locks',
+          '',
+          '**R051.LOCK.03**: This is a copy/paste mistake — wrong note ID.',
+        ].join('\n'),
+      };
+
+      const data = index.build([note]);
+
+      // Claim NOT registered
+      expect(index.getClaim('R049.1.LOCK.03')).toBeNull();
+      expect(index.getClaim('R051.1.LOCK.03')).toBeNull();
+      expect(index.getClaimsForNote('R049')).toHaveLength(0);
+
+      // Error surfaced
+      const mismatchErrors = data.errors.filter((e) => e.type === 'mismatched-self-prefix');
+      expect(mismatchErrors).toHaveLength(1);
+      expect(mismatchErrors[0].noteId).toBe('R049');
+      expect(mismatchErrors[0].message).toContain('R051');
+      expect(mismatchErrors[0].message).toContain('R049');
+    });
+
+    // @validates {R004.§3.AC.05} cross-note references to self-prefixed claims resolve
+    // @validates {S002.§8.AC.07} reference parser behavior unchanged
+    it('should resolve cross-note references to a registered self-prefixed claim', () => {
+      const r049: NoteWithContent = {
+        id: 'R049',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R049.md',
+        content: [
+          '# R049 Lock Authority',
+          '',
+          '## §1 Locks',
+          '',
+          '**R049.LOCK.03**: Lock criterion.',
+        ].join('\n'),
+      };
+      const r079: NoteWithContent = {
+        id: 'R079',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R079.md',
+        content: [
+          '# R079 Consumer',
+          '',
+          '## §1 Refs',
+          '',
+          '§1.AC.01 Implements {R049.1.LOCK.03} with extra constraints.',
+        ].join('\n'),
+      };
+
+      const data = index.build([r049, r079]);
+
+      // R079.1.AC.01 → R049.1.LOCK.03 cross-ref present
+      const xrefs = index.getCrossRefsTo('R049.1.LOCK.03');
+      expect(xrefs.length).toBeGreaterThanOrEqual(1);
+      expect(xrefs.some((x) => x.fromNoteId === 'R079')).toBe(true);
+
+      // No unresolved-reference errors
+      const unresolved = data.errors.filter((e) => e.type === 'unresolved-reference');
+      expect(unresolved).toHaveLength(0);
+    });
+
+    // @validates {S002.§8.AC.06} folder-note variant: aggregated companion content uses parent ID
+    it('should validate against the parent note ID for folder-aggregated content', () => {
+      // Simulates a folder-based note where R049/details.md is aggregated
+      // into R049's content. The index sees one logical note with id "R049"
+      // and content from all sub-files concatenated.
+      const folderNote: NoteWithContent = {
+        id: 'R049',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R049 Lock Authority/R049.md',
+        content: [
+          '# R049 Lock Authority',
+          '',
+          '## §1 Locks',
+          '',
+          // This claim came from a companion file (e.g., details.md), now aggregated:
+          '**R049.LOCK.03**: Defined in companion file but uses parent note ID.',
+        ].join('\n'),
+      };
+
+      const data = index.build([folderNote]);
+      expect(index.getClaim('R049.1.LOCK.03')).not.toBeNull();
+      const mismatchErrors = data.errors.filter((e) => e.type === 'mismatched-self-prefix');
+      expect(mismatchErrors).toHaveLength(0);
+    });
+
+    // @validates {S002.§8.AC.07} a self-prefix mismatch behaves like a missing claim for downstream refs
+    it('should produce unresolved-reference when an external note cites a self-prefix-mismatched claim', () => {
+      const r049: NoteWithContent = {
+        id: 'R049',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R049.md',
+        content: [
+          '# R049 Lock Authority',
+          '',
+          '## §1 Locks',
+          '',
+          // Mismatched — won't be registered:
+          '**R051.LOCK.03**: Mistake — wrong prefix.',
+        ].join('\n'),
+      };
+      const r079: NoteWithContent = {
+        id: 'R079',
+        type: 'Requirement',
+        filePath: '_scepter/notes/requirements/R079.md',
+        content: [
+          '# R079 Consumer',
+          '',
+          '## §1 Refs',
+          '',
+          '§1.AC.01 Cites {R049.1.LOCK.03}.',
+        ].join('\n'),
+      };
+
+      const data = index.build([r049, r079]);
+      const unresolved = data.errors.filter(
+        (e) => e.type === 'unresolved-reference' && e.noteId === 'R079',
+      );
+      expect(unresolved.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

@@ -1,5 +1,21 @@
 # Architecture Document Guide
 
+## Before You Draft (READ FIRST)
+
+An architectural claim asserts something structural about the system: a boundary, a responsibility, an invariant that holds across the whole, a constraint on how parts interact. Three rules are absolute. **Apply them prospectively to every numbered claim as you write it, not retrospectively when you review.**
+
+1. **Modal character — architecture leans toward Invariant and Constraint.** Most architectural claims are of the form "P must always hold across all instances of X" (Invariant) or "modules of class Y must NOT do Z" (Constraint). Existence claims appear ("a router component must exist between A and B") and Integration claims sometimes ("layer N must call layer N+1 only via interface I"). Behavior, Ordering apply less. The non-claim patterns rejected by `claims.md` § Authoring Litmus apply with full force here: "MUST distinguish boundary A from boundary B," "MUST be modular," "MUST be applied during reviews," and authorial framings about what the document does or doesn't cover are NOT claims.
+
+2. **Inspection-verifiability litmus.** Architectural claims are typically verified by structural inspection (a layer-violation lint, a module-boundary check, a manual code review against the invariant), not by black-box test. The litmus: *given this claim, can a reader determine whether a specific code change violates it without running the system?* If yes, it's an architectural claim. If determining violation requires runtime behavior, the claim is behavioral and may belong in a spec instead.
+
+3. **Layer.** Architecture sits above specification — it describes the structural rules every spec and implementation must honor. Architectural claims do NOT specify interfaces, type signatures, or behavioral contracts at the AC grain — those are spec content. They DO specify that boundaries exist, what is on each side, what may cross, and what may not. If a claim names a specific function signature or response shape, it has crossed into specification.
+
+**The "this is not Y" antipattern is especially common in architecture docs.** Architecture documents frequently include "Distinction from" or "Not in scope" sections describing what the architecture is NOT. These are authorial framing — they belong in the Overview or a Scope Boundary section, not as numbered MUST claims. "The system MUST distinguish authentication from authorization" is not an architectural claim; "Authorization decisions MUST consult AuthN-resolved identity, never raw request headers" is.
+
+**Brief-vs-guide rule.** If a dispatch brief specifies a section template that would force you to author non-claim content as a numbered MUST, the brief is wrong about claim grain. The guide is authoritative. Stop, surface the conflict to the orchestrator, and resolve before authoring.
+
+---
+
 An architecture document is the **architecture projection** of a system or subsystem — the layer of understanding that perceives boundaries, responsibilities, flows, and constraints. It answers: what are the parts, what does each part own, how do they interact, and what rules govern the whole. Architecture exists whether you document it or not. Every system has structure, boundaries, and implicit rules. The problem is not creating architecture — it is perceiving and articulating the architecture that already exists (or is emerging), so that contributors share a single structural mental model rather than each holding a private, partially wrong one. Without explicit architecture documentation, every contributor reverse-engineers their own model from the code, and those models diverge at exactly the boundaries and invariants that matter most.
 
 **Relationship to architectural analysis**: The [architectural-analysis](../../architectural-analysis/SKILL.md) skill helps you *decide* what the architecture should be — it maps decision spaces, evaluates trade-offs, assesses risk. This guide helps you *write it down* once you have that understanding. If you're still choosing between architectural approaches, use architectural analysis. If you've reached understanding and need to communicate it, use this guide.

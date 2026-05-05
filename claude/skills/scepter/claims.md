@@ -6,6 +6,53 @@ Claims connect ideas *within* documents. They enable mechanical traceability ("d
 
 ---
 
+## Authoring Litmus (READ BEFORE WRITING ANY CLAIM)
+
+Before writing or accepting any numbered claim, run these three filters. A claim that fails any of them is not yet a claim — it is a goal, a process step, an authorial scope statement, or a misclassified specification. **Apply prospectively as you draft, not retrospectively when you review.**
+
+### Filter 1 — Modal character
+
+Every claim asserts ONE of these six characters:
+
+| Character | What it asserts | Example |
+|-----------|-----------------|---------|
+| **Existence** | "X must exist" | "A companion field must be auto-created" |
+| **Behavior** | "X must do Y when Z" | "addField must return a pure function" |
+| **Integration** | "X must be invoked from Z" | "autoWire must run during bind()" |
+| **Constraint** | "X must NOT do Y" | "Must NOT run migrations on startup" |
+| **Ordering** | "X before Y" | "Schema tx before instance batches" |
+| **Invariant** | "P must always hold" | "Every query must filter by schemaId" |
+
+If the claim does NOT fit one of these, it is NOT a claim. Common failure modes:
+
+- **"MUST distinguish concept A from concept B"** — authorial framing about modeling, not a system assertion
+- **"MUST handle X gracefully"** — aspirational, not testable
+- **"MUST be possible during DSL editing, plan composition, or interactive UI editing"** — workflow context, not a system observable
+- **"This requirement MUST NOT pre-resolve Q042"** — meta-claim about the document, not the system
+- **"Documentation MUST cite §1.4 of E029"** — documentation rule, not a system requirement
+
+Each says something real, but none is a claim. Move them to overview, scope, or design-principle prose, or decompose into testable assertions where applicable.
+
+### Filter 2 — Testability
+
+Can a tester write a pass/fail test from this statement alone, without knowing the system's internal design?
+
+- **Yes** → it is a claim
+- **Needs implementation knowledge to test** → it is a specification, not a requirement (move to spec layer)
+- **Cannot be tested at all** → it is a goal or design principle (move to design principles)
+
+### Filter 3 — Layer
+
+Does the claim describe what the system does (claim layer) or how the system is built (specification layer)?
+
+- "The system MUST persist data with ACID guarantees across process restarts" — claim
+- "The system MUST use SQLite WAL mode" — specification
+- Type interfaces defining domain vocabulary are permitted at the requirements layer; full method surfaces with parameter signatures are not
+
+The full character table, decomposition catalog, anti-patterns, and authoring guidance follow below. **Do not draft numbered claims without applying these three filters first.**
+
+---
+
 ## Nature and Purpose of Claims (READ FIRST)
 
 A claim is **a statement with a subject, a predicate, and a modal status**. The modal status is constitutive: "the DC has four methods" (IS) and "the DC SHOULD have four methods" (SHOULD) are different information requiring different operations. See `epistemic-primer.md` in this skill directory for the vocabulary framework. This section covers the practical consequences for writing and tracking claims in SCEpter.
@@ -130,6 +177,8 @@ Treat attribution phrases as a class of claim that requires the same rigor as an
 
 ## Syntax & Rules
 
+> **Canonical behavioral source:** `{S002}` is the authoritative cross-tab specification for the claim reference grammar — every reference shape, every definition shape, every metadata permutation, and every consumer's contract. This file (`claims.md`) is the agent-facing summary; for edge cases, permutations, or consumer-specific behavior, defer to S002. Do not re-summarize S002 here.
+
 ### Claim Reference Format
 
 ```
@@ -162,7 +211,7 @@ Examples in both contexts:
 
 ### Range References
 
-`AC.01-06` or `AC.01-AC.06` expands to `AC.01` through `AC.06`. Works at any qualification level: `R004.§1.AC.01-06`. Works in braced and braceless contexts. Start must be less than end; sub-letters not supported in ranges.
+`AC.01-06` or `AC.01-AC.06` expands to `AC.01` through `AC.06`. Works at any qualification level: `R004.§1.AC.01-06`. Works in braced and braceless contexts. Start must be less than end; sub-letters not supported in ranges. (See {S002.§5} for the full range grammar and edge cases.)
 
 ### Hard Rules
 
@@ -184,6 +233,8 @@ Examples in both contexts:
 **Bare-id ambiguity is not flagged at definition time.** Using `§1.AC.01` and `§2.AC.01` in the same note is normal — that's the payoff of using sections. The "ambiguity" of the bare suffix `AC.01` matters only when an actual reference fails to resolve unambiguously, and it's surfaced there if it does.
 
 ### Cross-Project References
+
+(See {S002.§7} for the authoritative cross-project reference contract, including alias resolution and consumer behavior.)
 
 A reference may begin with a kebab-case alias (`vendor-lib/R005.§1.AC.01`). The alias is declared in the local project's `scepter.config.json` under `projectAliases` and resolves to a peer SCEpter project's filesystem path. References through that alias are looked up in the peer project's index for display and never become part of the local project's reference graph.
 
@@ -210,6 +261,8 @@ The peer's data flows out at display time when the local CLI dereferences a cita
 **Aliases are local to a project.** An alias name in project A's config maps a name to a path; the same alias name in project B's config may point elsewhere. There is no shared registry; aliases are not version-pinned by this requirement; and transitive aliasing (`a/b/R001`) is not supported.
 
 ### Folder Notes and Claims
+
+(See {S002.§9} for the full folder-note aggregation contract.)
 
 Folder-based notes (`R001 Title/R001.md` with companion `.md` files) are treated as a single logical document for claim purposes. All companion markdown files are aggregated with the main file — the claim index, linter, tracer, and gap detection operate on the unified content.
 
@@ -246,6 +299,8 @@ Metadata can also appear at the end of a claim heading line:
 
 ## Authoring Claims
 
+(See {S002.§2} for the authoritative definition-shape grammar — every recognized form, every parser rule.)
+
 ### Claim Definition Formats
 
 Claims are recognized in two structural positions:
@@ -265,6 +320,16 @@ DC.01:derives=R005.§1.AC.01 An <AppShell> MUST wrap every route.
 ```
 
 **Sections are optional.** Claims without a containing `§N` section produce bare IDs (`GLYPH.01`) with fully qualified forms like `S004.GLYPH.01`. Common in specs where the prefix provides namespacing (e.g., `GLYPH.01`, `CASCADE.01`, `THEME.01`).
+
+**Self-prefixed (own-note FQID)** — the containing note's ID MAY appear as a leading prefix on a definition. Heading-form is unconditional; paragraph-form requires bold wrapping to disambiguate from in-prose references:
+
+```markdown
+### R049.LOCK.03 The lock MUST be exclusive within a schema scope.
+
+**R049.§3.LOCK.03**: For migration sessions, the schema lock is held for the duration of the session.
+```
+
+The captured prefix is validated against the containing note's ID at index time; mismatched prefixes produce a `mismatched-self-prefix` error and the claim is not registered. Behavioral contract: {R004.§3.AC.05}, {S002.§8}.
 
 ### Nesting: Claims Under Sections
 

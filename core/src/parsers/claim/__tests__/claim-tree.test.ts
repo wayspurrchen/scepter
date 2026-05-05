@@ -1317,4 +1317,103 @@ describe('Claim Tree', () => {
       });
     }
   });
+
+  describe('Self-prefixed claim definitions', () => {
+    // @validates {R004.§3.AC.05} self-prefixed claim definitions are recognized
+    // @validates {S002.§8.AC.01} parser accepts optional leading note-ID prefix on heading-form
+    it('should accept heading-form self-prefix and capture it as data', () => {
+      const content = [
+        '# R049 Lock Authority',
+        '',
+        '### R049.LOCK.03 Lock authority claim',
+        '',
+        'Body content.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      expect(result.claims.size).toBe(1);
+      // Canonical id has NO note-ID prefix
+      expect(result.claims.has('LOCK.03')).toBe(true);
+      const node = result.claims.get('LOCK.03')!;
+      // @validates {S002.§8.AC.02} selfPrefix populated; canonical id stays bare
+      expect(node.selfPrefix).toBe('R049');
+      expect(node.id).toBe('LOCK.03');
+      expect(node.claimPrefix).toBe('LOCK');
+      expect(node.claimNumber).toBe(3);
+    });
+
+    // @validates {R004.§3.AC.05} bold-wrapped paragraph self-prefix recognized
+    // @validates {S002.§8.AC.01} parser accepts self-prefix on bold-wrapped paragraph-form
+    it('should accept bold-wrapped paragraph-form self-prefix', () => {
+      const content = [
+        '# R049 Lock Authority',
+        '',
+        '## §1 Locks',
+        '',
+        '**R049.LOCK.03**: The lock MUST hold for the duration of the operation.',
+        '',
+        'Trailing content.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      // Bare LOCK.03 inside §1 → 1.LOCK.03
+      expect(result.claims.has('1.LOCK.03')).toBe(true);
+      const node = result.claims.get('1.LOCK.03')!;
+      expect(node.selfPrefix).toBe('R049');
+      expect(node.claimPrefix).toBe('LOCK');
+      expect(node.claimNumber).toBe(3);
+    });
+
+    // @validates {R004.§3.AC.05} plain paragraph self-prefix is NOT a definition
+    // @validates {S002.§8.AC.01} plain (non-bold) paragraph-form self-prefix rejected as definition
+    it('should NOT treat plain (non-bold) paragraph-form self-prefix as a definition', () => {
+      const content = [
+        '# R049 Lock Authority',
+        '',
+        '## §1 Locks',
+        '',
+        'R049.LOCK.03 referenced here in normal prose, not a definition.',
+        '',
+        'Trailing content.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      expect(result.claims.size).toBe(0);
+      expect(result.claims.has('1.LOCK.03')).toBe(false);
+      expect(result.claims.has('LOCK.03')).toBe(false);
+    });
+
+    // @validates {R004.§3.AC.05} section-qualified self-prefix definitions accepted
+    // @validates {S002.§8.AC.05} section-qualified self-prefix produces correct id
+    it('should accept section-qualified self-prefix and produce section-qualified canonical id', () => {
+      const content = [
+        '# R049 Lock Authority',
+        '',
+        '**R049.§3.LOCK.03**: A section-qualified self-prefixed claim.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      expect(result.claims.size).toBe(1);
+      expect(result.claims.has('3.LOCK.03')).toBe(true);
+      const node = result.claims.get('3.LOCK.03')!;
+      expect(node.id).toBe('3.LOCK.03');
+      expect(node.selfPrefix).toBe('R049');
+    });
+
+    // @validates {S002.§8.AC.07} reference parser unaffected — bare claim w/o self-prefix still works
+    it('should leave non-self-prefixed claim definitions unchanged', () => {
+      const content = [
+        '# R049 Lock Authority',
+        '',
+        '## §1 Locks',
+        '',
+        '**LOCK.03**: A normal bold-wrapped claim with no self-prefix.',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      expect(result.claims.has('1.LOCK.03')).toBe(true);
+      const node = result.claims.get('1.LOCK.03')!;
+      expect(node.selfPrefix).toBeUndefined();
+    });
+  });
 });
