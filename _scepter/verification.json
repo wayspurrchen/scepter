@@ -4621,6 +4621,16 @@
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
       "note": "inline"
+    },
+    {
+      "id": "ai6hoxmtmuedhv2iyj39ctae",
+      "claimId": "S002.8.AC.01",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
+      "note": "inline"
     }
   ],
   "S002.8.AC.02": [
@@ -4632,6 +4642,16 @@
       "op": "add",
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "aty3tesz2tfta4inkmjgv6ih",
+      "claimId": "S002.8.AC.02",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
       "note": "inline"
     }
   ],
@@ -4645,6 +4665,16 @@
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
       "note": "inline"
+    },
+    {
+      "id": "ra0rwpzxl0g5vuuzwi51ylu3",
+      "claimId": "S002.8.AC.03",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
+      "note": "inline"
     }
   ],
   "S002.8.AC.04": [
@@ -4656,6 +4686,16 @@
       "op": "add",
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "gtxfrjxtqe2fzrti0esmb5ty",
+      "claimId": "S002.8.AC.04",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
       "note": "inline"
     }
   ],
@@ -4669,6 +4709,16 @@
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
       "note": "inline"
+    },
+    {
+      "id": "a06mp3eg3ys7ikbttz22irg5",
+      "claimId": "S002.8.AC.05",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
+      "note": "inline"
     }
   ],
   "S002.8.AC.06": [
@@ -4680,6 +4730,16 @@
       "op": "add",
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "ac1b3hjt3nmmawttey0b01dh",
+      "claimId": "S002.8.AC.06",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
       "note": "inline"
     }
   ],
@@ -4693,6 +4753,16 @@
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
       "note": "inline"
+    },
+    {
+      "id": "qat1mn2589ta34bcd7qbnbbh",
+      "claimId": "S002.8.AC.07",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
+      "note": "inline"
     }
   ],
   "S002.8.AC.08": [
@@ -4704,6 +4774,16 @@
       "op": "add",
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:15:57.151Z",
+      "note": "inline"
+    },
+    {
+      "id": "k7fdmz69sq8blt55ksk0j3q2",
+      "claimId": "S002.8.AC.08",
+      "key": "derives",
+      "value": "R004.§3.AC.05",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T18:15:12.801Z",
       "note": "inline"
     }
   ],
@@ -4868,6 +4948,52 @@
       "op": "add",
       "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
       "date": "2026-05-04T14:20:01.216Z",
+      "note": "inline"
+    }
+  ],
+  "S002.4.AC.08": [
+    {
+      "id": "apkkh1nrv0x2zaduw8fr2o16",
+      "claimId": "S002.4.AC.08",
+      "key": "importance",
+      "value": "3",
+      "op": "add",
+      "actor": "author:_scepter/notes/specs/S002 Claim Reference Grammar - Forms Permutations and Consumer Be/S002.md",
+      "date": "2026-05-04T15:48:32.552Z",
+      "note": "inline"
+    }
+  ],
+  "R005.3.AC.01": [
+    {
+      "id": "zcio3v2m2febzil0ugh2j14t",
+      "claimId": "R005.3.AC.01",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R005 Claim Metadata, Verification, and Lifecycle.md",
+      "date": "2026-05-04T15:57:48.689Z",
+      "note": "inline"
+    },
+    {
+      "id": "nhbqg4spi6lfwasuznsdh5vi",
+      "claimId": "R005.3.AC.01",
+      "key": "supersededBy",
+      "value": "R009.§7.AC.03",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R005 Claim Metadata, Verification, and Lifecycle.md",
+      "date": "2026-05-04T15:57:48.689Z",
+      "note": "inline"
+    }
+  ],
+  "R004.3.AC.05": [
+    {
+      "id": "bgdykzvhuecpps7o7ktgvdyq",
+      "claimId": "R004.3.AC.05",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R004 Claim-Level Addressability and Traceability System.md",
+      "date": "2026-05-04T18:14:13.415Z",
       "note": "inline"
     }
   ]

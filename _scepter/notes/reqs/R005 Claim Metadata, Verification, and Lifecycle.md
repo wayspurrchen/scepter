@@ -15,6 +15,8 @@ This requirement defines three extensions to the claim system: inline claim anno
 
 **Core Principle:** Claim metadata splits into two categories by where it belongs. Properties that change what a claim IS (importance, lifecycle state) belong inline in the document because they are part of the claim's identity. Properties that record the project's relationship to the claim (verification events, staleness) belong in a sidecar store because they are external judgments that should not clutter source documents.
 
+**Spec coverage:** The metadata-suffix grammar (importance, lifecycle, derives, freeform tags, key=value tokens) and the linter rules that enforce lifecycle-vocabulary errors are consolidated in {S002.§4} (Metadata Suffix Behavior) and {S002.§3.4} (Linter consumer contract, including lifecycle-error reporting). S002 is the authoritative cross-tab spec for every reference and definition shape; this requirement's metadata semantics map onto its grammar surface.
+
 ## Problem Statement
 
 | Scenario | Current Behavior | Correct Behavior |
@@ -39,11 +41,11 @@ This requirement defines three extensions to the claim system: inline claim anno
 
 ### §1 Inline Importance
 
-The system MUST recognize single digits 1 through 5 in the claim metadata suffix as importance levels, where 5 is most important and 1 is least. Importance is an ordinal scale — higher numbers indicate greater significance to the project.
+Importance is now implemented as the `importance` key in the generalized event store per {R009.§4.AC.02}; {R009.§7.AC.08} preserves the vocabulary defined in this section. This section is the authoritative source for *what* importance means; R009 is the authoritative source for *how* it is stored and queried.
 
-Claims without an importance annotation MUST be treated as having no importance signal — not as "importance 0" or "importance 3." The absence of importance is distinct from any importance level.
+Grammar specified in {S002.§4.AC.04}; this section asserts importance-related requirements.
 
-The system MUST NOT require importance on any claim. Importance is annotated only when notable — most claims will have no importance annotation.
+The system MUST recognize single digits 1 through 5 in the claim metadata suffix as importance levels (5 most, 1 least) on an ordinal scale. Importance is OPTIONAL — claims without it have no importance signal (not "importance 0").
 
 **AC.01** The parser MUST recognize bare digits 1-5 in the metadata suffix position as importance levels (e.g., `AC.01:4` → importance 4).
 
@@ -57,16 +59,18 @@ The system MUST NOT require importance on any claim. Importance is annotated onl
 
 ### §2 Lifecycle Tags
 
-The system MUST recognize a fixed vocabulary of lifecycle tags in the claim metadata suffix that change how the traceability system treats the claim. Lifecycle tags are single lowercase words following the colon separator.
+Lifecycle is now implemented as the `lifecycle` key in the generalized event store per {R009.§4.AC.03}; {R009.§7.AC.08} preserves the vocabulary, mutual-exclusion rule, and consumer conventions (linter validations, gap exclusions) defined in this section.
 
-The recognized lifecycle tags are:
+Grammar and error conditions specified in {S002.§4.AC.03} and {S002.§3.4.AC.04}.
 
-- `:closed` — The claim's gap has been resolved. The claim remains valid and traceable, but `scepter claims gaps` MUST exclude it from gap reports.
-- `:deferred` — The claim is intentionally postponed. `scepter claims gaps` MUST exclude it from gap reports unless `--include-deferred` is specified.
-- `:removed` — The claim is retired. The ID MUST NOT be reused. References to it SHOULD be flagged by the linter as pointing to a removed claim.
-- `:superseded=TARGET` — The claim has been replaced by TARGET, where TARGET is a fully qualified claim path (using `=` to bind the keyword to its value). The linter MUST validate that TARGET exists. References to the superseded claim SHOULD suggest the replacement.
+The system MUST recognize a fixed vocabulary of lifecycle tags in the claim metadata suffix:
 
-Lifecycle tags are mutually exclusive — a claim MUST NOT carry more than one lifecycle tag. The linter MUST flag multiple lifecycle tags on the same claim as an error.
+- `:closed` — gap resolved; `scepter claims gaps` MUST exclude.
+- `:deferred` — intentionally postponed; excluded from gaps unless `--include-deferred`.
+- `:removed` — retired; ID MUST NOT be reused; references flagged by linter.
+- `:superseded=TARGET` — replaced by TARGET (fully qualified path); linter MUST validate TARGET exists.
+
+Lifecycle tags are mutually exclusive — at most one per claim.
 
 **AC.01** The parser MUST extract lifecycle tags from the metadata suffix and store them as a distinct property, separate from freeform metadata tags.
 
@@ -78,9 +82,9 @@ Lifecycle tags are mutually exclusive — a claim MUST NOT carry more than one l
 
 **AC.05** The linter MUST flag claims with `:removed` that are still referenced by other claims as a warning ("reference to removed claim").
 
-**AC.04a** Metadata items MUST be colon-separated. The first colon separates the claim path from metadata; subsequent colons separate items from each other (e.g., `AC.01:4:closed`). This supersedes {R004.§2.AC.04} which used comma separation.
+**AC.04a** Colon-separated metadata grammar specified in {S002.§4.AC.01} and ingested as implicit events per {R009.§4.AC.01}. (Supersedes {R004.§2.AC.04} comma form.)
 
-**AC.04b** Key-value metadata items MUST use `=` to bind key to value (e.g., `superseded=R004.§2.AC.07`). The `=` sign is not a metadata separator — it is internal to the item.
+**AC.04b** Metadata charset specified in {S002.§4.AC.02}; key-value parsing in {R009.§4.AC.01}.
 
 **AC.06** The linter MUST validate that the TARGET in `:superseded=TARGET` resolves to an existing claim in the index.
 
@@ -90,13 +94,15 @@ Lifecycle tags are mutually exclusive — a claim MUST NOT carry more than one l
 
 ### §3 Verification Events
 
+The verification event store is a specialization of the generalized event log per {R009.§7.AC.10}: same substrate, narrower consumer semantics. The `_scepter/verification.json` filename is preserved per {R009.§7.AC.03}; the `scepter claims verify` CLI surface is preserved per {R009.§7.AC.04–05}; the sidecar-not-inline boundary remains authoritative here.
+
 The system MUST maintain a verification event store as a JSON file in the SCEpter data directory. Verification events record that a specific claim was reviewed or validated at a specific time, by a specific actor.
 
 Verification events are external judgments — they MUST NOT be written into the claim's source document. The store is the one exception to "compute, don't maintain" because verification events are human/agent judgments that cannot be inferred from document content.
 
 The verification store MUST survive index rebuilds. It is not part of the computed index — it is a persistent sidecar.
 
-**AC.01** The system MUST store verification events in `_scepter/verification.json` (or the configured data directory).
+**AC.01:superseded=R009.§7.AC.03** The system MUST store verification events in `_scepter/verification.json` (or the configured data directory). [Path canonicalization is preserved as back-compat by R009.§7.AC.03; the JSON shape and survives-rebuild aspects generalize via the §3 section-header annotation.]
 
 **AC.02:superseded=A004.§2.AC.01** Each verification event MUST record: fully qualified claim ID, date (ISO 8601), actor identifier (human name or agent ID), and optional method (e.g., "code review", "test run", "manual inspection"). [Generalized to `MetadataEvent` shape; legacy events migrate at load time. The required fields here are preserved as the back-compat subset.]
 
@@ -111,6 +117,8 @@ The verification store MUST survive index rebuilds. It is not part of the comput
 **AC.07** `scepter claims trace` MUST show the most recent verification date for each claim when verification data exists.
 
 ### §4 Staleness Detection
+
+Staleness derives its input from the generalized event log filtered on the `verified` key per {R009.§7.AC.11}. The computation algorithm and ACs in this section are not superseded.
 
 The system MUST compute staleness by comparing verification dates against modification times of files that implement or reference the claim. A claim is stale when its implementation has changed more recently than its last verification.
 
@@ -130,6 +138,8 @@ A claim with no verification events is not "stale" — it is "unverified." The s
 
 ### §5 Command Surface Integration
 
+These integration ACs use the `importance`, `lifecycle`, and `verified` keys per {R009.§4.AC.02–03} and {R009.§7.AC.10}. Author-facing flags (`--importance`, `--include-closed`, etc.) continue per {R009.§5.AC.05}; their internal implementation moves to `--where KEY=VALUE` semantics.
+
 The claim metadata system MUST integrate consistently across all existing claim commands. Importance, lifecycle state, and verification data MUST be surfaced wherever claim information is displayed.
 
 **AC.01** `scepter claims index` summary MUST report: count of claims by importance level, count of claims by lifecycle state, count of verified vs unverified claims.
@@ -144,8 +154,7 @@ The claim metadata system MUST integrate consistently across all existing claim 
 
 ### Importance and Lifecycle on Same Claim
 
-**Detection:** A claim has both importance and lifecycle metadata: `AC.01:4:closed`.
-**Behavior:** Both are recognized independently. A closed claim can still have importance — useful for reporting ("these high-importance claims were resolved"). The parser extracts importance and lifecycle as separate properties.
+Specified in {S002.§4.AC.03} — importance and lifecycle are independent metadata items; a claim MAY carry both.
 
 ### Supersession Chain
 
@@ -154,8 +163,7 @@ The claim metadata system MUST integrate consistently across all existing claim 
 
 ### Verification of Removed Claims
 
-**Detection:** `scepter claims verify R004.§1.AC.03` when AC.03 is tagged `:removed`.
-**Behavior:** The command MUST reject verification of removed claims. A removed claim has no current meaning to verify.
+Specified in {R009.§7.AC.07} and {R009.§2.AC.09}; the rule (verification writes against `:removed` claims are rejected) was originally in this edge case and R009 explicitly takes ownership going forward.
 
 ### Stale Claim with No Current Verification
 
@@ -222,6 +230,9 @@ The claim metadata system MUST integrate consistently across all existing claim 
 ## References
 
 - {R004} — Claim-Level Addressability and Traceability System (parent requirement)
+- {R009} — Claim Metadata Key-Value Store — generalizes the metadata substrate this requirement defines; vocabularies (importance, lifecycle) remain in force; mechanism moves to the event log per {R009.§7.AC.08}, {R009.§7.AC.10}, {R009.§7.AC.11}.
+- {S002.§4} — Metadata Suffix Behavior (the consolidated spec for metadata grammar this requirement contributes to)
+- {S002.§3.4} — Linter consumer contract (lifecycle-tag and metadata-syntax error rules)
 - {R004.§2.AC.04} — Colon-suffix metadata parsing (the syntax this requirement builds on)
 - {R004.§5.AC.03} — Removed staleness AC (now addressed by §4 of this requirement)
 - {R004.§7} — Stability and Verification Markers (deferred section; §7.AC.04 is addressed by §3 of this requirement)

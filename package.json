@@ -33,9 +33,9 @@
   },
   "scripts": {
     "build": "cd core && tsup",
-    "build:vscode": "pnpm run build && cd vscode && npm run build",
-    "vsix": "pnpm run build && cd vscode && npm run vsix",
-    "vsix:install": "pnpm run vsix && code --install-extension vscode/scepter-claims-0.0.1.vsix --force",
+    "build:vscode": "npm run build && cd vscode && npm run build",
+    "vsix": "npm run build && cd vscode && npm run vsix",
+    "vsix:install": "npm run vsix && code --install-extension vscode/scepter-claims-0.0.1.vsix --force",
     "cli": "tsx core/src/cli/index.ts",
     "typecheck": "tsc",
     "test": "cd core && vitest",

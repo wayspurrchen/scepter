@@ -1,5 +1,19 @@
 # Test Plan Document Guide
 
+## Before You Draft (READ FIRST)
+
+A test-plan claim asserts something about the verification strategy: that a test exists, that a coverage condition holds, that a verification activity occurs at a particular boundary. These are not system claims — they describe how confidence is built that the upstream spec and requirement claims hold.
+
+Apply the litmus from `claims.md` § Authoring Litmus, with two test-plan-specific notes:
+
+- **Modal character leans toward Existence and Coverage.** Common shapes: "A test case MUST exist for {AC.NN}" (Existence), "The integration suite MUST exercise all four state transitions in {S013.§3}" (Coverage), "A boundary-value test MUST verify the empty-input case" (Existence). Aspirational claims ("tests MUST be comprehensive," "the suite MUST be fast," "tests SHOULD be maintainable") are NOT test-plan claims — they are goals or design principles. Decompose them or relocate.
+
+- **Verifiability is by inspection of the test code, not black-box behavior.** A test-plan claim is satisfied when the corresponding test exists and exercises the specified case. The litmus: *can a reader determine, by inspecting the test suite, whether this claim is satisfied?* If yes, it's a test-plan claim. If satisfaction requires running the system or measuring an external property, the claim is behavioral and likely belongs in the spec.
+
+The "MUST distinguish," authorial-framing, and brief-vs-guide rules from `claims.md` § Authoring Litmus apply here as well. If a dispatch brief's section template forces non-claim content into numbered MUSTs (e.g., a "Distinction from {S020}'s test cases" section), surface the conflict before authoring.
+
+---
+
 A test plan is the projection between specification and test implementation — it defines what is tested, why, how, and in what order. It answers the verification questions: given these contracts and acceptance criteria, what test activities will demonstrate that the system satisfies them? A test plan defines *verification strategy*; it is not test code, not a requirements doc, not a task list.
 
 **Core Problem**: Specifications define contracts. Code implements them. Tests verify them. Between the specification and the test code is a planning gap where verification strategy is decided. Without a test plan, verification is improvised: tests accumulate organically, clustering around easy-to-test areas while leaving hard-to-test areas uncovered. The test plan closes this gap by deriving a deliberate verification strategy from the upstream artifacts — requirements, specifications, and acceptance criteria — before any test code is written.

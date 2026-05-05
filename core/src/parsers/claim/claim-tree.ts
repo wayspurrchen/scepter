@@ -39,6 +39,26 @@ export interface ClaimNode {
   endLine: number;
   children: ClaimNode[];
   metadata?: string[];
+  /**
+   * Captured note-ID prefix from a self-prefixed claim definition.
+   *
+   * WHEN SET: the heading or paragraph-form definition began with a
+   *   `[A-Z]{1,5}\d{3,5}.` prefix — e.g., `### R049.LOCK.03 ...` or
+   *   `**R049.§3.LOCK.03**: ...` — and the parser captured it as data.
+   * WHEN NULL/UNDEFINED: the definition had no leading note-ID prefix
+   *   (the common case — bare or section-qualified definitions like
+   *   `### LOCK.03 ...` or `### §3.LOCK.03 ...`).
+   * INVARIANT: when set, `selfPrefix` MUST be a syntactically valid note
+   *   ID. The canonical `id` field never contains the note-ID prefix —
+   *   it is always bare (`LOCK.03`) or section-qualified (`3.LOCK.03`).
+   *   The index validates `selfPrefix` against the containing note ID at
+   *   registration; a mismatch produces a `mismatched-self-prefix` error
+   *   and the claim is NOT registered.
+   *
+   * @implements {R004.§3.AC.05} self-prefixed claim definitions captured as data
+   * @implements {S002.§8.AC.02} selfPrefix populated when prefix recognized; canonical id stays bare
+   */
+  selfPrefix?: string;
 }
 
 export interface ClaimTreeResult {
@@ -71,7 +91,10 @@ export interface ClaimTreeError {
     | 'cross-project-superseded'
     | 'alias-unknown'
     | 'peer-unresolved'
-    | 'peer-target-not-found';
+    | 'peer-target-not-found'
+    // @implements {R004.§3.AC.05} mismatched self-prefix surfaced as diagnostic
+    // @implements {S002.§8.AC.04} mismatched-self-prefix added to error union
+    | 'mismatched-self-prefix';
   claimId: string;
   line: number;
   message: string;
@@ -104,28 +127,57 @@ const SECTION_ID_RE = /^§(\d+(?:\.\d+)*)\b/;
 
 /**
  * Matches a claim identifier at the start of text.
- * Format: optional-section-path + claim prefix + dot + number
- * Examples: §1.AC.01, AC.01, §3.AC.04, §1.2.SEC.03
+ * Format: optional-self-note-prefix + optional-section-path + claim prefix + dot + number
+ * Examples: §1.AC.01, AC.01, §3.AC.04, §1.2.SEC.03,
+ *           R049.LOCK.03, R049.§3.LOCK.03 (self-prefixed)
+ *
+ * The leading `(?:([A-Z]{1,5}\d{3,5})\.)?` group captures an optional
+ * note-ID prefix, supporting self-prefixed claim definitions inside the
+ * note that owns them (e.g., `### R049.LOCK.03 ...` inside R049.md).
+ * When captured, the consumer (`tryParseClaimText`) populates
+ * `node.selfPrefix` and the index validates it against the containing
+ * note ID at registration. The canonical `id` is built from sectionPath
+ * and claim parts only — the note-ID prefix is data, not part of the id.
  *
  * The two §? groups are hallucination tolerance — AI agents frequently
  * produce §AC.01 or §DC.01 (§ on a claim prefix) when § should only
  * appear on numeric section identifiers. The parser accepts and discards
  * the stray § so linting still works, but this form should never be
  * rendered into output or taught as correct syntax.
+ *
+ * Capture order: 1=noteIdPrefix (optional), 2=sectionPath (optional),
+ *                3=claimPrefix, 4=claimNumber, 5=claimSubLetter.
+ *
+ * @implements {R004.§3.AC.05} optional self-prefix accepted on heading-form
+ * @implements {S002.§8.AC.01} parser accepts optional self-prefix
+ * @implements {S002.§8.AC.05} section-qualified self-prefix supported
  */
-const CLAIM_ID_RE = /^§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?\b/;
+const CLAIM_ID_RE = /^(?:([A-Z]{1,5}\d{3,5})\.)?§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?\b/;
 
 /**
  * Matches a claim pattern at the start of a non-heading line.
  * This handles the R004 convention where claims are paragraph-level text like:
  *   §1.AC.01 The parser MUST extract section IDs...
  *   §2.AC.04:superseded=R005.§2.AC.04 Colon-suffix metadata...
+ *   **R049.LOCK.03**: ... (self-prefixed, bold-required — see gate below)
+ *
+ * The optional leading `(?:([A-Z]{1,5}\d{3,5})\.)?` group accepts a
+ * self-prefixed paragraph form. The regex itself does NOT enforce the
+ * bold requirement — the gate lives at the call site in `buildClaimTree`,
+ * which rejects self-prefixed paragraph-form lines whose original
+ * `trimmedLine` did not start with `**` or `__`. Heading-form has no
+ * such restriction (a markdown heading is unambiguous).
  *
  * The §? groups are hallucination tolerance (see CLAIM_ID_RE comment).
  *
+ * Capture order: 1=noteIdPrefix (optional), 2=sectionPath (optional),
+ *                3=claimPrefix, 4=claimNumber, 5=claimSubLetter.
+ *
  * @implements {R005.§2.AC.04a} Accept colon after claim number for metadata
+ * @implements {R004.§3.AC.05} optional self-prefix accepted on paragraph-form
+ * @implements {S002.§8.AC.01} parser accepts optional self-prefix on paragraph-form
  */
-const LINE_CLAIM_RE = /^§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?[\s:]/;
+const LINE_CLAIM_RE = /^(?:([A-Z]{1,5}\d{3,5})\.)?§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?[\s:]/;
 
 /**
  * Strip leading and trailing markdown inline formatting from a claim ID.
@@ -137,9 +189,16 @@ const LINE_CLAIM_RE = /^§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?[
 function stripInlineFormatting(text: string): string {
   // Strip leading bold/italic markers: **, *, __, _
   let result = text.replace(/^(?:\*{1,2}|_{1,2})/, '');
-  // Strip the closing markers after the claim ID portion
-  // Match: claim-like text followed by formatting close then space
-  result = result.replace(/^(§?(?:\d+(?:\.\d+)*\.)?§?[A-Z]+\.\d{2,3}[a-z]?)(?:\*{1,2}|_{1,2})([\s:])/, '$1$2');
+  // Strip the closing markers after the claim ID portion. The captured
+  // ID portion accepts an optional leading note-ID prefix
+  // (`R049.LOCK.03`, `R049.§3.LOCK.03`) so bold-wrapped self-prefixed
+  // definitions like `**R049.LOCK.03**: ...` are unwrapped to
+  // `R049.LOCK.03: ...` for downstream regex matching.
+  // @implements {S002.§8.AC.01} bold-wrapped self-prefix unwrapped pre-match
+  result = result.replace(
+    /^((?:[A-Z]{1,5}\d{3,5}\.)?§?(?:\d+(?:\.\d+)*\.)?§?[A-Z]+\.\d{2,3}[a-z]?)(?:\*{1,2}|_{1,2})([\s:])/,
+    '$1$2',
+  );
   return result;
 }
 
@@ -345,6 +404,17 @@ export function buildClaimTree(content: string): ClaimTreeResult {
       // so the no-dot typo this rule catches is unreachable in this branch.
       const claimNode = tryParseClaimText(strippedLine, currentHeadingLevel + 1, lineNum);
       if (claimNode) {
+        // Bold-required gate for self-prefixed paragraph-form definitions.
+        // Plain (non-bold) `R049.LOCK.03 ...` MUST NOT be treated as a
+        // definition — that's a normal reference inside prose. Heading-form
+        // does not need this gate (a heading unambiguously introduces a
+        // claim). The check inspects the original `trimmedLine` (before
+        // stripInlineFormatting unwrapped the bold markers) to confirm
+        // the author wrapped the ID in `**` or `__`.
+        // @implements {S002.§8.AC.01} bold-required gate on paragraph self-prefix
+        if (claimNode.selfPrefix && !/^(?:\*{2}|__)/.test(trimmedLine)) {
+          continue;
+        }
         // Use the original trimmed line as the heading for display
         claimNode.heading = trimmedLine;
         structuralNodes.push({
@@ -552,10 +622,12 @@ function tryParseClaimText(text: string, level: number, lineNum: number): ClaimN
   const claimMatch = text.match(CLAIM_ID_RE);
   if (!claimMatch) return null;
 
-  const sectionPart = claimMatch[1]; // e.g., "1" from "§1.AC.01"
-  const prefix = claimMatch[2];       // e.g., "AC"
-  const number = parseInt(claimMatch[3], 10);
-  const subLetter = claimMatch[4] || undefined;
+  // @implements {S002.§8.AC.02} capture self-prefix as data; canonical id excludes it
+  const selfPrefix = claimMatch[1] || undefined; // e.g., "R049" from "R049.LOCK.03"
+  const sectionPart = claimMatch[2]; // e.g., "1" from "§1.AC.01"
+  const prefix = claimMatch[3];       // e.g., "AC"
+  const number = parseInt(claimMatch[4], 10);
+  const subLetter = claimMatch[5] || undefined;
 
   const sectionNumbers = sectionPart
     ? sectionPart.split('.').map((s) => parseInt(s, 10))
@@ -564,7 +636,7 @@ function tryParseClaimText(text: string, level: number, lineNum: number): ClaimN
   const sectionPrefix = sectionNumbers.length > 0
     ? sectionNumbers.join('.') + '.'
     : '';
-  const claimId = `${sectionPrefix}${prefix}.${claimMatch[3]}${subLetter || ''}`;
+  const claimId = `${sectionPrefix}${prefix}.${claimMatch[4]}${subLetter || ''}`;
 
   // Parse metadata from the text if present
   // @implements {R005.§2.AC.04a} Colon-separated metadata items (supersedes comma separator)
@@ -597,6 +669,7 @@ function tryParseClaimText(text: string, level: number, lineNum: number): ClaimN
     children: [],
     ...(sectionNumbers.length > 0 ? { sectionNumber: sectionNumbers[sectionNumbers.length - 1] } : {}),
     ...(metadata ? { metadata } : {}),
+    ...(selfPrefix ? { selfPrefix } : {}),
   };
 }
 

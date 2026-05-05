@@ -14,6 +14,8 @@ This requirement generalizes the verification event store into a **free-form key
 
 **Core Principle:** **The store records events, not state.** Each event is `{claimId, key, value, op, actor, date, note?}` where `op ∈ {add, set, unset, retract}`. Current state is a fold over events per key: `add` appends; `set` is atomic "retract-all + add"; `unset` is "retract-all"; `retract` targets a single value. Keys are opaque strings; values are opaque strings. The system neither defines a key taxonomy nor validates what any key means — it only stores, folds, and queries.
 
+**Spec coverage:** The metadata-suffix grammar's character set — including the `key=value` token shape this requirement promotes to first-class events — is consolidated at {S002.§4.AC.02}, which defines the charset rules across every metadata permutation. S002 §4 is the authoritative cross-tab spec covering how this requirement's suffix grammar (§4) interacts with the broader reference grammar.
+
 ## Problem Statement
 
 The verification store's shape encodes a single consumer's semantics:
@@ -176,7 +178,9 @@ Read commands produce either folded current-state views or raw event logs.
 
 ### §4 — Suffix Grammar Generalization
 
-The note-body metadata suffix grammar (defined in {R004.§2.AC.04}, clarified in {R005.§2.AC.04a}, {R005.§2.AC.04b}) carries `key=value` tokens today. This requirement promotes those tokens to first-class implicit events in the store at ingest time.
+Suffix grammar charset and key-value parsing specified in {S002.§4.AC.01–02}; this section asserts the requirements that S002 §4 makes contractual.
+
+The note-body metadata suffix grammar carries `key=value` tokens (per {R004.§2.AC.04}, clarified in {R005.§2.AC.04a}, {R005.§2.AC.04b}). This requirement promotes those tokens to first-class implicit events in the store at ingest time.
 
 §4.AC.01:4 Every `key=value` token in a claim's metadata suffix MUST be interpreted at claim-index time as an implicit `op=add` event with `actor="author:<notepath>"`, `date = <note file mtime as ISO 8601 datetime>`, and `note = "inline"`. High binding: every R005-era claim in the project carries such tokens, and this rule governs how they enter the generalized store.
 
@@ -397,6 +401,7 @@ All four original open questions have been resolved by {A004} (Claim Metadata St
 ## References
 
 - {R004} — Claim-Level Addressability and Traceability System (parent addressability)
+- {S002.§4.AC.02} — Metadata grammar charset (consolidated spec covering this requirement's suffix-grammar contribution)
 - {R004.§2.AC.04} — Colon-suffix metadata parsing (superseded by R005.§2.AC.04a)
 - {R005} — Claim Metadata, Verification, and Lifecycle (the requirement this generalizes)
 - {R005.§1} — Importance (§1 AC.01-AC.05 remain in force; implementation moves to `importance` key convention per §4.AC.02)

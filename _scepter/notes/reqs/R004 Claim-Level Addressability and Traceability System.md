@@ -6,6 +6,8 @@ status: draft
 
 # R004 - Claim-Level Addressability and Traceability System
 
+**Realized in Specification:** {S002} — the cross-tab Specification projection consolidating this requirement's grammar (with {R005}, {R007}, {R008}, {R009}, {R011}, {R012}) into a single contract over reference shapes, definition shapes, metadata permutations, and consumer behavior.
+
 ## Overview
 
 SCEpter currently tracks knowledge at the note level — entire documents are referenceable via IDs like `{D045}` or `{REQ001}`. Individual claims within those documents (requirements, acceptance criteria, architectural constraints, specification contracts) are not addressable, traceable, or verifiable as discrete units. This means there is no mechanical way to answer: "Did this requirement make it into the implementation? Has it been tested? Is the specification stale?"
@@ -40,7 +42,7 @@ The root cause: claims inside documents have no identity. They cannot be referen
 
 ## Reference Syntax
 
-This section defines the complete grammar for claim references. All other sections in this document use this syntax.
+This section defines the complete grammar for claim references. All other sections in this document use this syntax. The full cross-tab catalog of every recognized reference shape (and its consumer-by-consumer behavior) lives in {S002.§1}.
 
 ### Components
 
@@ -49,23 +51,22 @@ A reference is composed of up to four parts, all optional except that at least o
 | Component | Pattern | Examples | Role |
 |-----------|---------|----------|------|
 | **Note ID** | `[A-Z]{1,5}\d{3,5}` | `REQ004`, `S012`, `D045` | Identifies the containing document |
-| **Section path** | Dot-separated numerics, `§` optional | `3`, `§3`, `3.1`, `§3.§1` | Identifies position in the document tree |
-| **Claim ID** | Letter prefix + `.` + number | `AC.01`, `SEC.03`, `CORE.12` | Identifies a leaf claim |
-| **Metadata** | `:` + comma-separated tags | `:P0`, `:critical,security` | Inline priority and annotations |
+| **Section path** | Dot-separated numerics, `§` optional | `3`, `§3`, `3.1` | Identifies position in the document tree |
+| **Claim ID** | Letter prefix + `.` + number | `AC.01`, `SEC.03` | Identifies a leaf claim |
+| **Metadata** | `:` + tokens | `:P0`, `:closed` | Inline priority and annotations |
+
+Detailed component grammar specified in {S002.§1} (Reference Shape Catalog) and {S002.Data Model}.
 
 ### Rules
 
-**Sections are numeric only.** A section is one or more dot-separated digits. Letter prefixes MUST NOT appear in section identifiers. Sections are interior nodes in the document tree.
+- **Sections are numeric only.** Letter prefixes MUST NOT appear in section identifiers.
+- **Leaf claims MUST have a letter prefix + dot + number** (e.g., `AC.01`).
+- **The form `AC01` (no dot) is FORBIDDEN.**
+- **The claim prefix MUST be alphabetic-only** (`[A-Z]+`); alphanumeric prefixes like `PH1` are FORBIDDEN because they overlap the note-ID namespace.
+- **The `§` symbol is optional emphasis** — `REQ004.§3.§AC.01` and `REQ004.3.AC.01` parse identically.
+- **The dot `.` is the universal separator** between all components; the parser distinguishes claim segments (uppercase letters + dot + digits) from section segments (purely numeric).
 
-**Leaf claims MUST have a letter prefix.** A claim identifier is an uppercase letter group followed by a dot followed by a number: `AC.01`, `SEC.03`, `CORE.12`. The letter prefix names the claim category. The dot separating prefix from number is mandatory.
-
-**The form `AC01` (no dot) is FORBIDDEN.** This is always invalid syntax. The dot between the letter prefix and number is what distinguishes a claim reference from arbitrary text. Agents and LLMs MUST NOT produce this form.
-
-**The claim prefix MUST be alphabetic-only (`[A-Z]+`).** Alphanumeric prefixes (e.g., `PH1`, `PRD2`, `WO3`) are FORBIDDEN. The prefix-with-digits form overlaps the note-ID namespace (`[A-Z]{1,5}\d{3,5}`) and creates ambiguity between bare note references and claim references. Addressing depth needs are met by deeper section paths (`§1.2.AC.01`) and sub-letters (`AC.01a`), not by digits in the prefix.
-
-**The `§` symbol is optional emphasis.** The section symbol `§` MAY be placed before any section number or claim ID to explicitly mark it as a structural reference. Its presence or absence does not change the meaning — it is disambiguation and visual emphasis only. Both `REQ004.§3.§AC.01` and `REQ004.3.AC.01` parse identically.
-
-**The dot `.` is the universal separator.** Dots separate all components in a reference path: note ID from section, section from subsection, section from claim. The one exception is the dot *within* a claim ID (e.g., `AC.01`), which separates the letter prefix from the number. The parser distinguishes these by rule: a segment beginning with uppercase letters followed by a dot and digits is a claim; a purely numeric segment is a section.
+Per-shape acceptance behavior in {S002.§1}; per-consumer contracts in {S002.§3}.
 
 ### Fully Qualified Path
 
@@ -87,24 +88,11 @@ REQ004.§3.1.§AC.01:P0
 └───────────────────── note ID
 ```
 
+{S002.§1.AC.08} specifies fully qualified resolution semantics.
+
 ### Valid Reference Forms
 
-From most to least explicit:
-
-| Form | Context | Example |
-|------|---------|---------|
-| `NOTE.§N.M.§PREFIX.NN:meta` | Fully qualified, maximum emphasis | `REQ004.§3.1.§AC.01:P0` |
-| `NOTE.N.M.PREFIX.NN:meta` | Fully qualified, no `§` | `REQ004.3.1.AC.01:P0` |
-| `NOTE.N.PREFIX.NN` | Skip subsection (claim in top-level section) | `REQ004.3.AC.01` |
-| `NOTE.PREFIX.NN` | Skip section (claim unique within note) | `REQ004.AC.01` |
-| `N.PREFIX.NN` | Within same document | `3.AC.01` |
-| `§N.PREFIX.NN` | Within same document, with `§` | `§3.AC.01` |
-| `PREFIX.NN` | Within same section, or globally unique | `AC.01` |
-| `§PREFIX.NN` | Bare claim with `§` emphasis | `§AC.01` |
-| `NOTE.§N` | Section reference | `S012.§3` |
-| `NOTE.N` | Section reference, no `§` | `S012.3` |
-| `§N` | Section within same document | `§3` |
-| `NOTE` | Whole note reference | `REQ004` |
+The full reference grammar — every shape, every qualification level, every modifier — is specified in {S002.§1}. The Acceptance Criteria below state the requirements; S002 §1 is the behavioral catalog.
 
 ### Scope Resolution
 
@@ -118,11 +106,7 @@ If a short-form reference is ambiguous (e.g., `AC.01` when multiple sections def
 
 ### Braceless Matching
 
-Note IDs (e.g., `REQ004`) may appear with or without the existing brace syntax (`{REQ004}`). Braceless matching is controlled by a project configuration flag (default: enabled). When enabled, the parser validates that the matched shortcode prefix is a configured note type.
-
-Braced references (`{REQ004}`) MUST always work regardless of configuration.
-
-Claim paths involving section numbers or letter-prefixed claims rely on the dot-and-letter-prefix structure for disambiguation, not on braces or `§`.
+Bare note IDs and claim paths may appear without the brace syntax `{...}`; braceless matching is controlled by a project configuration flag (default: enabled). Braced references MUST always work. Per-shape behavior is specified in {S002.§1.AC.02}; per-consumer parsing contracts in {S002.§3.2}.
 
 ## Requirements
 
@@ -168,7 +152,7 @@ A claim ID has exactly one letter-prefix segment. Two letter segments before the
 
 ### §2 Reference Matching and Configuration
 
-The system MUST support braceless references for claim paths. The existing braced syntax `{NOTE_ID}` MUST continue to work. Braces SHOULD be optional, controlled by a project configuration flag (default: braceless enabled).
+The system MUST support braceless references for claim paths. The existing braced syntax `{NOTE_ID}` MUST continue to work. Braces SHOULD be optional, controlled by a project configuration flag (default: braceless enabled). See {S002.§1} for the cross-tab of every reference shape this section authorizes (braced, braceless, with/without `§`, with/without metadata, ranges, alias-prefixed) and the consumer behavior expected for each.
 
 When braceless matching is enabled, the parser MUST validate matched shortcodes against the project's configured note types to prevent false positives. Only configured shortcodes (e.g., `REQ`, `S`, `D`, `T`) are recognized as bare note ID references.
 
@@ -190,7 +174,7 @@ The system MUST support an optional colon-suffix for inline metadata on referenc
 
 ### §3 Claim Definition via Section Headings
 
-Claims are defined by their presence in section headings. A heading with a numeric identifier defines a section. A heading with a letter-prefix-dot-number pattern defines a leaf claim. Everything under a heading until the next heading at the same or higher level is the claim's content.
+Claims are defined by their presence in section headings. A heading with a numeric identifier defines a section. A heading with a letter-prefix-dot-number pattern defines a leaf claim. Everything under a heading until the next heading at the same or higher level is the claim's content. The full catalog of definition shapes (heading, paragraph, table-row, and the proposed self-prefixed paragraph form) and their body-extent rules is consolidated in {S002.§2}.
 
 The system MUST NOT require any format beyond standard markdown headings with a naming convention. No custom block syntax (e.g., `[REQUIREMENT]`), no mandatory frontmatter per claim, no structured fields.
 
@@ -204,7 +188,11 @@ LLMs SHOULD be guided (via prompting and scaffolding) to use descriptive labels 
 
 §3.AC.04 The system MUST NOT require any structured format beyond the heading convention for claim definitions.
 
+§3.AC.05:4 A claim definition's leading token MAY include the containing note's ID as a prefix (e.g., `R049.LOCK.03` inside R049.md). Heading-form definitions accept this unconditionally — `### R049.LOCK.03 Lock authority` is a valid definition. Paragraph-form definitions require bold-wrapping to disambiguate from in-prose references at line-leading position — `**R049.LOCK.03**:` is a valid definition; plain `R049.LOCK.03 ...` at line-leading position is not. The captured prefix MUST match the containing note's ID; mismatched prefixes MUST produce a `mismatched-self-prefix` error and the claim MUST NOT be registered. Behavioral contract specified in {S002.§8}.
+
 ### §4 Claim Index and Cross-Reference Graph
+
+The behavioral contract for the index — how it ingests definition shapes from {S002.§2}, how it resolves the reference shapes from {S002.§1}, and what it owes each downstream consumer — is the consumer cross-tab in {S002.§3}.
 
 The system MUST compute a claim index by scanning all documents in the project. The index contains:
 - The tree of claims per document (derived from heading structure)
@@ -225,7 +213,7 @@ The index MUST be rebuildable from source documents at any time. It MUST NOT req
 
 ### §5 Traceability Matrix
 
-The system MUST compute a traceability matrix showing, for each claim, which projections contain a reference to it. Projections are identified by document type (Requirement, Specification, Architecture, etc.) and source code.
+The system MUST compute a traceability matrix showing, for each claim, which projections contain a reference to it. Projections are identified by document type (Requirement, Specification, Architecture, etc.) and source code. {S002.§3} fixes the trace/gaps consumer behavior — what counts as a cross-projection presence, how range-expanded references contribute to the matrix, and how alias-prefixed references resolve.
 
 The system MUST detect gaps: claims present at one projection but absent from downstream projections (e.g., a requirement AC that has no specification reference, or a specification claim with no implementation reference). Gap detection operates on claim presence — whether a claim ID appears in other documents — without prescribing relationship types between projections.
 
@@ -239,7 +227,7 @@ The system MUST detect gaps: claims present at one projection but absent from do
 
 ### §6 CLI Tooling for Mechanical Consistency
 
-The system MUST provide CLI commands that handle the mechanical operations LLMs are unreliable at: numbering, ID assignment, structural validation, and scaffolding.
+The system MUST provide CLI commands that handle the mechanical operations LLMs are unreliable at: numbering, ID assignment, structural validation, and scaffolding. The CLI's claim-aware command behavior — what `lint`, `trace`, `gaps`, `show`, and friends are required to produce against each reference and definition shape — is in the consumer cross-tab at {S002.§3}.
 
 LLMs write content freely in documents. The CLI repairs drift after each editing pass. The CLI MUST NOT constrain how LLMs interact with document text — it validates and repairs structure, not content.
 
@@ -311,8 +299,7 @@ The traceability matrix and property surface MUST support filtering and sorting 
 
 ### Braceless Matching Collision
 
-**Detection:** A bare uppercase+digits string matches the note ID format but is not intended as a reference (e.g., in code, URLs, or prose discussing the format itself).
-**Behavior:** The shortcode filter eliminates most false positives. Remaining false matches are acceptable — users can wrap non-references in backticks (code formatting) to exclude them from scanning, or the system can be configured to ignore references inside code blocks.
+Specified in {S002.§3.2.AC.03} (backtick / code-span exclusion).
 
 ### JIRA Ticket Collision
 
@@ -321,13 +308,11 @@ The traceability matrix and property surface MUST support filtering and sorting 
 
 ### Forbidden Form Detection
 
-**Detection:** An LLM produces `AC01` (no dot between prefix and number).
-**Behavior:** The linter detects and flags this as invalid syntax. `scepter fix` MAY offer to repair it to `AC.01` if the intent is clear from context.
+Specified in {S002.§3.1.AC.02}.
 
 ### Alphanumeric Prefix Detection
 
-**Detection:** An LLM produces `PH1.01`, `PRD2.05`, or other alphanumeric prefixes (letters followed by digits before the dot).
-**Behavior:** The linter detects and flags this as a `forbidden-form` error. The diagnostic explains that prefixes must be alphabetic-only because alphanumeric prefixes overlap the note-ID namespace (`[A-Z]{1,5}\d{3,5}`), and suggests the letter-only portion as a replacement (e.g., `PH` for `PH1`). Authors needing more addressing depth use deeper section paths or sub-letters.
+Specified in {S002.§3.1.AC.02}.
 
 ## Non-Goals
 
@@ -371,13 +356,13 @@ The traceability matrix and property surface MUST support filtering and sorting 
 |----------|-------|-------|
 | §1 Claim Syntax and Addressing | 8 | AC.07-08 added: alphabetic-only prefix rule, single-letter-segment rule |
 | §2 Reference Matching and Configuration | 5 | |
-| §3 Claim Definition via Section Headings | 4 | |
+| §3 Claim Definition via Section Headings | 5 | AC.05 added: self-prefixed definitions |
 | §4 Claim Index and Cross-Reference Graph | 5 | AC.04-05 added: section-only ref filtering, fuzzy match guarding |
 | §5 Traceability Matrix | 2 | AC.03, AC.04 removed |
 | §6 CLI Tooling for Mechanical Consistency | 3 | AC.03 removed |
 | §7 Confidence Markers | 4 | AC.04 superseded by {R005.§3.AC.04} |
 | §8 Priority and Metadata on Claims | 3 | |
-| **Total** | **34** | 3 removed from original 33, 4 added (§4.AC.04-05, §1.AC.07-08) |
+| **Total** | **35** | 3 removed from original 33, 5 added (§4.AC.04-05, §1.AC.07-08, §3.AC.05) |
 
 ## References
 

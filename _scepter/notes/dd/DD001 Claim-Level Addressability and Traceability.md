@@ -7,6 +7,7 @@ status: draft
 # DD001 - Claim-Level Addressability and Traceability
 
 **Spec:** {R004}
+**Spec consolidation:** {S002} — cross-tab Specification covering the reference grammar, definition shapes, metadata permutations, and consumer behaviors that this design wires into modules. When this design names a parser, index, linter, or CLI behavior, the authoritative behavioral contract is in {S002}; this document specifies module decomposition and integration sequence only.
 **Created:** 2026-03-09
 **Updated:** 2026-03-13
 
@@ -70,6 +71,8 @@ status: draft
 **OQ.03 — Observatory Integration Scope:** R004's default assumption is adopted: CLI-first. Observatory integration is deferred. The index data structure should be JSON-serializable for future consumption, but no UI work is in scope for this design.
 
 ## §2 Specification Scope
+
+The behavioral contract that the modules below conform to is consolidated in {S002}: {S002.§1} for reference shapes, {S002.§2} for definition shapes, {S002.§3} for per-consumer behavior. The table below maps which R004 ACs this design realizes.
 
 ### Covered in this design
 

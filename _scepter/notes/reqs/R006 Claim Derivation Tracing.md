@@ -21,6 +21,8 @@ When a high-binding acceptance criterion (e.g., `R005.§1.AC.01`) is decomposed 
 
 **Core Principle:** Derivation is the mechanism by which coarse requirements become fine-grained implementation targets. Without explicit derivation tracking, the link between a requirement AC and its implementation is either too coarse (one AC maps to 10 files) or invisible (design claims exist but aren't connected to their source). Derivation tracing closes this gap.
 
+**R009 integration:** The `derives=TARGET` token is also emitted as an implicit `derives=TARGET` event per {R009.§4.AC.04}, making it queryable through the generalized metadata surface (e.g., `scepter claims meta list --where derives=R005.§1.AC.01`). Derivation semantics — gap closure, bidirectional index, trace expansion — remain governed by this requirement.
+
 ## Design Principles
 
 **`derives=TARGET` is the only derivation syntax.** It uses the existing key-value metadata mechanism from {R005.§2.AC.04b}. No new syntax is needed — only semantic recognition of the `derives` key.
@@ -138,5 +140,6 @@ The linter MUST validate derivation metadata.
 - {R004} — Claim-Level Addressability and Traceability System (parent requirement)
 - {R005} — Claim Metadata, Verification, and Lifecycle (metadata syntax this builds on)
 - {R005.§2.AC.04b} — Key-value metadata syntax (`=` binding) that `derives=TARGET` uses
+- {R009} — Claim Metadata Key-Value Store — `derives=` tokens become implicit events per {R009.§4.AC.04}; queryable via the generalized surface, derivation semantics still governed by this requirement.
 - {DD001} — Detailed design for {R004} (integration context)
 - {DD002} — Detailed design for {R005} (metadata parser integration context)
