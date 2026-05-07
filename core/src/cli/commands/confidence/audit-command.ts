@@ -1,56 +1,88 @@
 /**
  * Audit command for confidence annotations.
  *
- * Discovers all source files from sourceCodeIntegration config,
- * parses each for @confidence annotations, and displays summary.
+ * Discovers files from sourceCodeIntegration (source scope) and/or
+ * discoveryPaths (notes scope), routes each through the confidence
+ * adapter registry, and displays summary or per-directory breakdown.
  *
  * @implements {R004.§7.AC.01} scepter confidence audit command
- * @see {DD016.§1.DC.06} consumes auditConfidence from the new barrel pending
- *   {S004}/{DD017} multi-scope audit refactor
+ * @implements {S004.§2.AC.01-10}
+ * @implements {DD017.DC.11}
+ * @implements {DD017.DC.12}
+ * @implements {DD017.DC.13}
+ * @implements {DD017.DC.14}
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
 import { auditConfidence } from '../../../claims/confidence/index.js';
-import { formatConfidenceAudit } from '../../formatters/confidence-formatter.js';
+import {
+  formatConfidenceAudit,
+  formatConfidenceAuditPaths,
+} from '../../formatters/confidence-formatter.js';
 
 export const auditCommand = new Command('audit')
-  .description('Audit source files for confidence annotations')
+  .description('Audit source files and notes for confidence annotations')
   .option('--format <format>', 'Output format: table or json', 'table')
   .option('--unannotated', 'List only files without annotations')
   .option('--level <level>', 'List only files at a specific confidence level')
+  .option('--source-only', 'Audit only source files (sourceCodeIntegration.folders)')
+  .option('--notes-only', 'Audit only notes (discoveryPaths)')
+  .option('--paths', 'Emit a per-directory breakdown of files and their annotations')
   .action(async (options: {
     format?: string;
     unannotated?: boolean;
     level?: string;
+    sourceOnly?: boolean;
+    notesOnly?: boolean;
+    paths?: boolean;
     projectDir?: string;
   }) => {
     try {
+      // Mutual-exclusivity check BEFORE any discovery runs (DC.11).
+      if (options.sourceOnly && options.notesOnly) {
+        console.error(
+          chalk.red(
+            'Error: --source-only and --notes-only are mutually exclusive. Choose one or omit both for the default (both scopes).',
+          ),
+        );
+        process.exit(1);
+      }
+
+      const scope: 'source' | 'notes' | 'both' = options.sourceOnly
+        ? 'source'
+        : options.notesOnly
+        ? 'notes'
+        : 'both';
+
       await BaseCommand.execute(
         {
           projectDir: options.projectDir,
-          requireNoteManager: false,
+          requireNoteManager: true,
           startWatching: false,
         },
         async (context) => {
           const config = context.projectManager.configManager.getConfig();
 
-          if (!config.sourceCodeIntegration?.enabled) {
-            console.log(chalk.yellow('Source code integration is not enabled in configuration.'));
-            console.log(chalk.gray('Add sourceCodeIntegration to scepter.config.json to use confidence audit.'));
+          if (
+            scope === 'source' &&
+            !config.sourceCodeIntegration?.enabled
+          ) {
+            console.log(
+              chalk.yellow('Source code integration is not enabled in configuration.'),
+            );
+            console.log(
+              chalk.gray(
+                'Add sourceCodeIntegration to scepter.config.json to use confidence audit on source files.',
+              ),
+            );
             return;
           }
 
-          // {S004} migrates this call to the new (pm, options) signature.
-          // Step 3 wires --source-only / --notes-only / --paths flags;
-          // for now we preserve the existing source-only behavior by
-          // passing scope: 'source'.
-          const result = await auditConfidence(context.projectManager, {
-            scope: 'source',
-          });
+          const result = await auditConfidence(context.projectManager, { scope });
 
-          // Filter by level if specified
+          // Filter by level if specified.
           if (options.level) {
             const level = parseInt(options.level, 10);
             if (level < 1 || level > 5 || isNaN(level)) {
@@ -65,20 +97,23 @@ export const auditCommand = new Command('audit')
             console.log(chalk.bold(`Files at confidence level ${level}:`));
             console.log('');
             for (const f of filtered) {
-              console.log(`  ${f.reviewer}${f.level} ${chalk.gray(f.date)}  ${f.filePath}`);
+              const dateStr = f.date ? ` ${chalk.gray(f.date)}` : '';
+              console.log(`  ${f.reviewer}${f.level}${dateStr}  ${f.filePath}`);
             }
             console.log('');
             console.log(chalk.gray(`${filtered.length} file(s)`));
             return;
           }
 
-          // Show only unannotated files if flag is set
+          // Show only unannotated files if flag is set.
           if (options.unannotated) {
             if (result.unannotatedFiles.length === 0) {
-              console.log(chalk.green('All source files have confidence annotations.'));
+              console.log(chalk.green('All files have confidence annotations.'));
               return;
             }
-            console.log(chalk.bold(`Unannotated files (${result.unannotatedFiles.length}):`));
+            console.log(
+              chalk.bold(`Unannotated files (${result.unannotatedFiles.length}):`),
+            );
             console.log('');
             for (const f of result.unannotatedFiles) {
               console.log(`  ${f}`);
@@ -86,11 +121,19 @@ export const auditCommand = new Command('audit')
             return;
           }
 
-          // Default: full audit output
+          // Default summary output.
           const output = formatConfidenceAudit(result, {
             format: options.format === 'json' ? 'json' : 'table',
+            scope,
           });
           console.log(output);
+
+          // --paths breakdown appended below the summary (DC.12).
+          if (options.paths && options.format !== 'json') {
+            const tty = Boolean(process.stdout.isTTY);
+            const breakdown = formatConfidenceAuditPaths(result, { tty, scope });
+            console.log(breakdown);
+          }
         },
       );
     } catch (error) {
