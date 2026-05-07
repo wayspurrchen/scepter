@@ -69,6 +69,55 @@ describe('S004.§5.AC.01: auto-insert default — autoInsert undefined → true'
   });
 });
 
+describe('S004.§5.AC.01: idempotence on direct double-call (TS001.§9.AC.02)', () => {
+  let ctx: TestContext;
+
+  beforeEach(async () => {
+    ctx = await setupFullTestProject('auto-insert-idempotent', HOOK_TEST_CONFIG_BASE);
+  });
+
+  afterEach(async () => {
+    await fs.remove(ctx.projectPath);
+    vi.useRealTimers();
+  });
+
+  it('calling maybeAutoInsertConfidence twice on the same path yields one annotation, byte-identically', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-05T12:00:00Z'));
+
+    // Seed a fresh note via createNote. The first call to the hook
+    // happens inside createNote; we then call it directly a second time
+    // to verify that idempotence holds — frontmatter idempotence per
+    // S003.§4.AC.08 means the second insert byte-equals the first.
+    const note = await ctx.noteManager.createNote({
+      type: 'Requirement',
+      title: 'Idempotent',
+      content: '# X\n\nbody\n',
+      tags: [],
+    });
+    const afterFirst = await fs.readFile(note.filePath!, 'utf-8');
+
+    // Direct second call into the private hook. Bracket-access via
+    // unknown to bypass TypeScript's private-member check; this is a
+    // testing-only access pattern.
+    const hook = (
+      ctx.noteManager as unknown as {
+        maybeAutoInsertConfidence: (notePath: string) => Promise<void>;
+      }
+    ).maybeAutoInsertConfidence.bind(ctx.noteManager);
+    await hook(note.filePath!);
+    const afterSecond = await fs.readFile(note.filePath!, 'utf-8');
+
+    // Byte-identical content after the second call.
+    expect(afterSecond).toBe(afterFirst);
+    // And the on-disk content has exactly one confidence key.
+    const confidenceLines = afterSecond
+      .split('\n')
+      .filter((l) => /^confidence:/.test(l));
+    expect(confidenceLines.length).toBe(1);
+  });
+});
+
 describe('S004.§5.AC.04: autoInsert: false — no-op (no confidence key, no adapter call)', () => {
   let ctx: TestContext;
 

@@ -217,6 +217,52 @@ describe('S004.§3: mark — includeDate config honored (DC.17)', () => {
   });
 });
 
+describe('S004.§3.AC.06: mark — command-owns-I/O contract (DC.18)', () => {
+  let ctx: TestContext;
+
+  beforeEach(async () => {
+    ctx = await setupFullTestProject('mark-owns-io', MARK_TEST_CONFIG);
+  });
+
+  afterEach(async () => {
+    await fs.remove(ctx.projectPath);
+    vi.restoreAllMocks();
+  });
+
+  it('adapter.insert receives (content: string, payload: object) — never an fs handle', async () => {
+    const filePath = await seed(ctx, 'core/src/foo.ts', 'const x = 1;\nexport {};\n');
+
+    const adapterModule = await import('../../../../claims/confidence/adapters/c-family.js');
+    const insertSpy = vi.spyOn(adapterModule.cFamilyAdapter, 'insert');
+
+    const outcome = await executeMark(ctx.projectManager!, {
+      file: 'core/src/foo.ts',
+      reviewerArg: 'ai',
+      levelArg: '2',
+    });
+    expect(outcome.ok).toBe(true);
+
+    // adapter.insert was called exactly once. Verifies the I/O contract
+    // (DC.18): the adapter is invoked with (content, payload) — content
+    // is a string, payload is a plain object — never a path, FileHandle,
+    // or Buffer. The mark command alone owns the read+write.
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    const [contentArg, payloadArg] = insertSpy.mock.calls[0];
+    expect(typeof contentArg).toBe('string');
+    expect(contentArg).toContain('const x = 1;');
+    expect(typeof payloadArg).toBe('object');
+    expect(payloadArg).not.toBeNull();
+    expect(Buffer.isBuffer(payloadArg)).toBe(false);
+    // payload shape per ConfidencePayload.
+    expect(payloadArg).toMatchObject({ reviewer: '🤖', level: 2 });
+
+    // And the on-disk file IS updated (exactly one write happened —
+    // verified by the file content reflecting the insert outcome).
+    const updated = await fs.readFile(filePath, 'utf-8');
+    expect(updated).toContain('@confidence 🤖2');
+  });
+});
+
 describe('S004.§3: mark — file-not-found path', () => {
   let ctx: TestContext;
 

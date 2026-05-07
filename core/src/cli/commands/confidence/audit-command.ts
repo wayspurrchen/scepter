@@ -22,6 +22,28 @@ import {
   formatConfidenceAuditPaths,
 } from '../../formatters/confidence-formatter.js';
 
+/**
+ * Resolve `--source-only`/`--notes-only` flags to a scope value, or
+ * report a mutual-exclusivity error. Exported for unit testing of the
+ * pre-discovery validation surface (TS001.§6.AC.04, DD017.DC.11).
+ */
+export function resolveAuditScope(opts: {
+  sourceOnly?: boolean;
+  notesOnly?: boolean;
+}): { ok: true; scope: 'source' | 'notes' | 'both' } | { ok: false; message: string } {
+  if (opts.sourceOnly && opts.notesOnly) {
+    return {
+      ok: false,
+      message:
+        '--source-only and --notes-only are mutually exclusive. Choose one or omit both for the default (both scopes).',
+    };
+  }
+  return {
+    ok: true,
+    scope: opts.sourceOnly ? 'source' : opts.notesOnly ? 'notes' : 'both',
+  };
+}
+
 export const auditCommand = new Command('audit')
   .description('Audit source files and notes for confidence annotations')
   .option('--format <format>', 'Output format: table or json', 'table')
@@ -41,20 +63,15 @@ export const auditCommand = new Command('audit')
   }) => {
     try {
       // Mutual-exclusivity check BEFORE any discovery runs (DC.11).
-      if (options.sourceOnly && options.notesOnly) {
-        console.error(
-          chalk.red(
-            'Error: --source-only and --notes-only are mutually exclusive. Choose one or omit both for the default (both scopes).',
-          ),
-        );
+      const scopeResult = resolveAuditScope({
+        sourceOnly: options.sourceOnly,
+        notesOnly: options.notesOnly,
+      });
+      if (!scopeResult.ok) {
+        console.error(chalk.red(`Error: ${scopeResult.message}`));
         process.exit(1);
       }
-
-      const scope: 'source' | 'notes' | 'both' = options.sourceOnly
-        ? 'source'
-        : options.notesOnly
-        ? 'notes'
-        : 'both';
+      const scope = scopeResult.scope;
 
       await BaseCommand.execute(
         {

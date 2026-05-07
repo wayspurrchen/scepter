@@ -342,6 +342,137 @@ describe('S004.§4: apply — wet run, mark and replace', () => {
   });
 });
 
+describe('S004.§4.AC.05: apply — dry-run accuracy across mixed fixture (TS001.§8.AC.02)', () => {
+  let ctx: TestContext;
+
+  beforeEach(async () => {
+    // autoInsert disabled so fixture-state remains exactly as seeded —
+    // the test verifies dry-run predicts wet-run; the createNote-time
+    // hook would otherwise mutate fixture annotation state mid-setup.
+    ctx = await setupFullTestProject('apply-dry-accuracy', {
+      ...APPLY_TEST_CONFIG,
+      claims: { confidence: { autoInsert: false } },
+    });
+  });
+
+  afterEach(async () => {
+    await fs.remove(ctx.projectPath);
+  });
+
+  it('the dry-run plan predicts the wet-run outcome row-for-row across 20 files', async () => {
+    // Build a 20-file fixture: 10 source + 10 notes; half of each
+    // pre-annotated, half bare. This exercises mark, skip-annotated,
+    // and replace branches predictably.
+    for (let i = 0; i < 5; i++) {
+      await seedSource(
+        ctx,
+        `core/src/annotated-${i}.ts`,
+        `// @confidence 🤖2 2026-01-${String(i + 1).padStart(2, '0')}\nconst x = ${i};\nexport {};\n`,
+      );
+    }
+    for (let i = 0; i < 5; i++) {
+      await seedSource(ctx, `core/src/bare-${i}.ts`, `const x = ${i};\nexport {};\n`);
+    }
+    for (let i = 0; i < 5; i++) {
+      // Pre-annotated note: write the file directly with confidence
+      // already in the frontmatter (createNote can't do this without
+      // the autoInsert hook, which is disabled here).
+      const notePath = path.join(
+        ctx.projectPath,
+        `_scepter/notes/requirements/R${String(100 + i).padStart(3, '0')} pre.md`,
+      );
+      await fs.ensureDir(path.dirname(notePath));
+      await fs.writeFile(
+        notePath,
+        `---\ntype: Requirement\nconfidence: "👤4 2026-02-${String(i + 1).padStart(2, '0')}"\n---\nbody ${i}\n`,
+        'utf-8',
+      );
+    }
+    for (let i = 0; i < 5; i++) {
+      await ctx.noteManager.createNote({
+        type: 'Decision',
+        title: `Bare D ${i}`,
+        content: `body ${i}`,
+        tags: [],
+      });
+    }
+
+    // Snapshot every file's pre-state for restoration after the wet run.
+    const dryArgs = {
+      reviewerArg: 'human' as const,
+      levelArg: '5',
+      filters: { glob: '**/*.{ts,md}' },
+      skipAnnotated: true,
+      overwrite: false,
+      dryRun: true,
+      verbose: false,
+    };
+    const wetArgs = { ...dryArgs, dryRun: false };
+
+    const dryResult = await executeApply(ctx.projectManager!, dryArgs);
+    expect(dryResult.ok).toBe(true);
+
+    const wetResult = await executeApply(ctx.projectManager!, wetArgs);
+    expect(wetResult.ok).toBe(true);
+
+    if (dryResult.ok && wetResult.ok) {
+      // Same row count.
+      expect(dryResult.rows.length).toBe(wetResult.rows.length);
+      expect(dryResult.rows.length).toBe(20);
+
+      // Build path → action maps; assert byte-identical action prediction.
+      const dryByPath = new Map(dryResult.rows.map((r) => [r.path, r.action]));
+      const wetByPath = new Map(wetResult.rows.map((r) => [r.path, r.action]));
+      for (const [path, dryAction] of dryByPath.entries()) {
+        const wetAction = wetByPath.get(path);
+        expect(wetAction).toBe(dryAction);
+      }
+
+      // Sanity-check the breakdown: 5 annotated source + 5 annotated
+      // notes → skip-annotated; 5 bare source + 5 bare notes → mark.
+      const dryActionCounts = dryResult.rows.reduce(
+        (acc: Record<string, number>, row) => {
+          acc[row.action] = (acc[row.action] ?? 0) + 1;
+          return acc;
+        },
+        {},
+      );
+      expect(dryActionCounts['mark']).toBe(10);
+      expect(dryActionCounts['skip-annotated']).toBe(10);
+    }
+  });
+});
+
+describe('S004.§4.AC.05: apply — includeDate: false honored (TS001.§8.AC.09)', () => {
+  let ctx: TestContext;
+
+  afterEach(async () => {
+    if (ctx) await fs.remove(ctx.projectPath);
+  });
+
+  it('writes annotations without a date when claims.confidence.includeDate is false', async () => {
+    ctx = await setupFullTestProject('apply-no-date', {
+      ...APPLY_TEST_CONFIG,
+      claims: { confidence: { autoInsert: false, includeDate: false } },
+    });
+    const abs = await seedSource(ctx, 'core/src/foo.ts', 'const x = 1;\nexport {};\n');
+    const result = await executeApply(ctx.projectManager!, {
+      reviewerArg: 'ai',
+      levelArg: '2',
+      filters: { glob: 'core/src/**/*.ts' },
+      skipAnnotated: true,
+      overwrite: false,
+      dryRun: false,
+      verbose: false,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.outcome.marked).toBe(1);
+    const updated = await fs.readFile(abs, 'utf-8');
+    expect(updated).toMatch(/@confidence 🤖2(\n|$)/);
+    expect(updated).not.toMatch(/@confidence 🤖2 \d{4}-\d{2}-\d{2}/);
+  });
+});
+
 describe('S004.§4.AC.07: apply — per-file failure isolation', () => {
   let ctx: TestContext;
 
