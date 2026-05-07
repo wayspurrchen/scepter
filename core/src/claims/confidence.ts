@@ -46,17 +46,16 @@ export interface ConfidenceAuditResult {
 }
 
 // ---------------------------------------------------------------------------
-// Constants
+// Validation re-exports
 // ---------------------------------------------------------------------------
 
-/** Valid confidence levels */
-const VALID_LEVELS: readonly ConfidenceLevel[] = [1, 2, 3, 4, 5] as const;
+// Reviewer/level validation lives at ./confidence/validation.ts.
+// @see {DD016.§7} validation module
+export { validateReviewerLevel, mapReviewerArg } from './confidence/validation.js';
 
-/** Allowed level ranges per reviewer icon */
-const REVIEWER_LEVEL_RANGES: Record<ReviewerIcon, readonly ConfidenceLevel[]> = {
-  '🤖': [1, 2, 3],
-  '👤': [3, 4, 5],
-};
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 /**
  * Regex to match @confidence annotations in both line comments and doc blocks.
@@ -90,7 +89,10 @@ export function parseConfidenceAnnotation(
       const reviewer = match[1] as ReviewerIcon;
       const level = parseInt(match[2], 10);
 
-      if (!VALID_LEVELS.includes(level as ConfidenceLevel)) {
+      // VALID_LEVELS = [1,2,3,4,5] inlined; the constant moved out with
+      // validation.ts and parseConfidenceAnnotation moves to c-family.ts in §3
+      // where it can carry its own copy.
+      if (![1, 2, 3, 4, 5].includes(level)) {
         continue;
       }
 
@@ -172,44 +174,6 @@ export function insertConfidenceAnnotation(
   // Insert the annotation
   lines.splice(insertIndex, 0, annotation);
   return lines.join('\n');
-}
-
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
-
-/**
- * Validate that a level is within the allowed range for a reviewer icon.
- * AI (🤖) can assign levels 1-3, Human (👤) can assign levels 3-5.
- */
-export function validateReviewerLevel(
-  reviewer: ReviewerIcon,
-  level: ConfidenceLevel,
-): { valid: boolean; message?: string } {
-  const allowed = REVIEWER_LEVEL_RANGES[reviewer];
-  if (!allowed.includes(level)) {
-    const range = `${allowed[0]}-${allowed[allowed.length - 1]}`;
-    const label = reviewer === '🤖' ? 'AI (🤖)' : 'Human (👤)';
-    return {
-      valid: false,
-      message: `${label} can only assign levels ${range}, got ${level}`,
-    };
-  }
-  return { valid: true };
-}
-
-/**
- * Map CLI positional argument to reviewer icon.
- */
-export function mapReviewerArg(arg: string): ReviewerIcon | null {
-  switch (arg.toLowerCase()) {
-    case 'ai':
-      return '🤖';
-    case 'human':
-      return '👤';
-    default:
-      return null;
-  }
 }
 
 // ---------------------------------------------------------------------------
