@@ -15,6 +15,8 @@ import type { ReferenceManager } from '../references/reference-manager';
 import { StatusValidator } from '../statuses/status-validator';
 import { parseNoteMentions } from '../parsers/note/note-parser';
 import { UnifiedDiscovery } from '../discovery/unified-discovery';
+import { getAdapter } from '../claims/confidence/registry';
+import * as fs from 'fs-extra';
 
 // Type definitions for the API
 export interface CreateNoteParams {
@@ -552,10 +554,81 @@ export class NoteManager extends EventEmitter {
     // Set the file path on the note object
     note.filePath = filepath;
 
+    // Auto-insert confidence annotation per S004.§5 / DD017.DC.30-33.
+    // Hook fires AFTER createNoteFile completes (line 520) and BEFORE
+    // note:created emits, so listeners see the note in its final shape.
+    await this.maybeAutoInsertConfidence(filepath);
+
     // Emit event
     this.emit('note:created', note);
 
     return note;
+  }
+
+  /**
+   * Auto-insert a default confidence annotation on a freshly-created
+   * note file when the project's `claims.confidence.autoInsert` config
+   * is true (or unset; default true). The hook MUST NOT block note
+   * creation: any throw from `adapter.insert` is caught, a warning is
+   * emitted, and the method returns. Template-supplied confidence
+   * values take precedence (parse-non-null → return).
+   *
+   * @implements {S004.§5.AC.01-06}
+   * @implements {DD017.DC.30}
+   * @implements {DD017.DC.31}
+   * @implements {DD017.DC.32}
+   * @implements {DD017.DC.33}
+   */
+  private async maybeAutoInsertConfidence(notePath: string): Promise<void> {
+    // Step 1: read autoInsert flag; undefined → true (default).
+    const config = this.configManager.getConfig();
+    const autoInsert = config.claims?.confidence?.autoInsert ?? true;
+    if (!autoInsert) return;
+
+    // Step 2: resolve adapter; null → silent return.
+    const adapter = getAdapter(notePath);
+    if (!adapter) return;
+
+    let content: string;
+    try {
+      content = await fs.readFile(notePath, 'utf-8');
+    } catch {
+      // File unreadable — bail without warning; createNote already
+      // succeeded, so the warning would be misleading.
+      return;
+    }
+
+    // Step 3: template precedence — if confidence already present, do
+    // not overwrite (parse non-null → return).
+    let parsed: ReturnType<typeof adapter.parse>;
+    try {
+      parsed = adapter.parse(content, notePath);
+    } catch {
+      return;
+    }
+    if (parsed) return;
+
+    // Step 4: includeDate honored per R013.§1.AC.06.
+    const includeDate = config.claims?.confidence?.includeDate ?? true;
+    const date = includeDate ? new Date().toISOString().slice(0, 10) : undefined;
+
+    // Step 5+6: attempt insert + write; on throw, emit warning and
+    // return. Note creation is the user's primary intent and MUST NOT
+    // be blocked per S004.§5.AC.06.
+    try {
+      const updated = adapter.insert(content, {
+        reviewer: '🤖',
+        level: 2,
+        date,
+      });
+      await fs.writeFile(notePath, updated, 'utf-8');
+    } catch (err) {
+      this.emit('warning', {
+        type: 'auto_insert_failed',
+        message: (err as Error).message,
+        notePath,
+      });
+    }
   }
 
   /**
