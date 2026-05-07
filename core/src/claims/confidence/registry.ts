@@ -36,3 +36,18 @@ export function getAdapter(filePath: string): ConfidenceAdapter | null {
   }
   return null;
 }
+
+/**
+ * Test-only introspection of the registration order. Per TS001 §2.AC.05's
+ * "MUST inspect the exported registration order directly" prescription,
+ * this export lets the registration-order test verify the literal array
+ * shape. The `__` prefix and `_FOR_TEST` suffix mark it as non-production;
+ * runtime callers MUST use getAdapter(). This is the principled resolution
+ * of the DC.14 (no export) / TS001 §2.AC.05 (must inspect) tension; a
+ * future doc-correction may amend DC.14 to acknowledge test-only access.
+ *
+ * @internal
+ * @see {DD016.§4.DC.14} no-export invariant — the readonly array is
+ *   structurally non-mutable; this re-export does not enable mutation
+ */
+export const __ADAPTERS_FOR_TEST: readonly ConfidenceAdapter[] = adapters;
