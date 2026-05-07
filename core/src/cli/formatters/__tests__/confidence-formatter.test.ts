@@ -6,6 +6,9 @@
  * @validates {S004.§2.AC.10}
  * @validates {S004.§4.AC.05}
  * @validates {S004.§4.AC.08}
+ * @validates {TS001.§6.AC.05}
+ * @validates {TS001.§6.AC.09}
+ * @validates {TS001.§8.AC.08}
  */
 
 import { describe, it, expect } from 'vitest';

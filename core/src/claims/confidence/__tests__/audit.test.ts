@@ -4,6 +4,11 @@
  *
  * @validates {S004.§2.AC.01-09}
  * @validates {DD017.DC.05-10}
+ * @validates {TS001.§6.AC.01}
+ * @validates {TS001.§6.AC.02}
+ * @validates {TS001.§6.AC.03}
+ * @validates {TS001.§6.AC.07}
+ * @validates {TS001.§6.AC.08}
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

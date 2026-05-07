@@ -10,7 +10,15 @@
  *
  * @implements {R013.§3} bulk apply
  * @implements {S004.§4.AC.01-09}
- * @implements {DD017.DC.20-28}
+ * @implements {DD017.DC.20}
+ * @implements {DD017.DC.21}
+ * @implements {DD017.DC.22}
+ * @implements {DD017.DC.23}
+ * @implements {DD017.DC.24}
+ * @implements {DD017.DC.25}
+ * @implements {DD017.DC.26}
+ * @implements {DD017.DC.27}
+ * @implements {DD017.DC.28}
  */
 
 import { Command } from 'commander';
@@ -72,7 +80,15 @@ function commaSplit(value: string | undefined): string[] | undefined {
  * The pure logic of apply. Returns the outcome (counters + per-file
  * rows) or an early-exit reason. Tests exercise this directly.
  *
- * @implements {DD017.DC.20-28}
+ * @implements {DD017.DC.20}
+ * @implements {DD017.DC.21}
+ * @implements {DD017.DC.22}
+ * @implements {DD017.DC.23}
+ * @implements {DD017.DC.24}
+ * @implements {DD017.DC.25}
+ * @implements {DD017.DC.26}
+ * @implements {DD017.DC.27}
+ * @implements {DD017.DC.28}
  */
 export async function executeApply(
   pm: ProjectManager,
