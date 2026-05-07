@@ -233,10 +233,20 @@ export interface ClaimConfig {
   /**
    * Configuration for file-level confidence markers.
    * @implements {R004.§7.AC.03} Confidence auto-insert config
+   * @implements {R013.§1.AC.06} Date inclusion control
+   * @implements {DD016.§8.DC.43} includeDate optional boolean field
    */
   confidence?: {
     /** Whether to auto-insert confidence annotations on file creation. Default: true */
     autoInsert?: boolean;
+    /**
+     * Whether confidence annotations carry a trailing ISO date.
+     * When true (default), annotations include `<emoji><level> <YYYY-MM-DD>`.
+     * When false, all writing paths emit the bare `<emoji><level>` form.
+     * Parse paths accept both forms regardless of this flag's value.
+     * Default: true
+     */
+    includeDate?: boolean;
   };
 }
 
