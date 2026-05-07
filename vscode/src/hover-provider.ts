@@ -109,7 +109,9 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
           range,
         );
       }
-      const entry = this.index.resolve(match.normalizedId, contextNoteId ?? undefined);
+      const entry = this.index.resolve(match.normalizedId, contextNoteId ?? undefined, {
+        selfScoped: match.selfScoped,
+      });
       if (entry) {
         const isOriginal = this.isOnClaimDefinition(entry, document, position);
         return new vscode.Hover(await this.buildClaimHover(entry, isOriginal), range);
@@ -164,6 +166,8 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
 
   // @implements {R012.§2.AC.01} original-claim mode: metadata + refs only, body omitted
   // @implements {R012.§2.AC.02} reference-to-claim mode: two-column layout with independent scroll
+  // @implements {R012.§1.AC.11} editor hover MUST NOT add inline `●N` badges (preview-tooltip-only surface);
+  //   inbound-reference info already surfaces textually in the refs panel built below
   private async buildClaimHover(
     entry: ClaimIndexEntry,
     isOriginal: boolean,
@@ -339,7 +343,7 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
    * @implements {R012.§5.AC.06} cross-project ranges fall back to listing-only mode
    */
   private async buildClaimRangeHover(
-    match: { normalizedId: string; rangeMembers?: string[]; aliasPrefix?: string },
+    match: { normalizedId: string; rangeMembers?: string[]; aliasPrefix?: string; selfScoped?: boolean },
     contextNoteId: string | undefined,
   ): Promise<vscode.MarkdownString> {
     const md = new vscode.MarkdownString();
@@ -367,7 +371,7 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     }
 
     for (const fqid of members) {
-      const entry = this.index.resolve(fqid, contextNoteId);
+      const entry = this.index.resolve(fqid, contextNoteId, { selfScoped: match.selfScoped });
       if (!entry) {
         md.appendMarkdown(`- **${escapeHtml(fqid)}** — *not in index*\n`);
         continue;
@@ -416,6 +420,9 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     return md;
   }
 
+  // @implements {R012.§1.AC.11} editor note hover MUST NOT add the aggregated `●N` badge
+  //   — the badge primitive is preview-tooltip-only; the note's reference reach is implicit in
+  //   the textual claim count below.
   private async buildNoteHover(noteInfo: NoteInfo): Promise<vscode.MarkdownString> {
     const md = new vscode.MarkdownString();
     md.isTrusted = true;

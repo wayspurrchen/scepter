@@ -56,6 +56,28 @@ const CLAIM_CONTEXT_MAX_LINES = 200;
 /** Cap for note excerpts before the `…content continues` truncation marker. */
 const NOTE_EXCERPT_LINE_CAP = 50;
 
+/** Wall-clock budget for `resolveTransitive` walks. Above this, the
+ *  BFS aborts and returns whatever it has accumulated so far. The
+ *  preview tooltip degrades to "no nested body" for unreached refs;
+ *  the host event loop never blocks past this bound. This is the
+ *  invariant that prevents indefinite "Loading…" hovers — see
+ *  R012 §7 / §8 history (eager rendering starves the host event
+ *  loop; the architecture mandates bounded lazy resolution). */
+const TRANSITIVE_BUDGET_MS = 250;
+/** Maximum number of uncapped note bodies a single `resolveTransitive`
+ *  walk may render. Note bodies are an order of magnitude larger than
+ *  claim bodies and rendering them through markdown-it with the
+ *  SCEpter plugin recursively triggers per-span index lookups. Cap
+ *  this hard so a document with many note mentions can't fan out
+ *  catastrophically. Reachable bodies past this cap fall back to
+ *  the capped excerpt. */
+const TRANSITIVE_MAX_UNCAPPED_NOTE_BODIES = 4;
+/** Hard line-count ceiling on uncapped note rendering. Above this,
+ *  even an "uncapped" request degrades to the capped path. Defends
+ *  against pathological notes (10k+ lines) that would still starve
+ *  the host even with the body-count cap. */
+const UNCAPPED_NOTE_HARD_LINE_CEILING = 5000;
+
 /**
  * Insertion-ordered Map with a hard size cap. On insert, if size
  * exceeds the cap, the oldest entry is evicted. This is the simplest
@@ -77,6 +99,11 @@ function lruSet<K, V>(map: Map<K, V>, key: K, value: V, cap: number): void {
 export class ClaimBodyResolver {
   private bodyCache = new Map<string, string>();
   private noteBodyCache = new Map<string, string>();
+  // Uncapped note bodies are cached separately so the capped path
+  // (editor hover) and the uncapped path (preview note hover scroll
+  // region — see {R012.§7.AC.06} / {R012.§3.AC.09}) coexist without
+  // either evicting the other.
+  private noteBodyCacheUncapped = new Map<string, string>();
   private noteLinesCache = new Map<string, string[]>();
   private excerptMd: any = null;
 
@@ -99,6 +126,7 @@ export class ClaimBodyResolver {
   clear(): void {
     this.bodyCache.clear();
     this.noteBodyCache.clear();
+    this.noteBodyCacheUncapped.clear();
     this.noteLinesCache.clear();
   }
 
@@ -109,6 +137,7 @@ export class ClaimBodyResolver {
    */
   invalidate(noteId: string): void {
     this.noteBodyCache.delete(noteId);
+    this.noteBodyCacheUncapped.delete(noteId);
     this.noteLinesCache.delete(noteId);
 
     const prefix = `${noteId}.`;
@@ -188,9 +217,20 @@ export class ClaimBodyResolver {
    * NOTE_EXCERPT_LINE_CAP lines with a `…content continues` marker).
    * Synchronous because the markdown-it plugin emits it from inside
    * a render hook.
+   *
+   * Pass `{ uncapped: true }` to render the full note body without
+   * the line cap or truncation marker — used by the markdown preview
+   * note hover (see {R012.§7.AC.06}, {R012.§3.AC.09}) where the
+   * rendered body lives inside a fixed-height scroll container so
+   * visual height is bounded regardless of body size. Capped and
+   * uncapped renders cache separately so neither evicts the other.
+   *
+   * @implements {R012.§7.AC.06} surface-specific carve-out: capped for flat surfaces, uncapped for scroll-bounded preview note hover
    */
-  resolveNoteBodySync(noteId: string): string | null {
-    const cached = this.noteBodyCache.get(noteId);
+  resolveNoteBodySync(noteId: string, opts?: { uncapped?: boolean }): string | null {
+    const uncapped = opts?.uncapped === true;
+    const cache = uncapped ? this.noteBodyCacheUncapped : this.noteBodyCache;
+    const cached = cache.get(noteId);
     if (cached !== undefined) return cached;
     if (this.renderingNotes.has(noteId)) return null;
 
@@ -203,21 +243,26 @@ export class ClaimBodyResolver {
     const raw = stripFrontmatterAndTitle(content);
     if (!raw) return null;
 
-    const lines = raw.split('\n');
-    const capped = lines.length > NOTE_EXCERPT_LINE_CAP
-      ? lines.slice(0, NOTE_EXCERPT_LINE_CAP).join('\n') + '\n\n---\n\n*…content continues*'
-      : raw;
+    let toRender: string;
+    if (uncapped) {
+      toRender = raw;
+    } else {
+      const lines = raw.split('\n');
+      toRender = lines.length > NOTE_EXCERPT_LINE_CAP
+        ? lines.slice(0, NOTE_EXCERPT_LINE_CAP).join('\n') + '\n\n---\n\n*…content continues*'
+        : raw;
+    }
 
     this.renderingNotes.add(noteId);
     let html: string | null;
     try {
-      html = this.renderMarkdown(capped);
+      html = this.renderMarkdown(toRender);
     } finally {
       this.renderingNotes.delete(noteId);
     }
     if (html === null) return null;
 
-    lruSet(this.noteBodyCache, noteId, html, DEFAULT_NOTE_BODY_CACHE_CAP);
+    lruSet(cache, noteId, html, DEFAULT_NOTE_BODY_CACHE_CAP);
     return html;
   }
 
@@ -265,17 +310,65 @@ export class ClaimBodyResolver {
     const out = new Map<string, string>();
     if (seedFqids.length === 0 || maxBodies <= 0 || maxDepth <= 0) return out;
 
+    const startedAt = Date.now();
     const visited = new Set<string>();
     let frontier = Array.from(new Set(seedFqids));
+    let uncappedNoteBodiesRendered = 0;
+
+    // Hard wall-clock guard. Even with depth/maxBodies caps, a single
+    // walk can chew through hundreds of milliseconds if note bodies
+    // are large or the citation graph fans out. The host event loop
+    // must NOT be blocked past TRANSITIVE_BUDGET_MS — that's the
+    // invariant whose violation surfaces as indefinite "Loading…"
+    // hovers in the editor and a stalled Cmd+Shift+V in the preview.
+    // R012 history: 2026-05-03 incident, eager `buildExcerptCache`
+    // pass starved the host on 11k-claim projects; the architecture
+    // was rewritten to lazy/bounded resolution; this budget is the
+    // explicit time-side bound that pairs with the existing depth
+    // and body-count bounds.
+    // @implements {R012.§8.AC.06} resolveTransitive wall-clock budget bounds preview render latency
+    const overBudget = (): boolean => Date.now() - startedAt > TRANSITIVE_BUDGET_MS;
 
     for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
+      if (overBudget()) return out;
       const nextFrontier: string[] = [];
       for (const fqid of frontier) {
+        if (overBudget()) return out;
         if (visited.has(fqid)) continue;
         visited.add(fqid);
         if (out.size >= maxBodies) return out;
 
-        const html = this.resolveBodySync(fqid);
+        // Bare note ids (no dot) route to the note body resolver in
+        // uncapped mode. The preview note hover reads
+        // window.__scepterBodyMap[noteId] for its scrollable body
+        // region. Note ids cannot collide with claim FQIDs because
+        // every claim FQID contains at least one dot.
+        //
+        // Two extra bounds beyond the shared depth/maxBodies/budget:
+        // (a) `TRANSITIVE_MAX_UNCAPPED_NOTE_BODIES` caps how many
+        //     uncapped note bodies we render per walk. Note bodies
+        //     are an order of magnitude larger than claim bodies and
+        //     each goes through the SCEpter plugin (per-span index
+        //     lookups). Past the cap, additional notes degrade to
+        //     the capped excerpt (still useful, much cheaper).
+        // (b) `UNCAPPED_NOTE_HARD_LINE_CEILING` defends against
+        //     pathological 10k-line notes by routing them to the
+        //     capped path even when uncapped was requested.
+        // @implements {R012.§3.AC.09} uncapped note bodies for preview hover, bounded by maxUncappedBodies
+        // @implements {R012.§7.AC.06} surface-specific carve-out: capped fallback when uncapped budgets exhausted
+        // @implements {R012.§8.AC.07} uncapped note rendering bounded by per-walk count + per-body line ceiling
+        let html: string | null;
+        if (isBareNoteId(fqid)) {
+          if (uncappedNoteBodiesRendered < TRANSITIVE_MAX_UNCAPPED_NOTE_BODIES &&
+              this.noteBodyLineCount(fqid) <= UNCAPPED_NOTE_HARD_LINE_CEILING) {
+            html = this.resolveNoteBodySync(fqid, { uncapped: true });
+            if (html !== null) uncappedNoteBodiesRendered++;
+          } else {
+            html = this.resolveNoteBodySync(fqid);
+          }
+        } else {
+          html = this.resolveBodySync(fqid);
+        }
         if (html === null) continue;
         out.set(fqid, html);
         if (out.size >= maxBodies) return out;
@@ -291,6 +384,18 @@ export class ClaimBodyResolver {
     }
 
     return out;
+  }
+
+  /**
+   * Cheap line-count peek for a note's aggregated content. Used as
+   * the safety check for uncapped rendering: if the note exceeds the
+   * hard ceiling, we degrade to the capped path even when uncapped
+   * was requested. Reads through the existing line cache so repeat
+   * calls inside one walk don't re-read the file.
+   */
+  private noteBodyLineCount(noteId: string): number {
+    const lines = this.getNoteLinesSync(noteId);
+    return lines === null ? 0 : lines.length;
   }
 
   // -------- internals --------
@@ -408,6 +513,14 @@ function stripFrontmatterAndTitle(content: string): string | null {
 }
 
 const FQID_ATTR_RE = /data-(?:claim-fqid|scepter-id)="([^"]+)"/g;
+const BARE_NOTE_ID_RE = /^[A-Z]{1,5}\d{3,5}$/;
+
+/** True when `fqid` is a bare note id (no dot) — e.g. `R044`, `DD012`.
+ *  Used by the body-map BFS to route note seeds to the note body
+ *  resolver instead of the claim body resolver. */
+function isBareNoteId(fqid: string): boolean {
+  return BARE_NOTE_ID_RE.test(fqid);
+}
 
 /**
  * Extract candidate FQIDs from a rendered HTML excerpt by scanning

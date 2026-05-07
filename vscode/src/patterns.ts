@@ -42,6 +42,16 @@ export interface ClaimMatch {
    * @implements {R012.§5.AC.01} single match per range token; rangeMembers carries every expanded FQID
    */
   rangeMembers?: string[];
+  /**
+   * True when the underlying claim address has no explicit note id
+   * prefix (e.g. `§5.AC.04`, `2.AC.02`, `AC.04`, `§3`). Self-scoped
+   * refs MUST resolve within the current document only — index
+   * consumers must not fall back to global suffix search, since that
+   * would incorrectly target claims in unrelated notes that happen to
+   * share the same section/claim id. False for explicit refs
+   * (`R044.§5.AC.04`) and cross-project refs (`vendor-lib/R005.§1.AC.01`).
+   */
+  selfScoped: boolean;
 }
 
 // --- Normalization ---
@@ -217,6 +227,7 @@ export function findAllMatches(
       end: claimEnd,
       normalizedId: buildNormalizedId(addr),
       kind,
+      selfScoped: !addr.noteId && !addr.aliasPrefix,
       ...(addr.aliasPrefix ? { aliasPrefix: addr.aliasPrefix } : {}),
       ...(rangeMembers ? { rangeMembers } : {}),
     });
@@ -255,6 +266,7 @@ export function findAllMatches(
       end: braceEnd,
       normalizedId: mention.id,
       kind: 'note',
+      selfScoped: false,
     });
   }
 

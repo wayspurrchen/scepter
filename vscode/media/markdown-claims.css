@@ -148,6 +148,21 @@ a.scepter-ref:hover {
   border-left-color: rgba(0,0,0,0.1);
 }
 
+/* Note hover body — fixed-height scrollable region holding the full
+ * rendered note body. The footer (file path + Open Note link) sits
+ * OUTSIDE this container so it stays visible regardless of how far
+ * the user has scrolled through the body.
+ * @implements {R012.§3.AC.09} note hover body region: max-height + vertical scroll, horizontal hidden
+ * @implements {R012.§7.AC.06} this scroll container is what bounds visual height for the
+ *   uncapped note body, making the carve-out safe for the preview surface */
+.scepter-note-body {
+  max-height: 360px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  word-break: break-word;
+}
+
 /* Refs panel — sources + grouped notes. */
 .scepter-refs-panel {
   font-size: 12px;

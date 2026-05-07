@@ -373,8 +373,9 @@ function highlightWithData(
       sourceLine,
       currentDocDir,
       useAbsoluteHrefs,
+      env,
     );
-    const linkTarget = buildLinkTarget(match.normalizedId, match.kind, index, currentDocDir, contextNoteId, useAbsoluteHrefs);
+    const linkTarget = buildLinkTarget(match.normalizedId, match.kind, index, currentDocDir, contextNoteId, useAbsoluteHrefs, match.selfScoped);
     const escaped = escapeHtml(match.raw);
 
     if (linkTarget) {
@@ -402,7 +403,9 @@ function highlightWithData(
       contextNoteId &&
       (match.kind === 'claim' || match.kind === 'bare-claim')
     ) {
-      const resolved = index.resolve(match.normalizedId, contextNoteId);
+      const resolved = index.resolve(match.normalizedId, contextNoteId, {
+        selfScoped: match.selfScoped,
+      });
       if (
         resolved &&
         resolved.noteId === contextNoteId &&
@@ -452,6 +455,7 @@ function buildDataAttrs(
   sourceLine: number | null,
   currentDocDir: string,
   useAbsolute = false,
+  env?: any,
 ): string {
   const attrs: string[] = [];
   const normalizedId = match.normalizedId;
@@ -471,7 +475,9 @@ function buildDataAttrs(
   }
 
   if (kind === 'claim' || kind === 'bare-claim') {
-    const entry = index.resolve(normalizedId, contextNoteId ?? undefined);
+    const entry = index.resolve(normalizedId, contextNoteId ?? undefined, {
+      selfScoped: match.selfScoped,
+    });
     if (entry) {
       attrs.push(`data-claim-fqid="${escAttr(entry.fullyQualified)}"`);
       attrs.push(`data-claim-heading="${escAttr(entry.heading)}"`);
@@ -511,6 +517,17 @@ function buildDataAttrs(
         attrs.push(`data-claim-refs="${escAttr(refsJson)}"`);
       }
 
+      // Claim hover badge — the same `●N` count + source/note color
+      // encoding as the inline rendering, surfaced inside the preview
+      // tooltip header (see preview-script.js renderClaimHover).
+      // @implements {R012.§1.AC.09} preview claim hover header carries the badge
+      const claimRefs = index.incomingRefs(entry.fullyQualified);
+      if (claimRefs.length > 0) {
+        const claimHasSource = claimRefs.some((r) => r.fromNoteId.startsWith('source:'));
+        attrs.push(`data-claim-badge-count="${claimRefs.length}"`);
+        attrs.push(`data-claim-badge-has-source="${claimHasSource ? '1' : '0'}"`);
+      }
+
       attrs.push(`title="${escAttr(entry.fullyQualified)} — ${escAttr(noteInfo?.noteTitle ?? entry.noteType)}"`);
     } else {
       attrs.push(`title="${escAttr(normalizedId)} — not in index"`);
@@ -528,11 +545,34 @@ function buildDataAttrs(
       // buildDataAttrs for every note B it cites, which calls
       // resolveNoteBodySync(B), which renders B, etc. Cache doesn't
       // help because entries land after the render returns. Note
-      // bodies belong in the body-map walk (resolveTransitive) so the
-      // webview can fetch them from window.__scepterBodyMap on demand.
-      // Until that's wired, preview note hovers omit the rich excerpt
-      // and fall back to title + claim count.
+      // bodies for the preview note hover reach the webview via the
+      // body-map walk in resolveTransitive (see {R012.§3.AC.09} and
+      // {R012.§8.AC.01}); the webview reads window.__scepterBodyMap[noteId].
       // @implements {R012.§7.AC.07} no eager resolveNoteBodySync in buildDataAttrs (recursion break)
+
+      // Aggregated note badge — sourced from the index's cached
+      // aggregator (`getNoteBadge`). Computing the badge inline per
+      // span would be O(N + claims-of-note × M) per render — a
+      // document with many note refs would re-trigger that work
+      // for every span, recursively inside body excerpts, and the
+      // host event loop would starve. (See R012 §8 history; the
+      // 2026-05-03 incident had this exact shape via the earlier
+      // `buildExcerptCache`.) The cache amortizes to O(1) lookups
+      // after the first warm hit per noteId per index refresh.
+      //
+      // Skip in nested renders (`_scepterLineOffset` set) — the
+      // body excerpt is shown inside a parent tooltip and the
+      // user can't see the badge anyway, so the work is wasted.
+      // @implements {R012.§1.AC.10} aggregated note hover badge: counts incoming + source across note id and all its claims
+      // @implements {R012.§8.AC.06} per-span O(1) badge lookup via cached aggregator; skipped in nested renders
+      const isNestedRender = typeof env?._scepterLineOffset === 'number';
+      if (!isNestedRender) {
+        const badge = index.getNoteBadge(noteInfo.noteId);
+        if (badge && badge.count > 0) {
+          attrs.push(`data-note-badge-count="${badge.count}"`);
+          attrs.push(`data-note-badge-has-source="${badge.hasSource ? '1' : '0'}"`);
+        }
+      }
 
       attrs.push(`title="${escAttr(normalizedId)} — ${escAttr(noteInfo.noteTitle)}"`);
     } else {
@@ -562,7 +602,9 @@ function buildDataAttrs(
   // @implements {R012.§5.AC.04} plugin emits `data-claim-range-members` JSON-encoded array
   if (match.rangeMembers && match.rangeMembers.length > 1) {
     const memberData = match.rangeMembers.map((fqid) => {
-      const entry = index.resolve(fqid, contextNoteId ?? undefined);
+      const entry = index.resolve(fqid, contextNoteId ?? undefined, {
+        selfScoped: match.selfScoped,
+      });
       if (!entry) return { fqid, found: false };
       const noteInfo = index.lookupNote(entry.noteId);
       return {
@@ -761,6 +803,7 @@ function buildLinkTarget(
   currentDocDir: string,
   contextNoteId: string | null,
   useAbsolute = false,
+  selfScoped = false,
 ): string | null {
   function open(filePath: string, line?: number): string {
     const abs = path.isAbsolute(filePath)
@@ -770,7 +813,7 @@ function buildLinkTarget(
   }
 
   if (kind === 'claim' || kind === 'bare-claim') {
-    const entry = index.resolve(normalizedId, contextNoteId ?? undefined);
+    const entry = index.resolve(normalizedId, contextNoteId ?? undefined, { selfScoped });
     if (entry?.noteFilePath) {
       return open(entry.noteFilePath, entry.line);
     }

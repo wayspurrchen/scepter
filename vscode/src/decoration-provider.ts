@@ -178,7 +178,9 @@ export class DecorationProvider {
           continue;
         }
 
-        const isKnown = this.index.isKnown(match.normalizedId, contextNoteId ?? undefined);
+        const isKnown = this.index.isKnown(match.normalizedId, contextNoteId ?? undefined, {
+          selfScoped: match.selfScoped,
+        });
 
         if (isKnown) {
           resolved.push({ range });

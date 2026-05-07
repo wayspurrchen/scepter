@@ -26,7 +26,9 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
 
     // Try claim-level resolve (handles FQID, bare claims, section-prefixed)
     if (match.kind === 'claim' || match.kind === 'bare-claim') {
-      const entry = this.index.resolve(match.normalizedId, contextNoteId ?? undefined);
+      const entry = this.index.resolve(match.normalizedId, contextNoteId ?? undefined, {
+        selfScoped: match.selfScoped,
+      });
       if (entry) {
         const absPath = this.index.resolveFilePath(entry.noteFilePath);
         return new vscode.Location(

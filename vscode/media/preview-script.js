@@ -124,6 +124,45 @@
    */
   var tooltipStack = [];
 
+  /**
+   * Active-scroll suppression for nested tooltips. While the user is
+   * scrolling inside an open tooltip, we suppress NESTED tooltip
+   * spawns (level >= 1). Intent: scrolling-through-content is
+   * reading, not exploring — surfacing extra popovers under the
+   * mouse during scroll is jarring. Top-level (level 0) hovers from
+   * the markdown body itself still fire normally; only stacked
+   * children are gated.
+   *
+   * Activity is detected from BOTH wheel events on the tooltip
+   * (touchpad / mouse wheel) AND scroll events on the inner
+   * `.scepter-scroll` containers (scrollbar drag, arrow keys, etc.).
+   * Each event extends the suppression window; while the user keeps
+   * scrolling the suppression stays active. SCROLL_IDLE_MS after the
+   * last scroll signal it lifts and nested hovers spawn normally.
+   */
+  var SCROLL_IDLE_MS = 300;
+  var scrollSuppressUntilTs = 0;
+  function noteTooltipScrollActivity() {
+    scrollSuppressUntilTs = Date.now() + SCROLL_IDLE_MS;
+  }
+  function isScrollingInTooltip() {
+    return Date.now() < scrollSuppressUntilTs;
+  }
+  // Catch scrollbar-drag / arrow-key scrolls on the inner scroll
+  // regions (the per-tooltip wheel handler covers wheel input;
+  // these `scroll` events fill the gap for non-wheel scrolling).
+  // Capture phase + passive — we never preventDefault here, just
+  // observe.
+  document.addEventListener('scroll', function (e) {
+    var t = e.target;
+    if (!t || t.nodeType !== 1) return;
+    var el = /** @type {HTMLElement} */(t);
+    if (!el.closest) return;
+    if (el.closest && el.closest('.scepter-tooltip')) {
+      noteTooltipScrollActivity();
+    }
+  }, { passive: true, capture: true });
+
   var TOOLTIP_STYLE = [
     'position: absolute',
     'z-index: 10000',
@@ -206,6 +245,9 @@
         e.stopPropagation();
         e.preventDefault();
         target.scrollTop += e.deltaY;
+        // Mark active scrolling inside a tooltip — nested tooltip
+        // spawns are gated on this for SCROLL_IDLE_MS.
+        noteTooltipScrollActivity();
       }
     }, { passive: false });
 
@@ -277,6 +319,7 @@
 
   // @implements {R012.§3.AC.01} tooltip appears on mouseenter of any `.scepter-ref` element with hide-timer cancel behavior
   // @implements {R012.§3.AC.02} stacked tooltips: child spawned on top with parent visible underneath
+  // @implements {R012.§3.AC.10} active-scroll inside a tooltip suppresses nested tooltip spawns (read-vs-explore disambiguation)
   function showTooltip(el) {
     // What level is this hover at? If the anchor is inside an existing
     // tooltip at level N, this hover spawns a tooltip at level N+1.
@@ -284,6 +327,15 @@
     // hover and any existing stack should be torn down first.
     var parentLevel = findEnclosingLevel(el);
     var newLevel = parentLevel + 1;
+
+    // Suppress nested-tooltip spawns while the user is actively
+    // scrolling inside an existing tooltip. Scrolling-through-content
+    // is reading, not exploring — popping a child tooltip under the
+    // mouse mid-scroll is jarring. Top-level (level 0) hovers from
+    // the markdown body itself are NOT gated; only stacked children.
+    if (newLevel >= 1 && isScrollingInTooltip()) {
+      return;
+    }
 
     // Tear down anything at or below newLevel — siblings replace,
     // children of a different parent need to go.
@@ -372,12 +424,20 @@
 
     var badges = buildBadgesHtml(importance, lifecycle, derivesFrom);
     var refsPanel = refsJson ? buildRefsPanelHtml(refsJson) : '';
+    // Inbound-count badge — same shape and color encoding as the
+    // inline rendering. Surfaced in both render modes' headers.
+    // @implements {R012.§1.AC.09} preview claim hover badge in header
+    var hoverBadge = buildHoverBadgeHtml(
+      el.getAttribute('data-claim-badge-count'),
+      el.getAttribute('data-claim-badge-has-source')
+    );
 
     if (isOriginal) {
       // Single-column layout: header + metadata + refs.
       var html = '';
       html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' +
         esc(fqid) +
+        (hoverBadge ? ' ' + hoverBadge : '') +
         '</div>';
       html += '<div style="color:#9cdcfe;margin-bottom:6px">' +
         '<i>' + esc(noteType || '') + '</i> — ' + escMarkdownLike(noteTitle || '') + '</div>';
@@ -403,6 +463,7 @@
       line: line,
       linkHref: linkHref,
       badges: badges,
+      hoverBadge: hoverBadge,
       contextHtml: contextHtml,
       refsJson: refsJson,
     });
@@ -427,12 +488,14 @@
 
   function buildBodyPanelHtml(args) {
     var html = '';
-    // FQID heading: bold colored text only — no badge, no dotted
-    // underline. The badge would suggest hover behavior but hovering
-    // the header does nothing (the user is already viewing this claim's
-    // hover), so the affordance is misleading.
+    // FQID heading: bold colored text plus the inbound-count badge
+    // when this claim has incoming refs. The badge is purely
+    // informational here — it carries no hover behavior on the panel
+    // header (the user is already viewing this claim's hover).
+    // @implements {R012.§1.AC.09} reference-to-claim body panel header carries the badge
     html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' +
       esc(args.fqid) +
+      (args.hoverBadge ? ' ' + args.hoverBadge : '') +
       '</div>';
     html += '<div style="color:#9cdcfe;margin-bottom:4px">' +
       '<i>' + esc(args.noteType || '') + '</i> — ' + escMarkdownLike(args.noteTitle || '') + '</div>';
@@ -603,13 +666,20 @@
     return html;
   }
 
+  // @implements {R012.§3.AC.09} note hover layout: header + badge + subline + scrollable body + persistent footer
+  // @implements {R012.§1.AC.10} aggregated note badge in hover header
   function renderNoteHover(el) {
     var id = el.getAttribute('data-scepter-id');
     var noteType = el.getAttribute('data-note-type');
     var noteTitle = el.getAttribute('data-note-title');
     var noteFile = el.getAttribute('data-note-file');
     var claimCount = el.getAttribute('data-claim-count');
-    var noteExcerpt = el.getAttribute('data-note-excerpt');
+    // Legacy data-note-excerpt path is retained as a graceful
+    // fallback for the case where window.__scepterBodyMap[noteId] is
+    // missing (e.g. the note sits outside the BFS closure for the
+    // current document). buildDataAttrs does not currently emit this
+    // attribute, so in practice the body comes from the body map.
+    var legacyExcerpt = el.getAttribute('data-note-excerpt');
     var linkHref = el.tagName === 'A' ? el.getAttribute('href') : null;
 
     if (!noteTitle) {
@@ -617,25 +687,51 @@
         '<div style="font-size:11px;opacity:0.7">Not in current index</div>';
     }
 
+    var hoverBadge = buildHoverBadgeHtml(
+      el.getAttribute('data-note-badge-count'),
+      el.getAttribute('data-note-badge-has-source')
+    );
+    var bodyHtml = (window.__scepterBodyMap && id && window.__scepterBodyMap[id]) || legacyExcerpt || '';
+
     var html = '';
+
+    // Header — id + title + aggregated badge.
+    var titleInner = esc(id || '') + ' — ' + escMarkdownLike(noteTitle) +
+      (hoverBadge ? ' ' + hoverBadge : '');
     if (linkHref) {
       html += '<div style="font-weight:600;margin-bottom:4px">' +
         '<a href="' + escAttr(linkHref) + '" style="color:#4EC9B0;text-decoration:none">' +
-        esc(id || '') + ' — ' + escMarkdownLike(noteTitle) + '</a></div>';
+        titleInner + '</a></div>';
     } else {
       html += '<div style="font-weight:600;color:#4EC9B0;margin-bottom:4px">' +
-        esc(id || '') + ' — ' + escMarkdownLike(noteTitle) + '</div>';
+        titleInner + '</div>';
     }
+
+    // Subline — type + claim count.
     html += '<div style="color:#9cdcfe;margin-bottom:4px"><i>' + esc(noteType || '') + '</i>';
     if (claimCount) {
       var n = parseInt(claimCount, 10);
       html += ' · ' + n + ' claim' + (n !== 1 ? 's' : '');
     }
     html += '</div>';
-    if (noteExcerpt) {
-      html += '<div class="scepter-tooltip-excerpt" style="border-top:1px solid rgba(255,255,255,0.1);' +
-        'padding-top:6px;margin-top:4px;font-size:12px;opacity:0.9">' + noteExcerpt + '</div>';
+
+    // Body region — fixed-height scrollable container holding the
+    // pre-rendered note body (uncapped per {R012.§7.AC.06} preview
+    // carve-out). Sourced from window.__scepterBodyMap[noteId] —
+    // because the body went through the SCEpter plugin during the
+    // resolver render, claim refs inside it carry the full hover
+    // machinery (deeper tooltips spawn naturally on mouseenter).
+    if (bodyHtml) {
+      html += '<div class="scepter-note-body scepter-scroll" style="border-top:1px solid rgba(255,255,255,0.1);' +
+        'padding-top:6px;margin-top:4px">' +
+        '<div class="scepter-tooltip-excerpt scepter-body-rich" style="font-size:12px;opacity:0.95">' +
+        bodyHtml +
+        '</div></div>';
     }
+
+    // Footer — file path + Open Note link, OUTSIDE the scroll region
+    // so it stays visible regardless of how far the user has scrolled
+    // through the body.
     html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;margin-top:6px;font-size:11px;opacity:0.5">';
     if (noteFile) html += escMarkdownLike(noteFile);
     if (linkHref) {
@@ -750,6 +846,27 @@
   function makeOpenHref(absPath, line) {
     var args = encodeURIComponent(JSON.stringify([String(absPath), line || 1]));
     return 'command:scepter.previewOpenAt?' + args;
+  }
+
+  /**
+   * Build the `●N` hover-badge span using the same source/note color
+   * encoding as the inline rendering. Returns '' when count is missing,
+   * non-numeric, or 0. Caller embeds the result inline next to the
+   * hover header — no whitespace prefix, since callers may want to
+   * control spacing per-context.
+   *
+   * @implements {R012.§1.AC.09} preview claim hover header carries the badge
+   * @implements {R012.§1.AC.10} preview note hover header carries the aggregated badge
+   */
+  function buildHoverBadgeHtml(countAttr, hasSourceAttr) {
+    if (countAttr == null) return '';
+    var n = parseInt(countAttr, 10);
+    if (!isFinite(n) || n <= 0) return '';
+    var cls = hasSourceAttr === '1'
+      ? 'scepter-claim-badge-source'
+      : 'scepter-claim-badge-note';
+    return '<span class="scepter-claim-badge ' + cls + '" data-scepter-claim-badge="1">●' +
+      esc(String(n)) + '</span>';
   }
 
   // --- Listener wiring -------------------------------------------------

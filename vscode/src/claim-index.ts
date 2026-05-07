@@ -246,6 +246,22 @@ export class ClaimIndexCache {
    * @implements {R012.§7.AC.01} HTML excerpts produced via markdown-it + SCEpter plugin (now lazy)
    */
   private bodyResolver: ClaimBodyResolver | null = null;
+  /**
+   * Cached aggregated note-badge counts. Computing the badge per
+   * note requires `claimsForNote(noteId)` (O(N) over all claims)
+   * plus `incomingRefs(claim.fqid)` (O(M) over all crossRefs) per
+   * claim — pathological cost if recomputed per render span. Cache
+   * the result here, populate lazily on first request, drop on full
+   * `refresh()` so the next access sees fresh counts.
+   *
+   * Without this cache, a document with 30 note mentions × 100
+   * claims/note × O(crossRefs) per claim = enough synchronous CPU
+   * work to starve the host event loop. That's the same shape as
+   * the 2026-05-03 `buildExcerptCache` regression — see R012 §8.
+   *
+   * @implements {R012.§8.AC.06} aggregated note badge cached, not recomputed per render span
+   */
+  private noteBadgeCache = new Map<string, { count: number; hasSource: boolean } | null>();
   private _onDidRefresh = new vscode.EventEmitter<void>();
   readonly onDidRefresh = this._onDidRefresh.event;
   private ready: Promise<void>;
@@ -466,8 +482,19 @@ export class ClaimIndexCache {
   /**
    * Smart resolve: try FQID first, then bare claim with context.
    * Returns the best-matching entry or undefined.
+   *
+   * When `opts.selfScoped` is true, the reference had no explicit note
+   * id prefix (e.g. `§5.AC.04`, `AC.01`). In that case the resolver
+   * MUST stay within the current note — falling back to the global
+   * `suffixIndex` would incorrectly target a claim with the same bare
+   * id in an unrelated note (e.g. `§5.AC.04` in a non-SCEpter review
+   * doc snapping to `S040.5.AC.04`).
    */
-  resolve(id: string, contextNoteId?: string): ClaimIndexEntry | undefined {
+  resolve(
+    id: string,
+    contextNoteId?: string,
+    opts?: { selfScoped?: boolean },
+  ): ClaimIndexEntry | undefined {
     // Try exact FQID match
     const exact = this.entries.get(id);
     if (exact) return exact;
@@ -478,18 +505,29 @@ export class ClaimIndexCache {
       if (withNote) return withNote;
     }
 
+    // Self-scoped refs never fall through to cross-note suffix search.
+    if (opts?.selfScoped) return undefined;
+
     // Try bare suffix match
     const bare = this.resolveBare(id, contextNoteId);
     return bare[0];
   }
 
-  /** Check if an ID resolves to a claim, note, section, or bare claim. */
-  isKnown(id: string, contextNoteId?: string): boolean {
+  /** Check if an ID resolves to a claim, note, section, or bare claim.
+   *
+   * `opts.selfScoped` mirrors `resolve`: a self-scoped id is only
+   * "known" if the current note actually defines it. */
+  isKnown(
+    id: string,
+    contextNoteId?: string,
+    opts?: { selfScoped?: boolean },
+  ): boolean {
     if (this.entries.has(id)) return true;
     if (this.noteMap.has(id)) return true;
     if (this.sections.has(id)) return true;
     if (contextNoteId && this.entries.has(`${contextNoteId}.${id}`)) return true;
     if (contextNoteId && this.sections.has(`${contextNoteId}.${id}`)) return true;
+    if (opts?.selfScoped) return false;
     if (this.suffixIndex.has(id)) return true;
     return false;
   }
@@ -531,6 +569,67 @@ export class ClaimIndexCache {
     return this.crossRefs.filter(
       (ref) => ref.fromNoteId === noteId || ref.toNoteId === noteId
     );
+  }
+
+  /**
+   * Aggregated badge for a note hover. Returns the total inbound
+   * count (note-level direct + claim-level fan-in across every
+   * claim in the note) plus a flag for whether any contributing
+   * reference is source-code.
+   *
+   * Memoized on first access per index refresh. Cleared on full
+   * `refresh()`. The computation walks the in-memory entries and
+   * crossRefs maps (no I/O), so the first cold call is fast even
+   * for heavily-cited notes — the cache exists to amortize the
+   * cost across the many render spans that ask for the same note.
+   *
+   * Returns `null` when the note id isn't known to the index.
+   *
+   * @implements {R012.§1.AC.10} aggregated note hover badge
+   * @implements {R012.§8.AC.06} per-render-span badge lookup is O(1) after first hit
+   */
+  getNoteBadge(noteId: string): { count: number; hasSource: boolean } | null {
+    if (this.noteBadgeCache.has(noteId)) {
+      return this.noteBadgeCache.get(noteId) ?? null;
+    }
+    const noteInfo = this.noteMap.get(noteId);
+    if (!noteInfo) {
+      this.noteBadgeCache.set(noteId, null);
+      return null;
+    }
+
+    let count = 0;
+    let hasSource = false;
+
+    // Note-level direct refs (incoming + source).
+    try {
+      const refs = this.getReferencesForNote(noteId);
+      count += refs.incoming.length + refs.source.length;
+      if (refs.source.length > 0) hasSource = true;
+    } catch {
+      // Defensive: if the underlying ProjectManager isn't ready
+      // for any reason, fall through with what we have.
+    }
+
+    // Claim-level fan-in across every claim defined in the note.
+    for (const entry of this.entries.values()) {
+      if (entry.noteId !== noteId) continue;
+      const claimIncoming = this.incomingRefs(entry.fullyQualified);
+      if (claimIncoming.length === 0) continue;
+      count += claimIncoming.length;
+      if (!hasSource) {
+        for (const ref of claimIncoming) {
+          if (ref.fromNoteId.startsWith('source:')) {
+            hasSource = true;
+            break;
+          }
+        }
+      }
+    }
+
+    const result = count > 0 ? { count, hasSource } : { count: 0, hasSource: false };
+    this.noteBadgeCache.set(noteId, result);
+    return result;
   }
 
   claimsForNote(noteId: string): ClaimIndexEntry[] {
@@ -1107,6 +1206,10 @@ export class ClaimIndexCache {
       if (this.bodyResolver) {
         this.bodyResolver.clear();
       }
+      // Note-badge counts depend on the entries map and crossRefs
+      // array we just rebuilt — drop the cache so the next request
+      // recomputes against fresh data.
+      this.noteBadgeCache.clear();
 
       this.resolveReady();
       this._onDidRefresh.fire();
@@ -1410,6 +1513,7 @@ export class ClaimIndexCache {
       this.bodyResolver.clear();
       this.bodyResolver = null;
     }
+    this.noteBadgeCache.clear();
 
     // Reset ready gate
     this.ready = new Promise((resolve) => {
