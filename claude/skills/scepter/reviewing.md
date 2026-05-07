@@ -179,10 +179,12 @@ Tag each finding in your final report as `MECHANICAL` or `HUMAN_JUDGMENT` so the
 
 | Tag | Meaning | Examples |
 |-----|---------|----------|
-| **MECHANICAL** | Fix is determined by the finding itself; no judgment between equally-valid alternatives | Typo. Missing or stale citation (`{S001.X.AC.NN}` after a canonicalization). Stub `@implements` that should be `@see` per claims.md. Unbalanced bidirectional ref. Misordered AC numbers. Format misalignment with an established precedent. |
+| **MECHANICAL** | Fix is determined by the finding itself; no judgment between equally-valid alternatives | Typo. Missing or stale citation (`{S001.X.AC.NN}` after a canonicalization). Stub `@implements` that should be `@see` per claims.md. Unbalanced bidirectional ref. Misordered AC numbers. Format misalignment with an established precedent. **Silent deviation from a cited source** (wrong attribution, invented content, silent rename, divergence from prior conventions) — default action is revert to source. **Skeletal or placeholder-incomplete authoring** (`(...all other rows...)` placeholders, dangling self-references, gestures at sections that don't exist) — default action is flesh out per the source. |
 | **HUMAN_JUDGMENT** | Fix requires choosing between alternatives, changing scope, or framing the issue | Scope expansion or contraction. "This belongs as a Q-note vs DEF vs amendment." Two equally-valid wording choices. Spec-clarification questions that affect downstream work. AC binding decomposition. Whether a flagged passage is a defect, a deferral, or a future capability. |
 
 **Untagged findings default to HUMAN_JUDGMENT.** When in doubt, leave untagged or explicitly tag HUMAN_JUDGMENT — the orchestrator surfaces ambiguous findings to the user, which is the conservative default.
+
+**Failure-to-follow-source is NOT human judgment by default.** When an artifact contradicts, invents content for, or skeletal-stubs a cited source, the finding is MECHANICAL and the default fix is revert-to-source or flesh-out-per-source. The deviation only escalates to HUMAN_JUDGMENT if the reviewer can explicitly argue the deviation is **genuinely better** than the source OR has **prior user authorization** on record. The justification must be in the finding text — absence of justification means MECHANICAL. The anti-pattern this prevents is laundering authoring failures as design questions: surfacing "should we use the invented namespace or the cited one?" as if both were equally-valid options when one is a hallucination wastes user attention and creates false bilateral framing.
 
 For MECHANICAL findings, recommend a specific producer prompt where you can — it shortens routing latency and makes the orchestrator's job mechanical.
 

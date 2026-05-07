@@ -53,13 +53,14 @@ export const initCommand = new Command('init')
       const boilerplatesDir = path.join(packageRoot, 'core', 'boilerplates');
       
       // List mode
-      if (options.list || !templateName) {
+      if (options.list) {
         await listBoilerplates(boilerplatesDir);
         return;
       }
 
-      // Copy mode
-      await copyBoilerplate(boilerplatesDir, templateName, options.target, options.force);
+      // Copy mode — bare `scepter init` uses the 'default' template
+      const effectiveTemplate = templateName ?? 'default';
+      await copyBoilerplate(boilerplatesDir, effectiveTemplate, options.target, options.force);
 
     } catch (error) {
       console.error(chalk.red('Error:'), error instanceof Error ? error.message : error);

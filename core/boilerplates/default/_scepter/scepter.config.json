@@ -31,8 +31,8 @@
     "dataDir": "_scepter"
   },
   "project": {
-    "name": "Epi-based SCEpter Project",
-    "description": "An example SCEpter project using note types from the Epi skill"
+    "name": "Default SCEpter Project",
+    "description": "Default SCEpter setup with the engineering-stack note types: Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task"
   },
   "sourceCodeIntegration": {
     "enabled": true,

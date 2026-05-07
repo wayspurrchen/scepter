@@ -41,7 +41,7 @@ npm link -g .
 
 ```bash
 cd /path/to/your/project
-scepter init          # Choose: blank, minimal, example, or epi
+scepter init          # Default schema (Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task). Pass `default`, `blank`, `minimal`, or `example` to pick a specific template.
 scepter scaffold      # Create folder structure from config
 ```
 
@@ -89,26 +89,18 @@ The typical SCEpter workflow with an AI agent:
 
 This cycle builds a persistent, traceable knowledge graph that survives across sessions — every decision, requirement, and implementation link is recorded so the next session picks up where the last one left off.
 
-### 6. (Optional) Add epi for epistemic vocabulary
+### 6. (Optional) Epi as inspiration and companion
 
-[Epi](https://github.com/wayspurrchen/epi) is a useful and entirely optional companion skill to SCEpter. SCEpter's note taxonomy and claims system are inspired by Epi's concepts, while the Epi skill contains format and process guidance for creating well-specified documents with claims.
+SCEpter's claims system, note taxonomy, and the discipline of separating IS / SHOULD / MUST claims across projections were inspired by [Epi](https://github.com/wayspurrchen/epi). SCEpter has absorbed the parts it needs — claims, derivation, projection, and the artifact templates — into its own skill files; you do not need to install Epi to use SCEpter or any of its agents.
 
-Install it the same way:
+If you want the broader Epi perceptual discipline (the perception-and-annotation companions that go beyond claim authoring), install it as a separate skill:
 
 ```bash
-# From the epi repo directory
 git clone https://github.com/wayspurrchen/epi.git ~/Projects/epi
 ln -s ~/Projects/epi/claude/skills/* ~/.claude/skills/
 ```
 
-Then add to your `CLAUDE.md`:
-
-```markdown
-## Epi
-
-This project uses the Epi epistemic vocabulary. Invoke /epi to load the
-perceptual discipline for analyzing claims, settlement status, and dependencies.
-```
+Loading the Epi skill is optional — invoke `/epi` only when you want that broader perceptual lens. SCEpter's own `scepter` skill stands alone.
 
 ## Core Concepts
 
@@ -123,7 +115,7 @@ DD002 - Traceability matrix design       (DetailedDesign)
 T005 - Implement claim search            (Task)
 ```
 
-Note types are configurable. Define whatever taxonomy fits your project — the examples above use the "epi" boilerplate (Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task), but you could use Decision/Question/Bug/Feature or anything else.
+Note types are configurable. Define whatever taxonomy fits your project — the examples above use the `default` boilerplate (Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task), but you could use Decision/Question/Bug/Feature or anything else.
 
 Notes are markdown files, discovered by their ID prefix rather than by a fixed folder location. By default, new notes are created under `_scepter/notes/[type_folder]/`, but you can configure `discoveryPaths` in `scepter.config.json` to scan any set of directories — for example, `["docs", "specs"]` or even `["."]` to pick up notes anywhere in the repo. This means existing markdown scattered across a project can participate in the knowledge graph without being relocated. Each note has YAML frontmatter for metadata (title, status, tags, dates) and a body that can contain references to other notes.
 
@@ -218,7 +210,7 @@ All commands support `--project-dir <path>` to target a specific project. Defaul
 
 | Command | Description |
 |---|---|
-| `scepter init [template]` | Initialize from a boilerplate (`blank`, `minimal`, `example`, `epi`) |
+| `scepter init [template]` | Initialize from a boilerplate. With no template name, uses `default` (Architecture/Requirement/Specification/DetailedDesign/TestPlan/Task). Other options: `blank`, `minimal`, `example`. |
 | `scepter scaffold` | Create folder structure from config |
 | `scepter config` | Display current configuration |
 
