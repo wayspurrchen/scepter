@@ -10,7 +10,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { BaseCommand } from '../base-command.js';
-import { auditConfidence } from '../../../claims/confidence.js';
+import { auditConfidence } from '../../../claims/confidence/index.js';
 import { formatConfidenceAudit } from '../../formatters/confidence-formatter.js';
 
 export const auditCommand = new Command('audit')

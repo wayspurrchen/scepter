@@ -13,8 +13,8 @@ import {
   insertConfidenceAnnotation,
   validateReviewerLevel,
   mapReviewerArg,
-} from '../confidence.js';
-import type { ConfidenceLevel, ReviewerIcon } from '../confidence.js';
+} from '../confidence/index.js';
+import type { ConfidenceLevel, ReviewerIcon } from '../confidence/index.js';
 
 // ---------------------------------------------------------------------------
 // parseConfidenceAnnotation

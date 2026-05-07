@@ -17,8 +17,8 @@ import {
   validateReviewerLevel,
   formatConfidenceAnnotation,
   insertConfidenceAnnotation,
-} from '../../../claims/confidence.js';
-import type { ConfidenceLevel } from '../../../claims/confidence.js';
+} from '../../../claims/confidence/index.js';
+import type { ConfidenceLevel } from '../../../claims/confidence/index.js';
 
 export const markCommand = new Command('mark')
   .description('Add or update a confidence annotation on a file')

@@ -7,7 +7,7 @@
  */
 
 import chalk from 'chalk';
-import type { ConfidenceAuditResult, ConfidenceLevel } from '../../claims/confidence.js';
+import type { ConfidenceAuditResult, ConfidenceLevel } from '../../claims/confidence/index.js';
 
 /** Level name labels for display */
 const LEVEL_NAMES: Record<ConfidenceLevel, string> = {
