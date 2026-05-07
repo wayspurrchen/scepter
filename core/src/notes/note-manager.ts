@@ -16,7 +16,6 @@ import { StatusValidator } from '../statuses/status-validator';
 import { parseNoteMentions } from '../parsers/note/note-parser';
 import { UnifiedDiscovery } from '../discovery/unified-discovery';
 import { getAdapter } from '../claims/confidence/registry';
-import * as fs from 'fs-extra';
 
 // Type definitions for the API
 export interface CreateNoteParams {
@@ -589,10 +588,8 @@ export class NoteManager extends EventEmitter {
     const adapter = getAdapter(notePath);
     if (!adapter) return;
 
-    let content: string;
-    try {
-      content = await fs.readFile(notePath, 'utf-8');
-    } catch {
+    const content = await this.noteFileManager.readFileByPath(notePath);
+    if (content === null) {
       // File unreadable — bail without warning; createNote already
       // succeeded, so the warning would be misleading.
       return;
@@ -621,7 +618,7 @@ export class NoteManager extends EventEmitter {
         level: 2,
         date,
       });
-      await fs.writeFile(notePath, updated, 'utf-8');
+      await this.noteFileManager.writeFileByPath(notePath, updated);
     } catch (err) {
       this.emit('warning', {
         type: 'auto_insert_failed',

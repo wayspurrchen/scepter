@@ -695,6 +695,16 @@ export class NoteFileManager extends EventEmitter {
   }
 
   /**
+   * Write file contents at an absolute path. Routes through this
+   * manager so callers (e.g. NoteManager's auto-insert hook) don't
+   * need a direct fs-extra import; the storage protocol boundary
+   * (DD010.§DC.25) keeps NoteManager fs-import-free.
+   */
+  async writeFileByPath(filePath: string, content: string): Promise<void> {
+    await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  /**
    * Update frontmatter fields in content
    */
   private updateFrontmatter(content: string, updates: Record<string, any>, removeFields?: string[]): string {

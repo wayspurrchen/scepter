@@ -338,7 +338,14 @@ describe('S004.§4.AC.07: apply — per-file failure isolation', () => {
   let ctx: TestContext;
 
   beforeEach(async () => {
-    ctx = await setupFullTestProject('apply-failure-isolation', APPLY_TEST_CONFIG);
+    // autoInsert disabled so createNote files don't already carry a
+    // confidence annotation — the failure-isolation test wants apply to
+    // see them as unannotated (action=mark) so the per-file try/catch
+    // around adapter.insert is what determines mark vs failed.
+    ctx = await setupFullTestProject('apply-failure-isolation', {
+      ...APPLY_TEST_CONFIG,
+      claims: { confidence: { autoInsert: false } },
+    });
   });
 
   afterEach(async () => {
