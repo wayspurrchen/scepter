@@ -11,7 +11,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { glob } from 'glob';
 import type { SourceCodeIntegrationConfig } from '../../types/config.js';
-import { parseConfidenceAnnotation } from '../confidence.js';
+import { cFamilyAdapter } from './adapters/c-family.js';
 import type { ConfidenceLevel, ConfidenceAnnotation } from './types.js';
 
 /**
@@ -80,7 +80,7 @@ export async function auditConfidence(
     const absolutePath = path.resolve(projectPath, relativeFile);
     try {
       const content = await fs.readFile(absolutePath, 'utf-8');
-      const annotation = parseConfidenceAnnotation(content, relativeFile);
+      const annotation = cFamilyAdapter.parse(content, relativeFile);
 
       if (annotation) {
         result.annotated++;
