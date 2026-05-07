@@ -1,3 +1,9 @@
+/**
+ * Tests for the SCEpterConfig Zod validator.
+ *
+ * @validates {DD016.§8.DC.44} includeDate Zod field with .default(true)
+ * @validates {R013.§1.AC.06} date-inclusion config flag (validation behavior)
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ConfigValidator, ConfigValidationError } from './config-validator';
 import type { SCEpterConfig } from '../types/config';
@@ -170,6 +176,42 @@ describe('ConfigValidator', () => {
       const config = {
         ...baseConfig,
         claims: { confidence: { autoInsert: 'yes' } },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept claims.confidence with includeDate true', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: { includeDate: true } },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should accept claims.confidence with includeDate false', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: { includeDate: false } },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should accept claims.confidence with no includeDate (defaults to true)', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: {} },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should reject claims.confidence.includeDate with non-boolean', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: { includeDate: 'yes' } },
       };
       const errors = validator.validate(config);
       expect(errors.length).toBeGreaterThan(0);
