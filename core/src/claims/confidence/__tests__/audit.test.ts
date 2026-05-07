@@ -2,8 +2,17 @@
  * Audit tests for `core/src/claims/confidence/audit.ts`. Realizes
  * TS001 §6 (library-side audit behavior).
  *
- * @validates {S004.§2.AC.01-09}
- * @validates {DD017.DC.05-10}
+ * @validates {S004.§2.AC.01}
+ * @validates {S004.§2.AC.02}
+ * @validates {S004.§2.AC.04}
+ * @validates {S004.§2.AC.05}
+ * @validates {S004.§2.AC.09}
+ * @validates {DD017.DC.05}
+ * @validates {DD017.DC.06}
+ * @validates {DD017.DC.07}
+ * @validates {DD017.DC.08}
+ * @validates {DD017.DC.09}
+ * @validates {DD017.DC.10}
  * @validates {TS001.§6.AC.01}
  * @validates {TS001.§6.AC.02}
  * @validates {TS001.§6.AC.03}

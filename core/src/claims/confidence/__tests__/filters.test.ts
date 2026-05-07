@@ -2,9 +2,23 @@
  * Filter resolver tests for `core/src/claims/confidence/filters.ts`.
  * Realizes TS001 §5 (filter resolution).
  *
- * @validates {S004.§1.AC.01-06}
- * @validates {DD017.DC.01-04}
- * @validates {TS001.§5.AC.01-07}
+ * @validates {S004.§1.AC.01}
+ * @validates {S004.§1.AC.02}
+ * @validates {S004.§1.AC.03}
+ * @validates {S004.§1.AC.04}
+ * @validates {S004.§1.AC.05}
+ * @validates {S004.§1.AC.06}
+ * @validates {DD017.DC.01}
+ * @validates {DD017.DC.02}
+ * @validates {DD017.DC.03}
+ * @validates {DD017.DC.04}
+ * @validates {TS001.§5.AC.01}
+ * @validates {TS001.§5.AC.02}
+ * @validates {TS001.§5.AC.03}
+ * @validates {TS001.§5.AC.04}
+ * @validates {TS001.§5.AC.05}
+ * @validates {TS001.§5.AC.06}
+ * @validates {TS001.§5.AC.07}
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

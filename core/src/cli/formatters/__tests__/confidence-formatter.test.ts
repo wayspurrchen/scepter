@@ -7,6 +7,7 @@
  * @validates {S004.§4.AC.05}
  * @validates {S004.§4.AC.08}
  * @validates {TS001.§6.AC.05}
+ * @validates {TS001.§6.AC.06}
  * @validates {TS001.§6.AC.09}
  * @validates {TS001.§8.AC.08}
  */
@@ -155,6 +156,37 @@ describe('S004.§2.AC.10: --paths breakdown is plaintext-friendly under non-TTY 
     const out = formatConfidenceAuditPaths(bothPopulated(), { tty: false });
     expect(out).toContain('🤖2 2026-05-05');
     expect(out).toContain('unannotated');
+  });
+
+  // TS001.§6.AC.06: --paths must be compatible with --source-only,
+  // --notes-only. The formatter accepts a `scope` option and excludes
+  // the unrequested scope's entries from the breakdown.
+  it('--paths --source-only emits only source files (no notes)', () => {
+    const out = formatConfidenceAuditPaths(bothPopulated(), {
+      tty: false,
+      scope: 'source',
+    });
+    expect(out).toContain('foo.ts');
+    expect(out).toContain('bar.ts');
+    expect(out).not.toContain('R001.md');
+    expect(out).not.toContain('R002.md');
+  });
+
+  it('--paths --notes-only emits only notes (no source)', () => {
+    const out = formatConfidenceAuditPaths(bothPopulated(), {
+      tty: false,
+      scope: 'notes',
+    });
+    expect(out).toContain('R001.md');
+    expect(out).toContain('R002.md');
+    expect(out).not.toContain('foo.ts');
+    expect(out).not.toContain('bar.ts');
+  });
+
+  it('--paths default (scope=both) emits source and notes together', () => {
+    const out = formatConfidenceAuditPaths(bothPopulated(), { tty: false });
+    expect(out).toContain('foo.ts');
+    expect(out).toContain('R001.md');
   });
 });
 

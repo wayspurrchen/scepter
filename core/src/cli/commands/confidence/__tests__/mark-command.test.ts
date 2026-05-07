@@ -3,13 +3,23 @@
  * getAdapter, includeDate honoring, null-adapter error path,
  * validation-before-adapter ordering, command-owns-I/O contract).
  *
- * @validates {S004.§3.AC.01-06}
- * @validates {DD017.DC.15-19}
+ * @validates {S004.§3.AC.01}
+ * @validates {S004.§3.AC.02}
+ * @validates {S004.§3.AC.03}
+ * @validates {S004.§3.AC.04}
+ * @validates {S004.§3.AC.05}
+ * @validates {S004.§3.AC.06}
+ * @validates {DD017.DC.15}
+ * @validates {DD017.DC.16}
+ * @validates {DD017.DC.17}
+ * @validates {DD017.DC.18}
+ * @validates {DD017.DC.19}
  * @validates {TS001.§7.AC.01}
  * @validates {TS001.§7.AC.02}
  * @validates {TS001.§7.AC.03}
  * @validates {TS001.§7.AC.04}
  * @validates {TS001.§7.AC.05}
+ * @validates {TS001.§7.AC.06}
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

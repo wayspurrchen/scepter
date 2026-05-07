@@ -3,8 +3,24 @@
  * accuracy, no-filters vs zero-match distinction, failure isolation,
  * filter contradiction error path).
  *
- * @validates {S004.§4.AC.01-09}
- * @validates {DD017.DC.20-28}
+ * @validates {S004.§4.AC.01}
+ * @validates {S004.§4.AC.02}
+ * @validates {S004.§4.AC.03}
+ * @validates {S004.§4.AC.04}
+ * @validates {S004.§4.AC.05}
+ * @validates {S004.§4.AC.06}
+ * @validates {S004.§4.AC.07}
+ * @validates {S004.§4.AC.08}
+ * @validates {S004.§4.AC.09}
+ * @validates {DD017.DC.20}
+ * @validates {DD017.DC.21}
+ * @validates {DD017.DC.22}
+ * @validates {DD017.DC.23}
+ * @validates {DD017.DC.24}
+ * @validates {DD017.DC.25}
+ * @validates {DD017.DC.26}
+ * @validates {DD017.DC.27}
+ * @validates {DD017.DC.28}
  * @validates {TS001.§8.AC.01}
  * @validates {TS001.§8.AC.02}
  * @validates {TS001.§8.AC.03}
@@ -12,6 +28,7 @@
  * @validates {TS001.§8.AC.05}
  * @validates {TS001.§8.AC.06}
  * @validates {TS001.§8.AC.07}
+ * @validates {TS001.§8.AC.09}
  * @validates {TS001.§8.AC.10}
  */
 

@@ -2,9 +2,19 @@
  * Auto-insert hook tests for `NoteManager.createNote`. Realizes
  * TS001 §9 (auto-insert at note creation time).
  *
- * @validates {S004.§5.AC.01-07}
- * @validates {DD017.DC.30-33}
+ * @validates {S004.§5.AC.01}
+ * @validates {S004.§5.AC.02}
+ * @validates {S004.§5.AC.03}
+ * @validates {S004.§5.AC.04}
+ * @validates {S004.§5.AC.05}
+ * @validates {S004.§5.AC.06}
+ * @validates {S004.§5.AC.07}
+ * @validates {DD017.DC.30}
+ * @validates {DD017.DC.31}
+ * @validates {DD017.DC.32}
+ * @validates {DD017.DC.33}
  * @validates {TS001.§9.AC.01}
+ * @validates {TS001.§9.AC.02}
  * @validates {TS001.§9.AC.03}
  * @validates {TS001.§9.AC.04}
  * @validates {TS001.§9.AC.05}
