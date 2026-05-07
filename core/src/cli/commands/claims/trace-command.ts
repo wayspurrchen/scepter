@@ -227,9 +227,18 @@ export const traceCommand = new Command('trace')
             process.exit(1);
           }
           // @implements {DD014.§3.DC.56} Apply metadata filters to TraceabilityRow[] AND-composed with importance
+          // @implements {DD019.§3.DC.11} Markdown overlay merged into fold at filter time
           const metadataStorage = context.projectManager.metadataStorage!;
+          const getEntryForFilter = (cid: string) =>
+            context.projectManager.claimIndex.getClaim(cid);
           const applyFilters = async <R extends { claimId: string }>(rows: R[]): Promise<R[]> => {
-            return applyMetadataFilters(rows, (row) => row.claimId, metadataStorage, filterParse);
+            return applyMetadataFilters(
+              rows,
+              (row) => row.claimId,
+              metadataStorage,
+              filterParse,
+              getEntryForFilter,
+            );
           };
 
           // @implements {R006.§4.AC.02} Get derivatives lookup from claim index

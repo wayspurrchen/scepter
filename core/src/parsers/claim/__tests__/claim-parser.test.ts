@@ -488,6 +488,28 @@ describe('Claim Parser', () => {
       // The regex backreference ensures the prefix must match
       expect(parseRangeSuffix('AC.01-SEC.06')).toBeNull();
     });
+
+    it('should parse leading-dot form: AC.01-.06', () => {
+      // LLMs sometimes carry the PREFIX. dot through to the range end.
+      const result = parseRangeSuffix('AC.01-.06');
+      expect(result).not.toBeNull();
+      expect(result!.baseRef).toBe('AC.01');
+      expect(result!.endNumber).toBe(6);
+    });
+
+    it('should parse fully qualified leading-dot: R004.§1.AC.01-.06', () => {
+      const result = parseRangeSuffix('R004.§1.AC.01-.06');
+      expect(result).not.toBeNull();
+      expect(result!.baseRef).toBe('R004.§1.AC.01');
+      expect(result!.endNumber).toBe(6);
+    });
+
+    it('should parse §-prefixed leading-dot: §1.AC.01-.06', () => {
+      const result = parseRangeSuffix('§1.AC.01-.06');
+      expect(result).not.toBeNull();
+      expect(result!.baseRef).toBe('§1.AC.01');
+      expect(result!.endNumber).toBe(6);
+    });
   });
 
   describe('expandClaimRange', () => {
@@ -635,6 +657,28 @@ describe('Claim Parser', () => {
       expect(acRefs).toHaveLength(3);
       expect(secRefs).toHaveLength(1);
     });
+
+    it('should expand leading-dot range in braces: {AC.01-.06}', () => {
+      const content = 'Covers {AC.01-.06} criteria.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(6);
+      expect(refs[0].address.claimNumber).toBe(1);
+      expect(refs[5].address.claimNumber).toBe(6);
+    });
+
+    it('should expand fully qualified leading-dot in braces: {R004.§1.AC.01-.06}', () => {
+      const content = 'See {R004.§1.AC.01-.06} for full list.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(6);
+      for (const ref of refs) {
+        expect(ref.address.noteId).toBe('R004');
+        expect(ref.address.sectionPath).toEqual([1]);
+        expect(ref.address.claimPrefix).toBe('AC');
+        expect(ref.braced).toBe(true);
+      }
+      expect(refs[0].address.claimNumber).toBe(1);
+      expect(refs[5].address.claimNumber).toBe(6);
+    });
   });
 
   describe('parseClaimReferences — braceless range expansion', () => {
@@ -680,6 +724,26 @@ describe('Claim Parser', () => {
       const content = 'See AC.01-06 here.';
       const refs = parseClaimReferences(content, { bracelessEnabled: false });
       expect(refs).toHaveLength(0);
+    });
+
+    it('should expand leading-dot braceless range: AC.01-.06', () => {
+      const content = 'Covers AC.01-.06 criteria.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(6);
+      for (let i = 0; i < 6; i++) {
+        expect(refs[i].address.claimPrefix).toBe('AC');
+        expect(refs[i].address.claimNumber).toBe(i + 1);
+        expect(refs[i].braced).toBe(false);
+      }
+    });
+
+    it('should expand note-prefixed leading-dot braceless: R004.§1.AC.01-.06', () => {
+      const content = 'Implements R004.§1.AC.01-.06 fully.';
+      const refs = parseClaimReferences(content);
+      const acRefs = refs.filter(
+        (r) => r.address.claimPrefix === 'AC' && r.address.noteId === 'R004',
+      );
+      expect(acRefs).toHaveLength(6);
     });
   });
 

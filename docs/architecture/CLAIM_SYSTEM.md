@@ -379,7 +379,7 @@ Lint extends this with eight derivation-specific checks (`lint-command.ts:208-34
 
 ### 8.4 Why "inline for identity, sidecar for judgment"
 
-R005's design principle (line 30): properties that change what the claim IS belong inline (importance, lifecycle, derivation). Properties that record the project's relationship to the claim — when it was verified, by whom, with what method — go into `_scepter/verification.json`, an append-only event store managed by `claims/verification-store.ts`. A claim's identity should be readable from its document text alone; verification history is a separate read.
+R005's design principle (line 30): properties that change what the claim IS belong inline (importance, lifecycle, derivation). Properties that record the project's relationship to the claim — when it was verified, by whom, with what method — go into `_scepter/meta.json`, an append-only event store managed by `storage/filesystem/filesystem-metadata-storage.ts`. A claim's identity should be readable from its document text alone; verification history is a separate read.
 
 ---
 

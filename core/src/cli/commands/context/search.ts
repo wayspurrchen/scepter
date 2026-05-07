@@ -380,11 +380,13 @@ async function performClaimSearch(
     process.exit(1);
   }
   const beforeCount = result.matches.length;
+  // @implements {DD019.§3.DC.11} Markdown overlay merged into fold at filter time
   result.matches = await applyMetadataFilters(
     result.matches,
     (entry) => entry.fullyQualified,
     context.projectManager.metadataStorage!,
     filterParse,
+    (cid) => context.projectManager.claimIndex.getClaim(cid),
   );
   const dropped = beforeCount - result.matches.length;
   if (dropped > 0) {

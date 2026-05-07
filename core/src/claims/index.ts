@@ -42,6 +42,7 @@ export type {
 
 // Metadata event log (replaces the legacy verification store; see DD014)
 // @implements {DD014.§3.DC.13} Legacy verification-store re-exports removed; metadata types exported
+// @implements {DD019.§3.DC.15} metadata-ingest barrel re-exports removed (module deleted under DD019)
 export { applyFold } from './metadata-event.js';
 
 export type {
@@ -52,11 +53,13 @@ export type {
 
 // Metadata filters (--where, --has-key, --missing-key)
 // @implements {DD014.§3.DC.56}
+// @implements {DD019.§3.DC.13} mergeMarkdownIntoFold exported for callers/tests
 export {
   parseMetadataFilters,
   matchesMetadataFilters,
   applyMetadataFilters,
   parseAndApplyMetadataFilters,
+  mergeMarkdownIntoFold,
   collectStrings,
 } from './metadata-filters.js';
 

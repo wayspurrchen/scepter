@@ -288,6 +288,7 @@ export function parseClaimAddress(raw: string, options?: ClaimParseOptions): Cla
  * Detects patterns like:
  *   "AC.01-06"        → { baseRef: "AC.01", endNumber: 6 }
  *   "AC.01-AC.06"     → { baseRef: "AC.01", endNumber: 6 }
+ *   "AC.01-.06"       → { baseRef: "AC.01", endNumber: 6 }
  *   "R004.§1.AC.01-06" → { baseRef: "R004.§1.AC.01", endNumber: 6 }
  *
  * Returns null if the string does not contain a range suffix.
@@ -300,6 +301,8 @@ export function parseRangeSuffix(
 
   // Match compact form: PREFIX.NN-MM (e.g., AC.01-06)
   // Match explicit form: PREFIX.NN-PREFIX.MM (e.g., AC.01-AC.06)
+  // Match leading-dot form: PREFIX.NN-.MM (e.g., AC.01-.06) — LLMs sometimes
+  //   emit the dot from the original PREFIX.NN shape into the range end.
   // Also with optional leading path: R004.§1.AC.01-06, §1.AC.01-AC.06
   // Also with optional cross-project alias prefix: vendor-lib/R004.§1.AC.01-06, vendor-lib/AC.01-06
   // The claim number portion is \d{2,3} (2-3 digits).
@@ -308,15 +311,19 @@ export function parseRangeSuffix(
   // ALIAS_PREFIX_RE without capturing — the captured baseRef carries
   // the alias prefix verbatim into parseClaimAddress, which then
   // separates it.
+  //
+  // The post-dash group `(?:\2?\.)?` allows three end forms: nothing
+  // (compact `-06`), bare dot (`-.06`), or matching prefix + dot
+  // (`-AC.06`). A mismatched prefix (`AC.01-XY.06`) still fails.
   // @implements {R011.§2.AC.01} alias prefix supported in range references
   const ALIAS_OPT = '(?:[a-z][a-z0-9-]*[a-z0-9]\\/)?';
-  const bareRangeRe = new RegExp(`^(${ALIAS_OPT}([A-Z]+)\\.(\\d{2,3}))-(?:(?:\\2)\\.)?(\\d{2,3})$`);
+  const bareRangeRe = new RegExp(`^(${ALIAS_OPT}([A-Z]+)\\.(\\d{2,3}))-(?:\\2?\\.)?(\\d{2,3})$`);
   const bareMatch = refPart.match(bareRangeRe);
   if (bareMatch) {
     return { baseRef: bareMatch[1], endNumber: parseInt(bareMatch[4], 10) };
   }
 
-  const qualifiedRangeRe = new RegExp(`^(${ALIAS_OPT}(.+)\\.([A-Z]+)\\.(\\d{2,3}))-(?:(?:\\3)\\.)?(\\d{2,3})$`);
+  const qualifiedRangeRe = new RegExp(`^(${ALIAS_OPT}(.+)\\.([A-Z]+)\\.(\\d{2,3}))-(?:\\3?\\.)?(\\d{2,3})$`);
   const qualifiedMatch = refPart.match(qualifiedRangeRe);
   if (qualifiedMatch) {
     return { baseRef: qualifiedMatch[1], endNumber: parseInt(qualifiedMatch[5], 10) };
@@ -659,9 +666,11 @@ function isInsideBraces(line: string, startCol: number, length: number): boolean
 function buildBracelessPatterns(knownShortcodes?: Set<string>): RegExp[] {
   const patterns: RegExp[] = [];
 
-  // Optional range suffix: -NN or -PREFIX.NN (compact and explicit forms)
-  // e.g., AC.01-06 or AC.01-AC.06
-  const rangeSuffix = '(?:-(?:[A-Z]+\\.)?\\d{2,3})?';
+  // Optional range suffix: -NN, -.NN, or -PREFIX.NN
+  // e.g., AC.01-06, AC.01-.06, AC.01-AC.06
+  // The `[A-Z]*\.` allows a leading bare dot before the end number,
+  // which LLMs sometimes emit by carrying the PREFIX. dot through.
+  const rangeSuffix = '(?:-(?:[A-Z]*\\.)?\\d{2,3})?';
 
   // Pattern for §-prefixed references: §3.AC.01, §AC.01, §3
   // These are distinctive enough to match without note ID validation

@@ -8,10 +8,11 @@
  *   - clear CLAIM                    clear ALL keys on a claim
  *   - get CLAIM [KEY]                read folded state
  *   - log CLAIM                      read the event log
- *   - migrate-legacy                 one-shot migration from legacy verification.json
  *
  * @implements {R009.§2.AC.01} `meta` group with write subcommands
- * @implements {DD014.§3.DC.24} metaCommand barrel registers all six write/read commands plus migrate-legacy
+ * @implements {DD014.§3.DC.24} metaCommand barrel registers the read/write commands
+ * @implements {DD019.§3.DC.40} migrate-legacy retired together with the verification.json → meta.json rename
+ * @implements {DD019.§3.DC.41} Recovery path: restore from git history if needed
  */
 
 import { Command } from 'commander';
@@ -21,7 +22,6 @@ import { unsetCommand } from './unset-command.js';
 import { clearCommand } from './clear-command.js';
 import { getCommand } from './get-command.js';
 import { logCommand } from './log-command.js';
-import { migrateLegacyCommand } from './migrate-legacy-command.js';
 
 export const metaCommand = new Command('meta')
   .description('Read and write claim metadata');
@@ -32,4 +32,3 @@ metaCommand.addCommand(unsetCommand);
 metaCommand.addCommand(clearCommand);
 metaCommand.addCommand(getCommand);
 metaCommand.addCommand(logCommand);
-metaCommand.addCommand(migrateLegacyCommand);

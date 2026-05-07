@@ -14,7 +14,8 @@ import {
 import type { StorageEvent } from '../storage-types';
 import type { MetadataEvent } from '../../claims/metadata-event';
 
-const STORE_FILENAME = 'verification.json';
+// @validates {DD019.§3.DC.25} STORE_FILENAME mirror updated to meta.json
+const STORE_FILENAME = 'meta.json';
 
 const event = (claimId: string): MetadataEvent => ({
   id: 'id-' + Math.random().toString(36).slice(2),

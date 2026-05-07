@@ -1,15 +1,15 @@
 /**
  * Filesystem adapter for the generalized metadata event log.
  *
- * Persists to `<dataDir>/verification.json` (filename preserved across the
- * verification → metadata transition for installed-project compatibility).
- * Writes are protected by a sidecar `.lock` file via `proper-lockfile`.
+ * Persists to `<dataDir>/meta.json`. Writes are protected by a sidecar
+ * `.lock` file via `proper-lockfile`.
  *
  * Reads are lock-free: the append-only invariant plus full-file rewrites at
  * save time guarantee that any partially-flushed write is either fully
  * visible or fully absent at the JSON-document boundary.
  *
- * @implements {A004.§2.AC.04} Filesystem adapter persists to verification.json
+ * @implements {DD019.§3.DC.20} STORE_FILENAME = 'meta.json'; supersedes A004.§2.AC.04
+ * @implements {DD019.§3.DC.21} Error strings and JSDoc updated to reference meta.json
  * @implements {A004.§1.AC.06} Concurrent-write protection via file lock
  * @implements {A004.§3.AC.05} Watch-mode hook
  * @implements {DD014.§3.DC.14} FilesystemMetadataStorage implements MetadataStorage
@@ -35,7 +35,8 @@ import type {
 import { applyFold } from '../../claims/metadata-event';
 import type { StorageEvent, Unsubscribe } from '../storage-types';
 
-const STORE_FILENAME = 'verification.json';
+// @implements {DD019.§3.DC.20} STORE_FILENAME = 'meta.json'
+const STORE_FILENAME = 'meta.json';
 const LOCK_SUFFIX = '.lock';
 const DEFAULT_LOCK_TIMEOUT_MS = 2000;
 
@@ -79,15 +80,20 @@ export class FilesystemMetadataStorage implements MetadataStorage {
     for (const [claimId, eventsRaw] of Object.entries(parsed)) {
       if (!Array.isArray(eventsRaw)) {
         throw new Error(
-          `Invalid verification.json: events for claim ${claimId} are not an array`,
+          `Invalid meta.json: events for claim ${claimId} are not an array`,
         );
       }
       const events = eventsRaw as Array<Record<string, unknown>>;
       for (const event of events) {
         if (event === null || typeof event !== 'object' || !('op' in event)) {
           throw new Error(
-            `Legacy-shape verification.json detected at ${this.filePath}. ` +
-              `Run \`scepter claims meta migrate-legacy\` to convert it to the new shape.`,
+            `Legacy-shape meta.json detected at ${this.filePath}. ` +
+              `The runtime no longer migrates legacy data automatically — the ` +
+              `previous \`scepter claims meta migrate-legacy\` command was ` +
+              `retired together with the verification.json → meta.json rename. ` +
+              `If you are encountering legacy data, restore migrate-legacy from ` +
+              `git history, run it against your verification.json, then rename ` +
+              `the file to meta.json. See DD019 for the rationale.`,
           );
         }
       }
@@ -122,6 +128,7 @@ export class FilesystemMetadataStorage implements MetadataStorage {
    * (lexicographic compare, which is correct for ISO 8601).
    *
    * @implements {DD014.§3.DC.11}
+   * @implements {DD019.§3.DC.34} Reads do not acquire the lock
    */
   async query(filter: EventFilter): Promise<MetadataEvent[]> {
     const store = await this.load();
@@ -144,6 +151,7 @@ export class FilesystemMetadataStorage implements MetadataStorage {
 
   /**
    * @implements {DD014.§3.DC.09a}
+   * @implements {DD019.§3.DC.34} Reads do not acquire the lock
    */
   async fold(claimId: string): Promise<Record<string, string[]>> {
     const store = await this.load();
@@ -152,7 +160,7 @@ export class FilesystemMetadataStorage implements MetadataStorage {
   }
 
   /**
-   * Watches `verification.json` (NOT the `.lock` sidecar) and emits a
+   * Watches `meta.json` (NOT the `.lock` sidecar) and emits a
    * `StorageEvent` on each change. The emitted event uses
    * METADATA_STORE_WATCH_SENTINEL as `noteId` since the underlying store is
    * not note-scoped.
@@ -180,12 +188,22 @@ export class FilesystemMetadataStorage implements MetadataStorage {
 
   // ---- internals ----
 
+  /**
+   * @implements {DD019.§3.DC.30} No regular sidecar lock file persists after withLock returns
+   * @implements {DD019.§3.DC.31} ensureLockFile removed; eager creation eliminated
+   * @implements {DD019.§3.DC.32} proper-lockfile.lock() retains realpath:false
+   * @implements {DD019.§3.DC.33} Lock-acquire timeout (2000ms default) preserved
+   * @implements {DD019.§3.DC.35} mkdir on dataDir retained — proper-lockfile needs it
+   */
   private async withLock<T>(fn: () => Promise<T>): Promise<T> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    // proper-lockfile expects the protected file to exist (or `realpath: false`).
-    // We explicitly target a sidecar lock file and create it eagerly so
-    // contention is gated on the lock file itself, not the data file.
-    await this.ensureLockFile();
+    // proper-lockfile manages its own `.lock.lock` sidecar directory for
+    // the actual mutex (created on acquire, removed on release). With
+    // `realpath: false`, the library does NOT require a regular file at
+    // `lockFilePath` to exist — it treats the path as a key for the mutex.
+    // We deliberately do NOT eagerly create `lockFilePath` as a regular
+    // file: that path was the source of the leaked 0-byte sidecar (see
+    // DD019.§3.DC.30). The library cleans up its own artifacts on release.
     let release: () => Promise<void>;
     try {
       release = await lockfile.lock(this.lockFilePath, {
@@ -214,16 +232,6 @@ export class FilesystemMetadataStorage implements MetadataStorage {
         // Lock-release failures are best-effort; the lock will be reclaimed
         // by the `stale` timeout if the process aborts mid-write.
       }
-    }
-  }
-
-  private async ensureLockFile(): Promise<void> {
-    try {
-      const handle = await fs.open(this.lockFilePath, 'a');
-      await handle.close();
-    } catch (err) {
-      if (isNodeError(err) && err.code === 'EEXIST') return;
-      throw err;
     }
   }
 

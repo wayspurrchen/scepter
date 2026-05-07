@@ -771,6 +771,36 @@
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
       "note": "inline"
+    },
+    {
+      "id": "xxne1yykmd72b3x8x4jx09v8",
+      "claimId": "DD014.3.DC.19",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "uvo9l3hq22j210cw1mph8bzz",
+      "claimId": "DD014.3.DC.19",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.40",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "mw3ge1u9k09pvpb96xaz6iwt",
+      "claimId": "DD014.3.DC.19",
+      "key": "derives",
+      "value": "R009.§7.AC.01",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
     }
   ],
   "DD014.3.DC.20": [
@@ -1069,6 +1099,36 @@
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
       "note": "inline"
+    },
+    {
+      "id": "hjs0jqjntw574zmia8u0p3m9",
+      "claimId": "DD014.3.DC.38",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "neo40yno62p7oz58ss96fovs",
+      "claimId": "DD014.3.DC.38",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "dlf9asx48el6qfrd5fl17nr4",
+      "claimId": "DD014.3.DC.38",
+      "key": "derives",
+      "value": "A004.§3.AC.01",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
     }
   ],
   "DD014.3.DC.39": [
@@ -1103,6 +1163,36 @@
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
       "note": "inline"
+    },
+    {
+      "id": "ov1wdyh45dc5nn195nx6bni2",
+      "claimId": "DD014.3.DC.40",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "e8iu3r9v8e1td1ml92pe2mkw",
+      "claimId": "DD014.3.DC.40",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "cpz03g6rpyfpie9mgdedsjqx",
+      "claimId": "DD014.3.DC.40",
+      "key": "derives",
+      "value": "A004.§3.AC.01",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
     }
   ],
   "DD014.3.DC.41": [
@@ -1114,6 +1204,36 @@
       "op": "add",
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "za736malbls55l8re7huxttd",
+      "claimId": "DD014.3.DC.41",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "t56aa9fllwg7rmrags2etlny",
+      "claimId": "DD014.3.DC.41",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "lbgfup5qmrrbv87qkplqkzep",
+      "claimId": "DD014.3.DC.41",
+      "key": "derives",
+      "value": "A004.§3.AC.03",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
       "note": "inline"
     }
   ],
@@ -1127,6 +1247,36 @@
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
       "note": "inline"
+    },
+    {
+      "id": "bac2o3hwu43xfkbsyfpgcaj3",
+      "claimId": "DD014.3.DC.42",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "o95l9mp4b7hy2t1g0fmo0j0e",
+      "claimId": "DD014.3.DC.42",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "uykvmxxim7ll9uvl3zqb9v2z",
+      "claimId": "DD014.3.DC.42",
+      "key": "derives",
+      "value": "A004.§3.AC.04",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
     }
   ],
   "DD014.3.DC.43": [
@@ -1139,6 +1289,36 @@
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
       "note": "inline"
+    },
+    {
+      "id": "wt6dritv90etmlhka15gkgno",
+      "claimId": "DD014.3.DC.43",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "tubvxnrlbxraa35ieajd0myf",
+      "claimId": "DD014.3.DC.43",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.10",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "dwq5w63gjj7571cb3kuvx0sp",
+      "claimId": "DD014.3.DC.43",
+      "key": "derives",
+      "value": "A004.§3.AC.04",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
     }
   ],
   "DD014.3.DC.44": [
@@ -1150,6 +1330,36 @@
       "op": "add",
       "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
       "date": "2026-04-25T04:47:50.562Z",
+      "note": "inline"
+    },
+    {
+      "id": "evkzu0d7vdwb07f7wwcyxqmh",
+      "claimId": "DD014.3.DC.44",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "lwmgqtzl5my0codx674m9k4j",
+      "claimId": "DD014.3.DC.44",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.09",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
+      "note": "inline"
+    },
+    {
+      "id": "in67psy2z0jh3q66eab4bal2",
+      "claimId": "DD014.3.DC.44",
+      "key": "derives",
+      "value": "A004.§3.AC.01",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD014 Claim Metadata Store - Implementation Blueprint.md",
+      "date": "2026-05-07T05:33:54.338Z",
       "note": "inline"
     }
   ],
@@ -2615,6 +2825,36 @@
       "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
       "date": "2026-04-25T06:17:47.954Z",
       "note": "inline"
+    },
+    {
+      "id": "hfjear62blrv3e32qxnhzhdu",
+      "claimId": "A004.3.AC.01",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    },
+    {
+      "id": "b09n831nunlhfvklgg47xqo9",
+      "claimId": "A004.3.AC.01",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    },
+    {
+      "id": "ogyirdbfyy5y9lhze0w62q6o",
+      "claimId": "A004.3.AC.01",
+      "key": "importance",
+      "value": "4",
+      "op": "retract",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
     }
   ],
   "A004.3.AC.03": [
@@ -2626,6 +2866,36 @@
       "op": "add",
       "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
       "date": "2026-04-25T06:17:47.954Z",
+      "note": "inline"
+    },
+    {
+      "id": "quay3w24ixfdg6wgkt7l6yrh",
+      "claimId": "A004.3.AC.03",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    },
+    {
+      "id": "gxr1rxhg27i1zfmsfm2qji9e",
+      "claimId": "A004.3.AC.03",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    },
+    {
+      "id": "jgnilnime59kcc2gj9kpz43z",
+      "claimId": "A004.3.AC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "retract",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
       "note": "inline"
     }
   ],
@@ -7479,6 +7749,26 @@
       "actor": "author:_scepter/notes/dd/DD018 Claim Snapshot Capture and Diff - Implementation Blueprint.md",
       "date": "2026-05-07T02:38:15.511Z",
       "note": "inline"
+    },
+    {
+      "id": "bebyn30jy123o3f8yh3sowus",
+      "claimId": "DD018.3.DC.02",
+      "key": "derives",
+      "value": "R014.§1.AC.07",
+      "op": "retract",
+      "actor": "author:_scepter/notes/dd/DD018 Claim Snapshot Capture and Diff - Implementation Blueprint.md",
+      "date": "2026-05-07T04:59:37.551Z",
+      "note": "inline"
+    },
+    {
+      "id": "ss0ya0jtvio42vanr6puik6d",
+      "claimId": "DD018.3.DC.02",
+      "key": "derives",
+      "value": "R014.§1.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD018 Claim Snapshot Capture and Diff - Implementation Blueprint.md",
+      "date": "2026-05-07T05:00:12.280Z",
+      "note": "inline"
     }
   ],
   "DD018.3.DC.03": [
@@ -9101,6 +9391,680 @@
       "actor": "author:_scepter/notes/dd/DD018 Claim Snapshot Capture and Diff - Implementation Blueprint.md",
       "date": "2026-05-07T03:08:19.322Z",
       "note": "inline"
+    }
+  ],
+  "T003.1.AC.03": [
+    {
+      "id": "ryv9jhuiscgy5pbzca2arhsd",
+      "claimId": "T003.1.AC.03",
+      "key": "lifecycle",
+      "value": "removed",
+      "op": "add",
+      "actor": "author:_scepter/notes/tasks/T003 Snapshot diff smoke harness.md",
+      "date": "2026-05-07T05:04:59.235Z",
+      "note": "inline"
+    },
+    {
+      "id": "ymy32y6jmvvy14q3h5kq285a",
+      "claimId": "T003.1.AC.03",
+      "key": "lifecycle",
+      "value": "removed",
+      "op": "retract",
+      "actor": "author:_scepter/notes/tasks/T003 Snapshot diff smoke harness.md",
+      "date": "2026-05-07T05:05:44.553Z",
+      "note": "inline"
+    },
+    {
+      "id": "mgec5zootb5oi6h7s6slxt41",
+      "claimId": "T003.1.AC.03",
+      "key": "lifecycle",
+      "value": "removed",
+      "op": "add",
+      "actor": "author:_scepter/notes/tasks/T003 Snapshot diff smoke harness.md",
+      "date": "2026-05-07T05:05:59.252Z",
+      "note": "inline"
+    }
+  ],
+  "T003.1.AC.05": [
+    {
+      "id": "eblbi4fcyoxrq8z28eosk0uf",
+      "claimId": "T003.1.AC.05",
+      "key": "derives",
+      "value": "R014.§1.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/tasks/T003 Snapshot diff smoke harness.md",
+      "date": "2026-05-07T05:05:44.553Z",
+      "note": "inline"
+    },
+    {
+      "id": "ptod4p6aemahbcttas0a1kqi",
+      "claimId": "T003.1.AC.05",
+      "key": "derives",
+      "value": "R014.§1.AC.07",
+      "op": "retract",
+      "actor": "author:_scepter/notes/tasks/T003 Snapshot diff smoke harness.md",
+      "date": "2026-05-07T05:05:59.252Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.1.1.DC.01": [
+    {
+      "id": "xhbuk37v37xjetevss9dydrz",
+      "claimId": "DD019.1.1.DC.01",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.1.1.DC.02": [
+    {
+      "id": "w9887ilgh7gzqz8sutwy25xm",
+      "claimId": "DD019.1.1.DC.02",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.1.1.DC.03": [
+    {
+      "id": "xij2u5jpj4db1fsetj2pckyl",
+      "claimId": "DD019.1.1.DC.03",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.1.DC.04": [
+    {
+      "id": "gxkmrq8gfej92pw17uko340j",
+      "claimId": "DD019.3.1.DC.04",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "kmjstxsx2157nv9e74hmzbzh",
+      "claimId": "DD019.3.1.DC.04",
+      "key": "derives",
+      "value": "R009.§4.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.1.DC.08": [
+    {
+      "id": "nqctiqv3ny4har6fltx1hqat",
+      "claimId": "DD019.3.1.DC.08",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "fcbh4h71fkox1mcwncskz2r1",
+      "claimId": "DD019.3.1.DC.08",
+      "key": "derives",
+      "value": "R009.§4.AC.08",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.1.DC.09": [
+    {
+      "id": "g5x64nfizwet0ydqpruopa44",
+      "claimId": "DD019.3.1.DC.09",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "l72iafqv1y1x5k25vsyvi1gp",
+      "claimId": "DD019.3.1.DC.09",
+      "key": "derives",
+      "value": "R009.§4.AC.08",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.1.DC.10": [
+    {
+      "id": "tl2a4hsmkhxcaut1zyo4hpe0",
+      "claimId": "DD019.3.1.DC.10",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "ft9wg2xsgv7yw9h334qsfzi8",
+      "claimId": "DD019.3.1.DC.10",
+      "key": "derives",
+      "value": "R009.§4.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.1.DC.11": [
+    {
+      "id": "t3w5jqj9jedecde5v488jp66",
+      "claimId": "DD019.3.1.DC.11",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "uruawcryv6kb7nga8uil75i2",
+      "claimId": "DD019.3.1.DC.11",
+      "key": "derives",
+      "value": "R009.§5.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.1.DC.12": [
+    {
+      "id": "rkgapmpewtst0jqa0r6xeww8",
+      "claimId": "DD019.3.1.DC.12",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.2.DC.20": [
+    {
+      "id": "c2c2tmai38loxadwpjbsupz2",
+      "claimId": "DD019.3.2.DC.20",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "ykf3y3cd9q4kvp271oxsigt3",
+      "claimId": "DD019.3.2.DC.20",
+      "key": "derives",
+      "value": "A004.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.2.DC.21": [
+    {
+      "id": "rh1jcx7lh7ulpli9md8zyfh1",
+      "claimId": "DD019.3.2.DC.21",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    },
+    {
+      "id": "w3r8rvzv3rn4uv24zgaofos9",
+      "claimId": "DD019.3.2.DC.21",
+      "key": "derives",
+      "value": "A004.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.3.DC.30": [
+    {
+      "id": "ibjra590uwkebvc34jmlhhot",
+      "claimId": "DD019.3.3.DC.30",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.3.DC.31": [
+    {
+      "id": "qtrtw3ifh0ofp0u0n9v5gue3",
+      "claimId": "DD019.3.3.DC.31",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.3.DC.32": [
+    {
+      "id": "yfq62i0oebkgu2x8no5r6f85",
+      "claimId": "DD019.3.3.DC.32",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.3.DC.36": [
+    {
+      "id": "k8gehrk9bm2npf7og1wb5a57",
+      "claimId": "DD019.3.3.DC.36",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.4.DC.40": [
+    {
+      "id": "z6fmx5t3u9r2w8yhzrhimn92",
+      "claimId": "DD019.3.4.DC.40",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:31:44.260Z",
+      "note": "inline"
+    }
+  ],
+  "R009.4.AC.07": [
+    {
+      "id": "eezcuii39rq4lmfrowv26scr",
+      "claimId": "R009.4.AC.07",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-05-07T05:34:38.489Z",
+      "note": "inline"
+    },
+    {
+      "id": "r5ald8lrv0dj4l3vqpncg8an",
+      "claimId": "R009.4.AC.07",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.10",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-05-07T05:34:38.489Z",
+      "note": "inline"
+    }
+  ],
+  "R009.4.AC.08": [
+    {
+      "id": "kwci6lysdj9o70xit3fhq73x",
+      "claimId": "R009.4.AC.08",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-05-07T05:34:38.489Z",
+      "note": "inline"
+    },
+    {
+      "id": "nrb2aphff9mvm0vvxh0icbbi",
+      "claimId": "R009.4.AC.08",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-05-07T05:34:38.489Z",
+      "note": "inline"
+    }
+  ],
+  "R009.7.AC.03": [
+    {
+      "id": "e02az81uyzw53v0f1vgh84da",
+      "claimId": "R009.7.AC.03",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-05-07T05:34:38.489Z",
+      "note": "inline"
+    },
+    {
+      "id": "yawd7weuqo9emcn6y66ts6q7",
+      "claimId": "R009.7.AC.03",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.20",
+      "op": "add",
+      "actor": "author:_scepter/notes/reqs/R009 Claim Metadata Key-Value Store.md",
+      "date": "2026-05-07T05:34:38.489Z",
+      "note": "inline"
+    }
+  ],
+  "A004.2.AC.04": [
+    {
+      "id": "jcne1mg8lpebrf9nlrb83mah",
+      "claimId": "A004.2.AC.04",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    },
+    {
+      "id": "qlbm32rq5w8trh2gz8rvl9py",
+      "claimId": "A004.2.AC.04",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.20",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    }
+  ],
+  "A004.3.AC.04": [
+    {
+      "id": "tccia5wlqv2att4vzyd87hrk",
+      "claimId": "A004.3.AC.04",
+      "key": "lifecycle",
+      "value": "superseded",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    },
+    {
+      "id": "v7ehigu108swjjlz9e1nkgn3",
+      "claimId": "A004.3.AC.04",
+      "key": "supersededBy",
+      "value": "DD019.§3.DC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/arch/A004 Claim Metadata Store Architecture.md",
+      "date": "2026-05-07T05:34:13.563Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.04": [
+    {
+      "id": "twdlty5xkfw4pvssb6czgedb",
+      "claimId": "DD019.3.DC.04",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "ad8gjxhjoub9kjn4bo01nfq5",
+      "claimId": "DD019.3.DC.04",
+      "key": "derives",
+      "value": "R009.§4.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.08": [
+    {
+      "id": "gorjh7pyq1a4l1p9hu0g0g28",
+      "claimId": "DD019.3.DC.08",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "z109qeay8tjb7q05sazyb89x",
+      "claimId": "DD019.3.DC.08",
+      "key": "derives",
+      "value": "R009.§4.AC.08",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.09": [
+    {
+      "id": "r7ovp7banwrqsr9vbkjffdu0",
+      "claimId": "DD019.3.DC.09",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "y7cufaa2wh86xr9u5wrx04hk",
+      "claimId": "DD019.3.DC.09",
+      "key": "derives",
+      "value": "R009.§4.AC.08",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.10": [
+    {
+      "id": "wmtvmklbrov58hgd4qur7foc",
+      "claimId": "DD019.3.DC.10",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "dx3d9veq2zkmqdgge6hns821",
+      "claimId": "DD019.3.DC.10",
+      "key": "derives",
+      "value": "R009.§4.AC.07",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.11": [
+    {
+      "id": "zk7keagf6r27po916ydkh94n",
+      "claimId": "DD019.3.DC.11",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "wfkk7wtvgkca4i330b85x5ie",
+      "claimId": "DD019.3.DC.11",
+      "key": "derives",
+      "value": "R009.§5.AC.01",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.12": [
+    {
+      "id": "cexl6vflk9wj0gw8llkz10jn",
+      "claimId": "DD019.3.DC.12",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.20": [
+    {
+      "id": "i4wlf9fv0eoky1z5xbaleiu2",
+      "claimId": "DD019.3.DC.20",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "b12g7bgs6jjqumifk4298wwn",
+      "claimId": "DD019.3.DC.20",
+      "key": "derives",
+      "value": "A004.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "hxuj4i7burkajspx0qbxvvlz",
+      "claimId": "DD019.3.DC.20",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "test-leak",
+      "date": "2026-05-07T05:51:17.690Z",
+      "note": "lock-leak verification test"
+    }
+  ],
+  "DD019.3.DC.21": [
+    {
+      "id": "sesbbm6wqmejybyqb0fa2fxc",
+      "claimId": "DD019.3.DC.21",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    },
+    {
+      "id": "qzzx13558trjfjuerp4y1zhc",
+      "claimId": "DD019.3.DC.21",
+      "key": "derives",
+      "value": "A004.§2.AC.04",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.30": [
+    {
+      "id": "vbf44prq2jxmqszb2kjiondh",
+      "claimId": "DD019.3.DC.30",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.31": [
+    {
+      "id": "yxoazu0cbid1mjd0gjx1y9jh",
+      "claimId": "DD019.3.DC.31",
+      "key": "importance",
+      "value": "5",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.32": [
+    {
+      "id": "a2rfcvejy6bnh5k8lhrp9vgy",
+      "claimId": "DD019.3.DC.32",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.36": [
+    {
+      "id": "hcwwlm08lwnrqs9oqhdvrqh6",
+      "claimId": "DD019.3.DC.36",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.40": [
+    {
+      "id": "jtx7ccpehkew2f12tku2727o",
+      "claimId": "DD019.3.DC.40",
+      "key": "importance",
+      "value": "4",
+      "op": "add",
+      "actor": "author:_scepter/notes/dd/DD019 Meta Store Overlay Model and verification json Rename.md",
+      "date": "2026-05-07T05:35:42.896Z",
+      "note": "inline"
+    }
+  ],
+  "DD019.3.DC.42": [
+    {
+      "id": "gm5uzuf0jokyq58m7xkm963b",
+      "claimId": "DD019.3.DC.42",
+      "key": "verified",
+      "value": "true",
+      "op": "add",
+      "actor": "test-phase6",
+      "date": "2026-05-07T05:52:46.634Z",
+      "note": "phase6 verify still works"
     }
   ]
 }

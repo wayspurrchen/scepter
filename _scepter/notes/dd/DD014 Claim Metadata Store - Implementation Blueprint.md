@@ -189,7 +189,7 @@ All non-watch methods return `Promise` per {A002.§2.AC.06} preserved by {A004.�
 
 §DC.18:5:derives=R009.§1.AC.12 `append(event)` MUST be durable: after the call resolves, a subsequent `load()` in a new process MUST see the event. The implementation MUST: (a) acquire the file lock; (b) re-load the current on-disk store (to pick up any external writes); (c) push the event onto the appropriate `claimId` array; (d) write the entire store back; (e) release the lock. The implementation MAY NOT cache an in-memory store across calls — every `append()` is a load-modify-write cycle. (This is conservative for Phase 1; an in-memory cache with invalidation is a Phase-2 optimization.) Highest binding: this is the load-modify-write cycle that backs every durability guarantee.
 
-§DC.19:5:derives=R009.§7.AC.01 A new one-shot CLI command `scepter claims meta migrate-legacy` MUST live at `core/src/cli/commands/claims/meta/migrate-legacy-command.ts`. Invocation reads the existing legacy-shape `verification.json`, projects each legacy event to a `MetadataEvent`, writes the resulting store to disk, and exits. The projection per legacy event:
+§DC.19:5:superseded=DD019.§3.DC.40 A new one-shot CLI command `scepter claims meta migrate-legacy` MUST live at `core/src/cli/commands/claims/meta/migrate-legacy-command.ts`. Invocation reads the existing legacy-shape `verification.json`, projects each legacy event to a `MetadataEvent`, writes the resulting store to disk, and exits. The projection per legacy event:
 
 - `id` = freshly generated cuid2
 - `claimId` = legacy `claimId` verbatim
@@ -276,7 +276,7 @@ The ingest path is what makes R005-era inline metadata (`AC.01:5:closed:reviewer
 
 #### `core/src/claims/metadata-ingest.ts` (NEW)
 
-§DC.38:4:derives=A004.§3.AC.01 The `MetadataIngest` module MUST expose a function `reconcileNoteEvents(noteId, claimEntries, store)` that, for one note, produces a list of `MetadataEvent`s representing the deltas between the author's current declarations (in the `claimEntries`) and the existing `author:` events in the store. The function returns `{toAppend: MetadataEvent[], toRetract: MetadataEvent[]}`. The caller is responsible for invoking `metadataStorage.append` for each event in the result. High binding: this is the canonical ingest-time reconciliation; every implementation difference produces invisible drift between author intent and persisted state.
+§DC.38:4:superseded=DD019.§3.DC.04 The `MetadataIngest` module MUST expose a function `reconcileNoteEvents(noteId, claimEntries, store)` that, for one note, produces a list of `MetadataEvent`s representing the deltas between the author's current declarations (in the `claimEntries`) and the existing `author:` events in the store. The function returns `{toAppend: MetadataEvent[], toRetract: MetadataEvent[]}`. The caller is responsible for invoking `metadataStorage.append` for each event in the result. High binding: this is the canonical ingest-time reconciliation; every implementation difference produces invisible drift between author intent and persisted state.
 
 §DC.39:5:derives=A004.§3.AC.02 The bare-token shorthand normalization rules per {A004.§3.AC.02} MUST be applied losslessly inside `reconcileNoteEvents`:
 
@@ -293,9 +293,9 @@ The ingest path is what makes R005-era inline metadata (`AC.01:5:closed:reviewer
 
 Highest binding: this is the table that makes back-compat work. Every normalization is reversed by the projection in §DC.42, restoring the legacy `ParsedMetadata` shape.
 
-§DC.40:derives=A004.§3.AC.01 Every emitted event MUST set `op="add"`, `actor="author:<notepath>"` (relative to project root), `date=<note file mtime as ISO 8601 datetime>`, and `note="inline"`. The `id` is a freshly-generated cuid2 per event.
+§DC.40:superseded=DD019.§3.DC.04 Every emitted event MUST set `op="add"`, `actor="author:<notepath>"` (relative to project root), `date=<note file mtime as ISO 8601 datetime>`, and `note="inline"`. The `id` is a freshly-generated cuid2 per event.
 
-§DC.41:derives=A004.§3.AC.03 Reconciliation MUST be incremental at the token level. For each `(claimId, key, value)` declared by the author in the current parse:
+§DC.41:superseded=DD019.§3.DC.04 Reconciliation MUST be incremental at the token level. For each `(claimId, key, value)` declared by the author in the current parse:
 - If a matching `author:` event already exists in the store and its current folded state still contains the value, emit nothing (idempotent — §DC.42 invariant).
 - If the value is missing from the current folded state, emit an `add` event.
 
@@ -304,13 +304,13 @@ For each `(claimId, key, value)` event currently in the store with an `author:<t
 
 Compound reconciliation events (one event per claim summarizing the delta) MUST NOT be used — every change is per-token. The verbosity cost is acceptable; `compact` (Phase 2) handles size growth.
 
-§DC.42:derives=A004.§3.AC.04 Re-ingest of unchanged tokens MUST be a no-op. If a token is present in the suffix and the author's existing events for that `(claimId, key, value)` triple already produce the value in the folded state, no new event is emitted. This prevents log churn on every index rebuild for unchanged source files. Combined with §DC.41's idempotence, this means the steady-state cost of repeated index builds is zero events.
+§DC.42:superseded=DD019.§3.DC.04 Re-ingest of unchanged tokens MUST be a no-op. If a token is present in the suffix and the author's existing events for that `(claimId, key, value)` triple already produce the value in the folded state, no new event is emitted. This prevents log churn on every index rebuild for unchanged source files. Combined with §DC.41's idempotence, this means the steady-state cost of repeated index builds is zero events.
 
-§DC.43:derives=A004.§3.AC.04 Reconciliation operates ONLY on events with the `author:` prefix in their actor field. CLI-written events (no prefix) MUST NOT be touched by reconciliation — they live independently. This is what allows author edits and CLI writes to coexist on the same key (Scenario 2 in {A004.§7}).
+§DC.43:superseded=DD019.§3.DC.10 Reconciliation operates ONLY on events with the `author:` prefix in their actor field. CLI-written events (no prefix) MUST NOT be touched by reconciliation — they live independently. This is what allows author edits and CLI writes to coexist on the same key (Scenario 2 in {A004.§7}).
 
 #### `core/src/claims/claim-index.ts` (MODIFY)
 
-§DC.44:derives=A004.§3.AC.01 At the end of each claim-index build, after all notes are parsed and all `(claimId, suffixTokens)` pairs are known, the index builder MUST invoke `reconcileNoteEvents` for each note and append the resulting events to `metadataStorage`. The hook point is a new method `applyAuthorDeltas(metadataStorage)` on `ClaimIndex` which the caller invokes after `build()`. The actual call site is the `ensureIndex` pipeline at `core/src/cli/commands/claims/ensure-index.ts:101` (not `ProjectManager.initialize()`); every CLI command that needs the claim index goes through `ensureIndex`, so wiring the deltas there ensures author tokens are committed on every reindex without coupling them to construction. The index itself does not write events directly; it produces the planned deltas and the caller commits them. This separation enables the `--dry-run` semantics that future Phase-2 commands need.
+§DC.44:superseded=DD019.§3.DC.09 At the end of each claim-index build, after all notes are parsed and all `(claimId, suffixTokens)` pairs are known, the index builder MUST invoke `reconcileNoteEvents` for each note and append the resulting events to `metadataStorage`. The hook point is a new method `applyAuthorDeltas(metadataStorage)` on `ClaimIndex` which the caller invokes after `build()`. The actual call site is the `ensureIndex` pipeline at `core/src/cli/commands/claims/ensure-index.ts:101` (not `ProjectManager.initialize()`); every CLI command that needs the claim index goes through `ensureIndex`, so wiring the deltas there ensures author tokens are committed on every reindex without coupling them to construction. The index itself does not write events directly; it produces the planned deltas and the caller commits them. This separation enables the `--dry-run` semantics that future Phase-2 commands need.
 
 ### Phase 1F: Composition Root and Consumer Migration
 

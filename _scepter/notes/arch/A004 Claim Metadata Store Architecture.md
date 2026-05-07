@@ -143,7 +143,7 @@ interface EventFilter {
 
 `VerificationStorage` ({A002.§2.AC.04}) and its filesystem adapter (`FilesystemVerificationStorage`) are removed in favor of `MetadataStorage` and `FilesystemMetadataStorage`. `ProjectManager.verificationStorage` is renamed `metadataStorage`. The legacy verification CLI continues to work (§4) but reads/writes through `MetadataStorage`. This is a hard boundary — parallel coexistence creates two stores that drift, exactly the problem we're avoiding. High binding: composition-root change ripples through every consumer.
 
-### §2.AC.04 The filesystem adapter MUST persist to `_scepter/verification.json`.
+### §2.AC.04:superseded=DD019.§3.DC.20 The filesystem adapter MUST persist to `_scepter/verification.json`.
 
 The legacy filename is preserved (resolves R009 OQ.01). Renaming would force every project through a one-time migration with no functional benefit — the contents of the file are a strict superset of legacy verification events, but the storage location is unchanged. Future renaming is not blocked: `ConfigStorage.load()` may surface a configurable `metadataStorePath` setting in a downstream phase.
 
@@ -157,33 +157,37 @@ Every method returns a `Promise`, even for the filesystem adapter where some ope
 
 ---
 
-## §3 Ingest Paths and Reconciliation
+## §3 Read-Time Overlay (formerly Ingest Paths and Reconciliation)
 
-Two ingest grammars produce events. The architecture's job is to keep them composable without conflict.
+The metadata layer has two sources of metadata, not two ingest grammars. The markdown source (suffix tokens on claim definitions) and the event log (CLI/agent writes via `meta add/set/unset`, `verify`) merge at **read time** in `applyMetadataFilters` to produce the unified key→values projection that filter and trace consumers query. The markdown is the authoritative input for any tag written there; the event log holds only CLI/agent-issued meta. No suffix token is ever persisted as an event. See {DD019.§3.DC.04}, {DD019.§3.DC.11}, {DD019.§3.DC.13} for the merge mechanism and {DD019.§3.DC.14} for the lifecycle-decomposition rule.
 
-### §3.AC.01:4 Suffix-token ingest MUST emit one event per token.
+Three of this section's four original ingest-side ACs ({A004.§3.AC.01}, {A004.§3.AC.03}, {A004.§3.AC.04}) are superseded by {DD019} and remain below as historical record. The two surviving ACs — the lossless normalization table ({A004.§3.AC.02}) and watch-mode integration ({A004.§3.AC.05}) — are re-framed under the overlay model immediately before each.
+
+### §3.AC.01:superseded=DD019.§3.DC.04 Suffix-token ingest MUST emit one event per token.
 
 When the claim index is built (or rebuilt), every `key=value` token in a claim's metadata suffix produces one implicit event with `op="add"`, `actor="author:<notepath>"`, `date = <note file mtime as ISO 8601 datetime>`, and `note = "inline"`. Bare-token shorthands (`:5`, `:closed`, `:deferred`, `:removed`, `:superseded=TARGET`, `:derives=TARGET`, freeform tags) normalize to k=v form before becoming events, per the rules in §3.AC.02. High binding: every R005-era claim in every project carries such tokens, and this rule governs how they enter the generalized store.
 
 ### §3.AC.02 Bare-token shorthand normalization MUST be lossless.
 
-| Shorthand | Normalized event(s) |
-|-----------|---------------------|
+The table below is a **read-side projection rule**: it specifies how `parseClaimMetadata`'s output is mapped into the `Record<key, string[]>` shape that the read-time merge in `applyMetadataFilters` exposes alongside event-log fold results. Under {DD019}, no event is emitted for these tokens — the projection happens in-memory, per claim, on each read.
+
+| Shorthand | Projected key=value(s) |
+|-----------|------------------------|
 | `:5` (digit 1-5) | `importance=5` |
 | `:closed` | `lifecycle=closed` |
 | `:deferred` | `lifecycle=deferred` |
 | `:removed` | `lifecycle=removed` |
-| `:superseded=TARGET` | `lifecycle=superseded` AND `supersededBy=TARGET` (two events) |
+| `:superseded=TARGET` | `lifecycle=superseded` AND `supersededBy=TARGET` (two key entries) |
 | `:derives=TARGET` | `derives=TARGET` |
 | `:freeform` (digit-less, no `=`) | `tag=freeform` |
 
-The reconstruction invariant: applying `parseClaimMetadata()` to a claim's suffix and reconstructing `ParsedMetadata` from the folded state of its implicit events MUST produce identical results. This is the load-bearing rule that makes back-compat work — every existing R005-era consumer of `parseClaimMetadata` continues to see the same shape.
+The losslessness invariant: the unified projection (markdown projection merged with event-log fold) MUST contain every key=value pair the suffix expresses, with no shorthand collapsing two distinct values, and with the lifecycle-superseded decomposition producing the two key entries shown above. The merge implementation in `mergeMarkdownIntoFold` ({DD019.§3.DC.13}, {DD019.§3.DC.14}) is the binding mechanism; this AC is the contract it satisfies.
 
-### §3.AC.03:4 Re-ingest reconciliation MUST be incremental.
+### §3.AC.03:superseded=DD019.§3.DC.04 Re-ingest reconciliation MUST be incremental.
 
 When a claim's note is re-indexed (file mtime changed, claim re-parsed), the ingest path MUST reconcile per token: emit `retract` events for tokens the author removed, emit `add` events for tokens the author added, leave unchanged tokens untouched. A compound "reconciliation event" MUST NOT be used (resolves R009 OQ.03). High binding: this rule is what makes the event log faithful to author edits at token granularity rather than collapsing them into opaque snapshots. The verbosity cost is acceptable — `compact` exists for log compression.
 
-### §3.AC.04 Implicit-event idempotence: re-ingest of an unchanged token MUST be a no-op.
+### §3.AC.04:superseded=DD019.§3.DC.04 Implicit-event idempotence: re-ingest of an unchanged token MUST be a no-op.
 
 If a token is present in the suffix and an `author:` event already exists for it with the same key=value, re-ingest MUST NOT emit a new event. This prevents log churn on every index rebuild for unchanged source files.
 
@@ -191,7 +195,7 @@ If a token is present in the suffix and an `author:` event already exists for it
 
 When SCEpter is running in watch mode (the existing chokidar-based mechanism in `unified-discovery` and `note-manager`), the `MetadataStorage` filesystem adapter MUST register a watcher on its backing file (`_scepter/verification.json`). On file change, the storage MUST re-load the event log and emit a change notification via the optional `watch?` callback (§2.AC.02). Consumers that maintain folded-state caches (formatters, trace renderers, the long-running CLI in chat sessions) MUST subscribe and refresh on change.
 
-This makes the metadata store first-class in the project's reactive surface — the same way note edits trigger re-indexing today, external edits or out-of-band writes to `verification.json` (e.g., from a sibling process or a manual edit) are observed and reflected. Watch is opt-in at the consumer level (matching A002's `watch?` optional method); not every consumer needs to subscribe.
+This makes the metadata store first-class in the project's reactive surface — the same way note edits trigger re-indexing today, external edits or out-of-band writes to the meta file (e.g., from a sibling CLI process or a manual edit) are observed and reflected. Under the overlay model, the meta file holds only CLI/agent-issued events; markdown-source changes flow through the existing note watcher, which re-parses the suffix and refreshes `ClaimIndexEntry` fields, so the next read automatically sees the new projection. Watch is opt-in at the consumer level (matching A002's `watch?` optional method); not every consumer needs to subscribe. The on-disk meta file is `meta.json` post-{DD019.§3.DC.20}; AC.05's body retains the historical filename for traceability with the original architecture, but the watcher path follows `STORE_FILENAME` at runtime.
 
 ---
 

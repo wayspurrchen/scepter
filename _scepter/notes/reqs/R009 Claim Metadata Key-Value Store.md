@@ -180,7 +180,9 @@ Read commands produce either folded current-state views or raw event logs.
 
 Suffix grammar charset and key-value parsing specified in {S002.§4.AC.01–02}; this section asserts the requirements that S002 §4 makes contractual.
 
-The note-body metadata suffix grammar carries `key=value` tokens (per {R004.§2.AC.04}, clarified in {R005.§2.AC.04a}, {R005.§2.AC.04b}). This requirement promotes those tokens to first-class implicit events in the store at ingest time.
+The note-body metadata suffix grammar carries `key=value` tokens, bare digits, lifecycle tags, derivation shorthands, and freeform tokens (per {R004.§2.AC.04}, clarified in {R005.§2.AC.04a}, {R005.§2.AC.04b}). These tokens are recognized at claim-index build time and surfaced as a **read-time projection** alongside the event-log fold; the markdown source is the authoritative input for any tag written there, and the event log is reserved for CLI/agent-issued meta. See {DD019.§3.DC.04}, {DD019.§3.DC.11}, {DD019.§3.DC.13} for the read-time merge mechanism.
+
+Two consequences follow from this framing. First, suffix tokens are not persisted as events — `parseClaimMetadata` populates `ClaimIndexEntry.importance/.lifecycle/.parsedTags/.derivedFrom` during index build, and consumers (filters, formatters, gap analysis) read those fields directly. Filter commands (`meta list`, `trace --where`, `gaps --where`) merge the markdown projection with `metadataStorage.fold` results in `applyMetadataFilters`, so a token written in markdown participates in queries identically to an event written by the CLI. Second, lossless preservation of suffix tokens is satisfied trivially: the markdown is the source, so no information can be lost in transit — there is no transit. {DD019} authors this model and supersedes the prior "implicit events at ingest time" framing.
 
 §4.AC.01:4 Every `key=value` token in a claim's metadata suffix MUST be interpreted at claim-index time as an implicit `op=add` event with `actor="author:<notepath>"`, `date = <note file mtime as ISO 8601 datetime>`, and `note = "inline"`. High binding: every R005-era claim in the project carries such tokens, and this rule governs how they enter the generalized store.
 
@@ -194,9 +196,9 @@ The note-body metadata suffix grammar carries `key=value` tokens (per {R004.§2.
 
 §4.AC.06 The implicit-event normalization MUST be lossless with respect to the existing `parseClaimMetadata()` output: reconstructing `ParsedMetadata` (importance, lifecycle, derivedFrom, tags) from the folded state for a claim's implicit events MUST produce the same structure as the direct parser output. The current-state fold is a strict superset of the legacy shape.
 
-§4.AC.07 Implicit events from suffix tokens MUST be distinguishable from CLI-written events by their `actor` field (prefix `author:`). Downstream tooling that needs only author-declared state (e.g., a "what did the author say about this claim" view) MUST be able to filter the event log to implicit events only.
+§4.AC.07:superseded=DD019.§3.DC.10 Implicit events from suffix tokens MUST be distinguishable from CLI-written events by their `actor` field (prefix `author:`). Downstream tooling that needs only author-declared state (e.g., a "what did the author say about this claim" view) MUST be able to filter the event log to implicit events only.
 
-§4.AC.08 When a claim's document is re-indexed, implicit events from the prior parse MUST NOT accumulate. The ingest MUST reconcile: retract any implicit events the author no longer declares, and add any implicit events the author newly declares. The invariant is that the current implicit-event set for a claim equals the set produced by parsing the current document.
+§4.AC.08:superseded=DD019.§3.DC.04 When a claim's document is re-indexed, implicit events from the prior parse MUST NOT accumulate. The ingest MUST reconcile: retract any implicit events the author no longer declares, and add any implicit events the author newly declares. The invariant is that the current implicit-event set for a claim equals the set produced by parsing the current document.
 
 ### §5 — Integration Filters on Existing Commands
 
@@ -260,7 +262,7 @@ This requirement generalizes R005's verification subsystem; it does not replace 
 
 §7.AC.02 The migration precedent is the existing `timestamp` → `date` normalization in `loadVerificationStore` (`core/src/claims/verification-store.ts:64-71`). The legacy-event migration MUST follow the same pattern: transparent on load, no separate migration step required of the user.
 
-§7.AC.03 The system MUST preserve the legacy file name (`verification.json`) as the canonical storage path. This is settled by {A004.§2.AC.04} (filename unchanged); a future rename is not blocked but requires explicit configuration support, not silent migration.
+§7.AC.03:superseded=DD019.§3.DC.20 The system MUST preserve the legacy file name (`verification.json`) as the canonical storage path. This is settled by {A004.§2.AC.04} (filename unchanged); a future rename is not blocked but requires explicit configuration support, not silent migration.
 
 #### Legacy CLI
 

@@ -115,11 +115,13 @@ export const gapsCommand = new Command('gaps')
             process.exit(1);
           }
           // @implements {DD014.§3.DC.56} AND-compose metadata filters with the existing flag set
+          // @implements {DD019.§3.DC.11} Markdown overlay merged into fold at filter time
           matrix.rows = await applyMetadataFilters(
             matrix.rows,
             (row) => row.claimId,
             context.projectManager.metadataStorage!,
             filterParse,
+            (cid) => context.projectManager.claimIndex.getClaim(cid),
           );
 
           // @implements {R005.§1.AC.04} Sort rows by importance descending

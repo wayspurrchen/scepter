@@ -13,7 +13,8 @@ import * as lockfile from 'proper-lockfile';
 import { FilesystemMetadataStorage } from './filesystem-metadata-storage';
 import type { MetadataEvent } from '../../claims/metadata-event';
 
-const STORE_FILENAME = 'verification.json';
+// @validates {DD019.§3.DC.24} STORE_FILENAME mirror updated to meta.json
+const STORE_FILENAME = 'meta.json';
 
 const event = (claimId: string, value: string): MetadataEvent => ({
   id: 'id-' + Math.random().toString(36).slice(2),
@@ -30,6 +31,8 @@ async function ensureLockFile(filePath: string): Promise<void> {
   await handle.close();
 }
 
+// @validates {DD019.§3.DC.38} Existing concurrent-write rejection tests preserved unchanged
+// @validates {DD019.§3.DC.34} Reads (load, query, fold) MUST NOT acquire the lock
 describe('FilesystemMetadataStorage — concurrent-write lock', () => {
   let tmpDir: string;
   let lockFilePath: string;
@@ -86,5 +89,63 @@ describe('FilesystemMetadataStorage — concurrent-write lock', () => {
     await expect(storage.append(event('R001.§1.AC.01', 'a'))).resolves.toBeUndefined();
     const loaded = await storage.load();
     expect(loaded['R001.§1.AC.01']).toHaveLength(1);
+  });
+});
+
+describe('FilesystemMetadataStorage — lock-leak regression (DD019.§3.DC.30, .DC.31, .DC.36, .DC.37)', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'scepter-meta-leak-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  // @validates {DD019.§3.DC.30} No regular sidecar lock file persists after a successful append
+  // @validates {DD019.§3.DC.31} ensureLockFile removed; eager file creation gone
+  // @validates {DD019.§3.DC.36} Regression test for the leak fix
+  it('does not persist a regular meta.json.lock file after append() returns', async () => {
+    const storage = new FilesystemMetadataStorage(tmpDir);
+    const lockPath = path.join(tmpDir, STORE_FILENAME + '.lock');
+
+    await storage.append(event('R001.§1.AC.01', 'a'));
+
+    // The eager regular sidecar must be gone. proper-lockfile manages its
+    // own `.lock.lock` directory; the application-level eager file is the
+    // leak we removed.
+    await expect(fs.access(lockPath, fs.constants.F_OK)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  // @validates {DD019.§3.DC.37} proper-lockfile's own sidecar (.lock.lock) cleans up on release
+  it('does not persist a proper-lockfile .lock.lock directory after append()', async () => {
+    const storage = new FilesystemMetadataStorage(tmpDir);
+    const lockPath = path.join(tmpDir, STORE_FILENAME + '.lock');
+    const sidecarDir = lockPath + '.lock';
+
+    await storage.append(event('R001.§1.AC.01', 'a'));
+
+    // proper-lockfile's contract: the .lock.lock directory is created on
+    // acquire and removed on release. Belt-and-suspenders assertion.
+    await expect(fs.access(sidecarDir, fs.constants.F_OK)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  // @validates {DD019.§3.DC.30} repeated calls do not accumulate lock artifacts
+  it('does not leave a regular sidecar after multiple appends', async () => {
+    const storage = new FilesystemMetadataStorage(tmpDir);
+    const lockPath = path.join(tmpDir, STORE_FILENAME + '.lock');
+
+    await storage.append(event('R001.§1.AC.01', 'a'));
+    await storage.append(event('R001.§1.AC.02', 'b'));
+    await storage.append(event('R002.§1.AC.01', 'c'));
+
+    await expect(fs.access(lockPath, fs.constants.F_OK)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 });

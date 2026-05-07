@@ -138,7 +138,7 @@ scepter/
       blank/                    Empty project
       minimal/                  Minimal starter
       example/                  Full example with sample notes
-      epi/                      Epistemic vocabulary taxonomy
+      default/                  Engineering-stack schema (Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task) — picked when `scepter init` runs with no template name
   claude/                       Claude Code integration
     agents/                     Specialized subagents (researcher, reviewer, producer, linker)
     skills/                     Skills (scepter workflow, sce-retrofit)
@@ -248,7 +248,7 @@ R004
 - **Claim Tree Builder** (`parsers/claim/claim-tree.ts`) -- Parses markdown into a hierarchical tree of sections and claims based on heading structure
 - **Claim Index** (`claims/claim-index.ts`) -- Builds an in-memory index across all notes, mapping fully-qualified claim IDs to their entries with cross-references. For folder-based notes, the index receives aggregated content from all companion `.md` files via `NoteFileManager.getAggregatedContents()`, so claims defined in any sub-file are indexed under the parent note's ID.
 - **Traceability** (`claims/traceability.ts`) -- Builds traceability matrices showing how claims project across note types (Requirement -> Spec -> Design -> Source) and detects gaps
-- **Verification Store** (`claims/verification-store.ts`) -- Append-only JSON store (`_scepter/verification.json`) recording when claims were verified
+- **Metadata Store** (`storage/filesystem/filesystem-metadata-storage.ts`) -- Append-only JSON store (`_scepter/meta.json`) recording CLI/agent-issued claim metadata (verifications, reviews, freeform key/value pairs). Author-declared suffix tokens (`:5`, `:closed`, `:derives=...`) are NOT persisted here — they are read directly from the markdown source via `ClaimIndexEntry` fields and merged into the event-derived projection at filter time (see DD019).
 - **Staleness** (`claims/staleness.ts`) -- Detects stale claims by comparing source file modification times against verification dates
 - **Search** (`claims/claim-search.ts`) -- Filters claims by text, note type, importance, lifecycle state, and derivation graph
 - **Thread** (`claims/claim-thread.ts`) -- Builds relationship trees showing how claims connect across notes
@@ -298,7 +298,7 @@ Manages Handlebars templates for note creation:
 - Templates are loaded at initialization and cached in memory
 - Supports file watching for live reloading
 
-Project initialization templates (boilerplates) are stored in `core/boilerplates/` with four options: `blank`, `minimal`, `example`, and `epi`.
+Project initialization templates (boilerplates) are stored in `core/boilerplates/` with four options: `default` (used when `scepter init` runs with no template name), `blank`, `minimal`, and `example`.
 
 ### Type System
 
@@ -378,7 +378,7 @@ _scepter/
     ...
   templates/
     types/               Handlebars templates per note type
-  verification.json      Verification event store (for claims)
+  meta.json              Claim metadata event store (CLI/agent-issued meta)
 ```
 
 **Notes are not required to live under `_scepter/`.** The `_scepter/` directory is the canonical home for project-level state (config, templates, verification data), and new notes default to `_scepter/notes/[type_folder]/`, but the `discoveryPaths` configuration option tells SCEpter where to scan for existing notes. A project may set `discoveryPaths: ["."]` to discover notes anywhere in the repo, or point at specific roots like `["docs", "specs"]`. Discovery is keyed on ID prefix (e.g., `R001`, `DD003`), not folder location, so notes are portable. Code and documentation should never assume a fixed note path — always use the `scepter` CLI (`scepter ctx list`, `scepter ctx show`, `scepter config`) to locate notes.

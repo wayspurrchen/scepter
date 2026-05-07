@@ -1,10 +1,10 @@
 /**
  * Structural tests for the `meta` Commander subcommand group.
  *
- * Verifies the seven subcommands are registered with the correct argument
+ * Verifies the six subcommands are registered with the correct argument
  * shapes and option flags per DD014 §3.DC.24-§3.DC.35.
  *
- * @validates {DD014.§3.DC.24} metaCommand barrel registers add/set/unset/clear/get/log/migrate-legacy
+ * @validates {DD014.§3.DC.24} metaCommand barrel registers add/set/unset/clear/get/log
  * @validates {DD014.§3.DC.25} `add` accepts <claim> + variadic KEY=VALUE; --actor/--date/--note
  * @validates {DD014.§3.DC.29} `set` accepts the same arguments
  * @validates {DD014.§3.DC.30} `unset` accepts <claim> + variadic KEY (bare)
@@ -12,6 +12,7 @@
  * @validates {DD014.§3.DC.32} `get` accepts <claim> + optional [key]
  * @validates {DD014.§3.DC.34} `get --json` flag
  * @validates {DD014.§3.DC.35} `log` accepts <claim>; --json flag
+ * @validates {DD019.§3.DC.40} migrate-legacy is no longer registered
  */
 import { describe, it, expect } from 'vitest';
 import { metaCommand } from '../index';
@@ -27,17 +28,23 @@ describe('metaCommand structure', () => {
   });
 
   // @validates {DD014.§3.DC.24}
-  it('registers the seven subcommands', () => {
+  // @validates {DD019.§3.DC.40} migrate-legacy retired; six subcommands remain
+  it('registers the six subcommands (migrate-legacy retired per DD019.§3.DC.40)', () => {
     const names = metaCommand.commands.map((c) => c.name()).sort();
     expect(names).toEqual([
       'add',
       'clear',
       'get',
       'log',
-      'migrate-legacy',
       'set',
       'unset',
     ]);
+  });
+
+  // @validates {DD019.§3.DC.40} migrate-legacy is no longer registered
+  it('does not register migrate-legacy', () => {
+    const names = metaCommand.commands.map((c) => c.name());
+    expect(names).not.toContain('migrate-legacy');
   });
 
   // @validates {DD014.§3.DC.25}
@@ -161,15 +168,4 @@ describe('metaCommand structure', () => {
     });
   });
 
-  describe('migrate-legacy subcommand', () => {
-    const migrate = metaCommand.commands.find((c) => c.name() === 'migrate-legacy')!;
-
-    it('exists', () => {
-      expect(migrate).toBeDefined();
-    });
-
-    it('takes no positional arguments', () => {
-      expect(migrate.registeredArguments).toHaveLength(0);
-    });
-  });
 });

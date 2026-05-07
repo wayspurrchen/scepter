@@ -1,74 +1,119 @@
 /**
- * Lossless invariant test: parseClaimMetadata(tokens) and the fold
- * reconstruction of reconcileNoteEvents output produce identical
- * ParsedMetadata for every legal suffix token combination.
+ * Lossless invariant: parseClaimMetadata(tokens) produces the documented
+ * ParsedMetadata shape for every legal suffix-token combination.
  *
- * @validates {DD014.§3.DC.59} parseClaimMetadata <-> fold lossless
- * @validates {A004.§3.AC.02}
- * @validates {DD014.§3.DC.39}
+ * Originally this test round-tripped tokens through reconcileNoteEvents →
+ * applyFold → reconstructFromFold and asserted equality. Under the
+ * read-time overlay model authored by DD019, no such round-trip exists —
+ * the markdown projection is read directly from ClaimIndexEntry fields
+ * populated by parseClaimMetadata at index build time. The lossless
+ * property therefore reduces to a parser-only invariant: every legal
+ * token combination produces the documented ParsedMetadata shape, and
+ * KEY=VALUE general-form tokens are surfaced through `tags` in their
+ * original on-disk shape (the merge layer in metadata-filters splits
+ * them back into (key, value) pairs at filter time per DD019.§3.DC.13).
+ *
+ * @validates {DD019.§3.DC.45} Lossless invariant retained as a parser-only test
+ * @validates {A004.§3.AC.02} Read-time normalization table semantics
  */
 import { describe, it, expect } from 'vitest';
 import { parseClaimMetadata } from '../claim-metadata';
-import {
-  reconcileNoteEvents,
-  reconstructFromFold,
-  authorActor,
-} from '../metadata-ingest';
-import { applyFold } from '../metadata-event';
 import type { ParsedMetadata } from '../claim-metadata';
 
-const NOTE_PATH = 'note.md';
-const CLAIM = 'R009.§1.AC.01';
-const DATE = '2026-04-25T00:00:00.000Z';
-
-function normalizeForCompare(p: ParsedMetadata): {
+interface Expected {
   importance?: number;
   lifecycle?: { type: string; target?: string };
   tags: string[];
   derivedFrom: string[];
-} {
-  const tags = [...p.tags].sort();
-  const derivedFrom = [...p.derivedFrom].sort();
-  const out: ReturnType<typeof normalizeForCompare> = { tags, derivedFrom };
+}
+
+function snapshot(p: ParsedMetadata): Expected {
+  const out: Expected = {
+    tags: [...p.tags].sort(),
+    derivedFrom: [...p.derivedFrom].sort(),
+  };
   if (p.importance !== undefined) out.importance = p.importance;
   if (p.lifecycle !== undefined) out.lifecycle = p.lifecycle;
   return out;
 }
 
-function reconstructed(tokens: string[]): ReturnType<typeof reconstructFromFold> {
-  const { toAppend } = reconcileNoteEvents(
-    NOTE_PATH,
-    [{ fullyQualified: CLAIM, metadata: tokens }],
-    {},
-    DATE,
-  );
-  // Filter to events for this claim (all should be) and fold.
-  const claimEvents = toAppend.filter((e) => e.claimId === CLAIM);
-  // The author actor should be consistent with our authorActor() helper.
-  const actor = authorActor(NOTE_PATH);
-  for (const event of claimEvents) {
-    expect(event.actor).toBe(actor);
-  }
-  const folded = applyFold(claimEvents);
-  const out = reconstructFromFold(folded);
-  out.tags = [...out.tags].sort();
-  out.derivedFrom = [...out.derivedFrom].sort();
-  return out;
-}
-
-describe('Lossless invariant: parseClaimMetadata <-> fold reconstruction', () => {
-  const cases: Array<{ name: string; tokens: string[] }> = [
-    { name: 'empty', tokens: [] },
-    { name: 'importance only', tokens: ['5'] },
-    { name: 'importance + lifecycle', tokens: ['4', 'closed'] },
-    { name: 'importance + derives', tokens: ['3', 'derives=R005.§1.AC.01'] },
-    { name: 'lifecycle alone', tokens: ['deferred'] },
-    { name: 'superseded', tokens: ['superseded=R004.§2.AC.07'] },
-    { name: 'multiple derives', tokens: ['derives=R001.§1.AC.01', 'derives=R002.§1.AC.02'] },
-    { name: 'freeform tag', tokens: ['security'] },
-    { name: 'multiple tags', tokens: ['security', 'auth', 'compliance'] },
+describe('Lossless invariant: parseClaimMetadata produces documented shape', () => {
+  const cases: Array<{ name: string; tokens: string[]; expected: Expected }> = [
     {
-      name: 'kitchen sink',
+      name: 'empty',
+      tokens: [],
+      expected: { tags: [], derivedFrom: [] },
+    },
+    {
+      name: 'importance only',
+      tokens: ['5'],
+      expected: { tags: [], derivedFrom: [], importance: 5 },
+    },
+    {
+      name: 'importance + lifecycle (closed)',
+      tokens: ['4', 'closed'],
+      expected: {
+        tags: [],
+        derivedFrom: [],
+        importance: 4,
+        lifecycle: { type: 'closed' },
+      },
+    },
+    {
+      name: 'importance + derives',
+      tokens: ['3', 'derives=R005.§1.AC.01'],
+      expected: {
+        tags: [],
+        derivedFrom: ['R005.§1.AC.01'],
+        importance: 3,
+      },
+    },
+    {
+      name: 'lifecycle alone (deferred)',
+      tokens: ['deferred'],
+      expected: {
+        tags: [],
+        derivedFrom: [],
+        lifecycle: { type: 'deferred' },
+      },
+    },
+    {
+      name: 'superseded=TARGET preserves the target',
+      tokens: ['superseded=R004.§2.AC.07'],
+      expected: {
+        tags: [],
+        derivedFrom: [],
+        lifecycle: { type: 'superseded', target: 'R004.§2.AC.07' },
+      },
+    },
+    {
+      name: 'multiple derives entries collected independently',
+      tokens: ['derives=R001.§1.AC.01', 'derives=R002.§1.AC.02'],
+      expected: {
+        tags: [],
+        derivedFrom: ['R001.§1.AC.01', 'R002.§1.AC.02'],
+      },
+    },
+    {
+      name: 'freeform tag',
+      tokens: ['security'],
+      expected: { tags: ['security'], derivedFrom: [] },
+    },
+    {
+      name: 'multiple freeform tags',
+      tokens: ['security', 'auth', 'compliance'],
+      expected: {
+        tags: ['auth', 'compliance', 'security'],
+        derivedFrom: [],
+      },
+    },
+    {
+      name: 'KEY=VALUE token surfaced verbatim through tags (split at filter time)',
+      tokens: ['reviewer=alice'],
+      expected: { tags: ['reviewer=alice'], derivedFrom: [] },
+    },
+    {
+      name: 'kitchen sink: importance + lifecycle + derives + tags',
       tokens: [
         '5',
         'closed',
@@ -77,23 +122,42 @@ describe('Lossless invariant: parseClaimMetadata <-> fold reconstruction', () =>
         'security',
         'auth',
       ],
+      expected: {
+        tags: ['auth', 'security'],
+        derivedFrom: ['R005.§1.AC.01', 'R006.§1.AC.02'],
+        importance: 5,
+        lifecycle: { type: 'closed' },
+      },
     },
-    { name: 'kv pair', tokens: ['reviewer=alice'] },
   ];
 
   for (const c of cases) {
-    it(`agrees on: ${c.name}`, () => {
-      const fromParser = normalizeForCompare(parseClaimMetadata(c.tokens));
-      const fromFold = reconstructed(c.tokens);
-
-      // The parser collects k=v general-form tokens as freeform tags
-      // (e.g., `reviewer=alice` ends up in `tags`). The fold path stores them
-      // under the explicit key. To compare, we normalize the parser's tag
-      // bucket: any element matching `KEY=VALUE` is dropped from the
-      // comparison set since it has no representation in fromFold.tags.
-      const parserTagsFiltered = fromParser.tags.filter((t) => !/^[a-z][a-z0-9._-]*=/.test(t));
-
-      expect({ ...fromParser, tags: parserTagsFiltered.sort() }).toEqual(fromFold);
+    it(`produces the documented shape for: ${c.name}`, () => {
+      const parsed = snapshot(parseClaimMetadata(c.tokens));
+      const expected: Expected = {
+        ...c.expected,
+        tags: [...c.expected.tags].sort(),
+        derivedFrom: [...c.expected.derivedFrom].sort(),
+      };
+      expect(parsed).toEqual(expected);
     });
   }
+
+  it('first importance digit wins; subsequent digits become tags only when outside 1-5', () => {
+    const parsed = snapshot(parseClaimMetadata(['5', '4']));
+    expect(parsed.importance).toBe(5);
+    // The second digit is in range 1-5 so it is silently ignored, not tagged.
+    expect(parsed.tags).toEqual([]);
+  });
+
+  it('digits outside 1-5 are surfaced as freeform tags', () => {
+    const parsed = snapshot(parseClaimMetadata(['7']));
+    expect(parsed.importance).toBeUndefined();
+    expect(parsed.tags).toEqual(['7']);
+  });
+
+  it('multiple lifecycle tags: first wins (lint catches separately)', () => {
+    const parsed = snapshot(parseClaimMetadata(['closed', 'deferred']));
+    expect(parsed.lifecycle).toEqual({ type: 'closed' });
+  });
 });

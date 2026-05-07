@@ -2,7 +2,9 @@
  * Tests for FilesystemMetadataStorage: load/save/append/query/fold semantics
  * plus legacy-shape rejection. Lock and watch tests live in dedicated files.
  *
- * @validates {DD014.§3.DC.14} Implements MetadataStorage; persists to verification.json
+ * @validates {DD019.§3.DC.20} STORE_FILENAME is meta.json
+ * @validates {DD019.§3.DC.23} Test mirror updated to meta.json; legacy-shape rejection preserved
+ * @validates {DD014.§3.DC.14} Implements MetadataStorage; persists to meta.json
  * @validates {DD014.§3.DC.15} Constructor accepts dataDir; no I/O at construction
  * @validates {DD014.§3.DC.16} load returns {} on missing file; rejects legacy shape
  * @validates {DD014.§3.DC.17} save round-trips
@@ -16,7 +18,7 @@ import * as os from 'os';
 import { FilesystemMetadataStorage } from './filesystem-metadata-storage';
 import type { MetadataEvent, MetadataStore } from '../../claims/metadata-event';
 
-const STORE_FILENAME = 'verification.json';
+const STORE_FILENAME = 'meta.json';
 
 const baseEvent = (
   partial: Partial<MetadataEvent> & Pick<MetadataEvent, 'op' | 'key' | 'value'>,
@@ -51,7 +53,8 @@ describe('FilesystemMetadataStorage', () => {
 
     // T-Migration-5
     // @validates {DD014.§3.DC.16}
-    it('rejects legacy-shape verification.json with a clear error', async () => {
+    // @validates {DD019.§3.DC.21} legacy-shape error references meta.json (not verification.json)
+    it('rejects legacy-shape meta.json with a clear error', async () => {
       const filePath = path.join(tmpDir, STORE_FILENAME);
       const legacy = {
         'R001.§1.AC.01': [
@@ -59,7 +62,7 @@ describe('FilesystemMetadataStorage', () => {
         ],
       };
       await fs.writeFile(filePath, JSON.stringify(legacy, null, 2), 'utf-8');
-      await expect(storage.load()).rejects.toThrow(/meta migrate-legacy/);
+      await expect(storage.load()).rejects.toThrow(/Legacy-shape meta\.json/);
     });
 
     it('loads new-shape events', async () => {
