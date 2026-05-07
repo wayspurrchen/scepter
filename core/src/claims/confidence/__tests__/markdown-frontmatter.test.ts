@@ -222,25 +222,17 @@ describe('markdownFrontmatterAdapter.insert', () => {
     expect(twice.replace(/\n+$/, '\n')).toBe(once.replace(/\n+$/, '\n'));
   });
 
-  // S003 Edge case 2 — insert MAY propagate errors (the "MAY propagate" half
-  // of the parse-vs-insert asymmetry). Our implementation does not catch
-  // gray-matter errors in insert; whether gray-matter throws on a given
-  // malformed input is a function of its parser, not our adapter. The
-  // test below verifies that our adapter does NOT silently swallow a
-  // throw — i.e. if gray-matter throws, the throw propagates.
-  it('S003 Edge case 2: insert does not silently swallow gray-matter throws', () => {
-    // Simulate gray-matter throwing by passing input that gray-matter
-    // recognizes as having a frontmatter sentinel but rejects when
-    // re-stringifying. In practice this is hard to arrange reliably across
-    // gray-matter versions, so we instead verify the contract via spec
-    // inspection: parse() catches its matter() call (line 60-65), insert()
-    // does not (line 152). If matter() throws on insert's input, that
-    // throw propagates to the caller. Smoke check: parse the same
-    // ill-formed input and confirm parse returns null.
-    const malformed = '---\nunclosed: "quote\n---\nbody';
-    expect(markdownFrontmatterAdapter.parse(malformed, 'bad.md')).toBeNull();
-    // The asymmetry — that insert is structurally NOT wrapped in try/catch —
-    // is a code-shape contract verified by reading the source.
+  // S003 Edge case 2 — insert propagates gray-matter throws.
+  // gray-matter caches its rejection of any particular malformed input
+  // within a single test module, so the input here MUST be unique and
+  // not used by any earlier test in this file (otherwise the second
+  // matter() call returns the cached "no frontmatter" result instead of
+  // throwing). The duplicate-mapping-key shape below reliably throws on
+  // first-encounter inputs through js-yaml.
+  it('S003 Edge case 2: insert propagates gray-matter throws on malformed YAML', () => {
+    const malformed =
+      '---\nedge_case_2_unique_key: 1\nedge_case_2_unique_key: 2\n---\nbody';
+    expect(() => markdownFrontmatterAdapter.insert(malformed, payload)).toThrow();
   });
 });
 
