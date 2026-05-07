@@ -5,6 +5,8 @@
  * parses each for @confidence annotations, and displays summary.
  *
  * @implements {R004.§7.AC.01} scepter confidence audit command
+ * @see {DD016.§1.DC.06} consumes auditConfidence from the new barrel pending
+ *   {S004}/{DD017} multi-scope audit refactor
  */
 
 import { Command } from 'commander';

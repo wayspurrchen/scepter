@@ -5,6 +5,8 @@
  * formats and inserts the confidence annotation, writes back.
  *
  * @implements {R004.§7.AC.02} scepter confidence mark command
+ * @see {DD016.§1.DC.06} legacy-compat wrappers consumed here pending {S004}/{DD017}
+ *   routing this command through getAdapter
  */
 
 import * as path from 'path';

@@ -92,6 +92,8 @@ export type {
 } from './claim-thread.js';
 
 // Confidence markers
+// @see {DD016.§1.DC.06} barrel re-export contract — these names are
+//   preserved as legacy-compat wrappers around the new adapter registry
 export {
   parseConfidenceAnnotation,
   formatConfidenceAnnotation,
