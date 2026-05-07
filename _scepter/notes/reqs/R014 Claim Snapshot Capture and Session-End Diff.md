@@ -202,6 +202,7 @@ None open.
 - {R004} — Claim-Level Addressability and Traceability System. Establishes the FQID format and the claim index that capture and diff consume.
 - {S002} — Claim Reference Grammar Cross-Tab. The authoritative grammar for FQIDs that snapshot files serialize.
 - {R009} — Claim Metadata Key-Value Store. The current home of the importance and lifecycle values that §1.AC.04 captures.
+- {DD018} — Claim Snapshot Capture and Diff Implementation Blueprint. The downstream design that pins the schema, hash algorithm, atomic-write mechanics, diff pipeline, tombstone detector, and CLI surface against this requirement's 47 ACs.
 
 ## Status
 

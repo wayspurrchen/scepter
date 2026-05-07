@@ -39,6 +39,8 @@ import { staleCommand } from './commands/claims/stale-command.js';
 import { threadCommand } from './commands/claims/thread-command.js';
 // @implements {DD014.§3.DC.24} `meta` subcommand group registered at top level
 import { metaCommand } from './commands/claims/meta/index.js';
+// @implements {DD018.§3.DC.76} `snapshot` subcommand group registered at top level
+import { snapshotCommand } from './commands/claims/snapshot/index.js';
 
 // Remaining top-level commands
 import { typesCommand } from './commands/types/index.js';
@@ -95,6 +97,8 @@ program.addCommand(verifyCommand);
 program.addCommand(staleCommand);
 program.addCommand(threadCommand);
 program.addCommand(metaCommand);
+// @implements {DD018.§3.DC.76} register snapshotCommand at top level
+program.addCommand(snapshotCommand);
 
 // Backward-compatible hidden aliases {DD006.§3.DC.05}, {DD006.§3.DC.06}, {DD006.§3.DC.07}
 // These intercept old-style `scepter ctx <cmd>`, `scepter claims <cmd>`, `scepter notes <cmd>`
@@ -134,7 +138,7 @@ createBackwardCompatAlias('notes');
 const COMMAND_GROUPS: Record<string, string[]> = {
   'Note CRUD': ['create', 'show', 'list', 'search', 'delete', 'archive', 'restore', 'purge', 'convert', 'ingest'],
   'Connection Understanding': ['trace', 'thread', 'gather', 'gaps'],
-  'Quality and Hygiene': ['lint', 'verify', 'stale'],
+  'Quality and Hygiene': ['lint', 'verify', 'stale', 'snapshot'],
   'Configuration': ['types', 'confidence', 'config', 'init'],
 };
 
