@@ -15,36 +15,22 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { glob } from 'glob';
 import type { SourceCodeIntegrationConfig } from '../types/config.js';
+import type {
+  ConfidenceLevel,
+  ReviewerIcon,
+  ConfidenceAnnotation,
+} from './confidence/types.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * Numeric confidence level 1-5.
- * @implements {R004.§7.AC.01} Level type definition
- * @implements {R004.§7.AC.02} Level type definition
- */
-export type ConfidenceLevel = 1 | 2 | 3 | 4 | 5;
-
-/**
- * Reviewer icon: AI-generated or human-reviewed.
- * @implements {R004.§7.AC.02} Reviewer icon type
- */
-export type ReviewerIcon = '🤖' | '👤';
-
-/**
- * Parsed confidence annotation from a source file.
- * @implements {R004.§7.AC.01} Annotation data structure
- * @implements {R004.§7.AC.02} Annotation data structure
- */
-export interface ConfidenceAnnotation {
-  level: ConfidenceLevel;
-  reviewer: ReviewerIcon;
-  date?: string;
-  line: number;
-  filePath: string;
-}
+export type {
+  ConfidenceLevel,
+  ReviewerIcon,
+  ConfidencePayload,
+  ConfidenceAnnotation,
+} from './confidence/types.js';
 
 /**
  * Aggregate result from scanning multiple files for confidence annotations.
