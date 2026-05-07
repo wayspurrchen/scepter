@@ -1,7 +1,7 @@
 ---
 created: 2026-05-05T16:00:38.497Z
 tags: [confidence, audit, mark, apply, auto-insert, cli, detailed-design]
-status: draft
+status: ready_for_review
 ---
 
 # DD017 - Confidence command surface implementation
