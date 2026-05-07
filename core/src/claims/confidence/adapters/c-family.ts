@@ -81,9 +81,14 @@ function parse(
 }
 
 /**
- * Hat 1 implementation: dated path only. Hat 2 §7 adds the no-date branch.
+ * Format a payload as the C-family annotation string. When date is
+ * defined, includes the trailing space and date; when undefined, emits
+ * the bare `// @confidence <reviewer><level>` form per the
+ * `claims.confidence.includeDate=false` path.
  *
- * @see {S003.§3.AC.03} format string contract (full contract realized in §7)
+ * @implements {DD016.§5.DC.22} dated and no-date branches
+ * @implements {S003.§3.AC.03} format string contract (dated AND no-date)
+ * @implements {R013.§1.AC.06} no-date format branch (source projection)
  * @implements {R004.§7.AC.02} format string convention
  */
 function format(
@@ -91,9 +96,10 @@ function format(
   level: ConfidenceLevel,
   date?: string,
 ): string {
-  // Hat 1: callers always supply date; Hat 2 §7 rewrites with the
-  // no-date branch and lifts this non-null assertion.
-  return `// @confidence ${reviewer}${level} ${date!}`;
+  if (date === undefined) {
+    return `// @confidence ${reviewer}${level}`;
+  }
+  return `// @confidence ${reviewer}${level} ${date}`;
 }
 
 /**
