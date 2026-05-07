@@ -146,6 +146,27 @@ When editing, correcting, or rewriting a document, write what IS — not what it
 
 This applies to section headers, claim text, architectural descriptions, any prose being corrected. It does NOT apply to claim lifecycle tags (`:removed`, `:superseded`) — those use the claim lifecycle system.
 
+### Do not catalog absences in the canonical body
+
+A canonical artifact states what IS, not what is excluded and why. Prose that explains what the document deliberately does not include — "the ACs below intentionally do not enumerate X because Y," "this section deliberately does not specify Z, that is specification-layer content," "we do not assert distinguishability as a numbered claim because doing so would be authorial framing" — pollutes the canonical body with meta-content about authoring choices. Future readers reverse-engineer the rejected options from the prose, treating them as if they were considered or live. The artifact should read as if it had always been written this way.
+
+**Examples to remove from canonical content:**
+- "The acceptance criteria below intentionally do not enumerate {context A, context B, context C} because those are user-facing surfaces that produce or consume the claim, not observable system states."
+- "This requirement deliberately does not commit to a behavioral protocol — that belongs to a downstream specification."
+- "The exact mechanism is open and not asserted here."
+- "We do not include {feature} because of layer concerns."
+- "This section deliberately omits {topic}; see Open Questions for why."
+
+**What to do instead:**
+- State what IS. If a workflow context isn't enumerated, just don't enumerate it. The reader can see what's there; they don't need a paragraph telling them what isn't.
+- For decisions with genuine downstream impact (alternatives considered before settling), use an Open Questions, Design Decisions, or Decision Log section — those are first-class content, not absence-justifications.
+- Forward references to where something is located (not why it isn't here) are fine: "See §OQ.NN" without the "deliberately not asserted" framing.
+- Before-after comparison, change summaries, and author's-notes-for-review prose go in a SEPARATE review document or in an explicitly-marked `## Author's notes` section consumers know to skip — never inline in the canonical body.
+
+**The test:** Would removing this prose change what a reader needs to know to use or implement the artifact? If no, remove it. The canonical body is for current state; everything else goes elsewhere.
+
+This rule applies to YOUR conversational output as well as artifact bodies. When the user corrects a position, state the corrected position directly. Do not narrate the correction trail ("previously I said X, now I think Y", "I was wrong about Z"). The user already knows what they corrected; restating it is noise.
+
 ## Claim Traceability Rules
 
 - **`@implements` means actually implemented.** NEVER annotate a stub, placeholder, no-op, or function that returns a hardcoded empty result with `@implements`. This poisons the trace matrix — `scepter claims trace` shows Source coverage for something that doesn't work, and `scepter claims gaps` stays silent about a real gap. Use `@see` for stubs and tag the claim with `:deferred` in the note. See `implementing.md` and `claims.md` for the full rule and correct annotation patterns.
