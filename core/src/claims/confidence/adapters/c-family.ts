@@ -102,7 +102,9 @@ function format(
  * DD016 §5.
  *
  * @see {S003.§3.AC.05} corrected three-branch insert (NOT yet implemented)
- * @implements {S003.§3.AC.04} replace-in-place when annotation found (legacy preserves this)
+ * @see {S003.§3.AC.04} carrier preservation on replace (NOT yet implemented;
+ *   legacy always writes `//`-form regardless of matched carrier; DC.27/DC.28
+ *   carrier-aware replace lands in §7)
  * @implements {R004.§7.AC.02} insert/replace annotation
  */
 function insert(content: string, payload: ConfidencePayload): string {
