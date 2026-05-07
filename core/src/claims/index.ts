@@ -99,11 +99,11 @@ export {
   validateReviewerLevel,
   mapReviewerArg,
   auditConfidence,
-} from './confidence.js';
+} from './confidence/index.js';
 
 export type {
   ConfidenceLevel,
   ReviewerIcon,
   ConfidenceAnnotation,
   ConfidenceAuditResult,
-} from './confidence.js';
+} from './confidence/index.js';
