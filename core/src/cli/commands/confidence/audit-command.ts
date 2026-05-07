@@ -42,10 +42,13 @@ export const auditCommand = new Command('audit')
             return;
           }
 
-          const result = await auditConfidence(
-            context.projectPath,
-            config.sourceCodeIntegration,
-          );
+          // {S004} migrates this call to the new (pm, options) signature.
+          // Step 3 wires --source-only / --notes-only / --paths flags;
+          // for now we preserve the existing source-only behavior by
+          // passing scope: 'source'.
+          const result = await auditConfidence(context.projectManager, {
+            scope: 'source',
+          });
 
           // Filter by level if specified
           if (options.level) {
