@@ -3,24 +3,24 @@
  * getAdapter(filePath) lookup.
  *
  * Order is "most-specific-first" — narrower matchers register before
- * broader ones. The Hat 1 registry contains only the C-family adapter
- * so adapter lookup is well-defined for source files (the only shape
- * with a real adapter at this step). The markdown-frontmatter adapter
- * is added in DD016 §4 (Hat 2 step 9).
+ * broader ones. Currently no two adapters overlap (`.md` for frontmatter;
+ * `.ts`, `.tsx`, `.js`, `.jsx`, `.css` for c-family), but the order is
+ * specified anyway so future adapters can refine dispatch by registering
+ * BEFORE the adapter they narrow.
  *
  * @see {DD016.§4} registry mechanics
  */
 
 import type { ConfidenceAdapter } from './adapter.js';
+import { markdownFrontmatterAdapter } from './adapters/markdown-frontmatter.js';
 import { cFamilyAdapter } from './adapters/c-family.js';
 
 /**
- * @implements {DD016.§4.DC.14} adapters array readonly, not exported
- * @implements {DD016.§4.DC.16,.DC.17} first-match-wins, pure
- * @implements {S003.§2.AC.03,.AC.04} returns adapter or null, pure
- * @see {S003.§2.AC.02} markdown-frontmatter order — Hat 2 step 9
+ * @implements {DD016.§4.DC.14,.DC.15,.DC.16,.DC.17}
+ * @implements {S003.§2.AC.01,.AC.02,.AC.03,.AC.04}
  */
 const adapters: readonly ConfidenceAdapter[] = [
+  markdownFrontmatterAdapter,
   cFamilyAdapter,
 ];
 
