@@ -378,10 +378,19 @@ function highlightWithData(
     const linkTarget = buildLinkTarget(match.normalizedId, match.kind, index, currentDocDir, contextNoteId, useAbsoluteHrefs, match.selfScoped);
     const escaped = escapeHtml(match.raw);
 
+    // When the local index doesn't resolve the ref to a target, mark it
+    // unknown so the preview can render it with the same gray + wavy
+    // treatment the editor decoration uses for unresolved refs. Without
+    // this class, indexed and unindexed refs render identically and
+    // there's no signal to hover-check.
+    const fullClass = linkTarget
+      ? `scepter-ref ${cssClass}`
+      : `scepter-ref ${cssClass} scepter-unknown`;
+
     if (linkTarget) {
-      result += `<a href="${linkTarget}" class="scepter-ref ${cssClass}" ${dataAttrs}>${escaped}</a>`;
+      result += `<a href="${linkTarget}" class="${fullClass}" ${dataAttrs}>${escaped}</a>`;
     } else {
-      result += `<span class="scepter-ref ${cssClass}" ${dataAttrs}>${escaped}</span>`;
+      result += `<span class="${fullClass}" ${dataAttrs}>${escaped}</span>`;
     }
 
     // Inline crossref-count badge anchored right after the FQID. Same

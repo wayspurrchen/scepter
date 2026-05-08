@@ -270,7 +270,7 @@ For the full rules, transition matrix, and examples, see `status-management.md`.
 
 ## Note Creation Guidelines
 
-**Triggers:** Decision made → Decision note. Requirement discovered → Requirement note. Question arises → Question note. Work identified → Task.
+**Triggers:** Decision made → Decision note (where the decision warrants tracking — see threshold below). Requirement discovered → Requirement note. Question arises → Question note. Work identified → Task.
 
 **Timing:** IMMEDIATELY. Not "later."
 
@@ -279,3 +279,23 @@ For the full rules, transition matrix, and examples, see `status-management.md`.
 **Content:** Capture what was STATED, not what you think should exist. Note questions to clarify rather than inventing specifications.
 
 **After creation:** Edit the file to add content and `{ID}` references. Always date updates.
+
+### When a decision warrants a Decision note
+
+The default lean is to create one when the trigger fires, but the threshold is non-trivial. Decision notes record decisions that downstream readers might reasonably want to revisit, second-guess, or understand the rationale of. They are not journals of every choice.
+
+**Create a decision note when:**
+- The choice affects long-standing architecture, public API surface, operational practice, or a contract that other code/agents depend on.
+- Multiple reasonable options exist and one was selected for stated reasons. The justification is what the note carries — without it, future agents have to reconstruct the rationale or re-litigate the choice.
+- The decision creates downstream constraints (e.g., "we will always do X this way") that other work must respect.
+- The decision overrides or supersedes an earlier decision, even implicitly.
+
+**Skip the decision note when:**
+- The original behavior was simply wrong (e.g., a typecheck error, a misimplementation, a bug). Picking the correct behavior is not a "decision" — it's a fix. The fix lives in the code and a progress note on the relevant task; a standalone D-note adds noise.
+- One option is clearly correct and the other options are bugs / mistakes / non-options. There is no "we could go either way" tension to record.
+- The choice is fully captured by the code change itself, with no rationale a future reader would need.
+- The decision is a routine implementation detail invisible to consumers (variable names, internal helper structure, loop ordering).
+
+**Heuristic test:** If you removed the decision note's content, would a future agent re-encountering this area face a choice with multiple reasonable answers and no recorded justification? If yes, write the note. If the only honest content of the proposed note is "we did the obviously correct thing instead of the wrong thing," skip the note and let the code + progress note carry it.
+
+This threshold matters because decision-note proliferation degrades the graph: the signal (real architectural decisions worth knowing about) gets diluted by routine bug-fix entries, and the proper-noun authority of D-notes erodes. A graph with 100 D-notes where 60 are routine fixes is harder to navigate than one with 40 substantive decisions.

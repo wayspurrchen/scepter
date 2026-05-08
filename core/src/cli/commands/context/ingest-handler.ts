@@ -2,6 +2,7 @@ import * as path from 'path';
 import fs from 'fs-extra';
 import chalk from 'chalk';
 import matter from 'gray-matter';
+import { stringifyFrontmatter } from '../../../notes/yaml-frontmatter.js';
 import type { CommandContext } from '../base-command.js';
 
 export interface IngestOptions {
@@ -115,7 +116,7 @@ export async function ingestNotes(
 
       // Rebuild content: ensure the heading has the ID prefix
       const newBody = ensureIdHeading(body, noteId, title);
-      const newContent = matter.stringify(newBody, mergedData);
+      const newContent = stringifyFrontmatter(newBody, mergedData);
 
       // Generate destination filename
       const cleanTitle = title
@@ -140,7 +141,7 @@ export async function ingestNotes(
         id: noteId,
         type: resolvedType,
         title,
-        content: newContent, // Already has frontmatter from matter.stringify()
+        content: newContent, // Already has frontmatter from stringifyFrontmatter()
         tags: mergedData.tags || [],
         created: mergedData.created ? new Date(mergedData.created) : now,
         metadata: mergedData,

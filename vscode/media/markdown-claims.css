@@ -38,6 +38,26 @@ a.scepter-ref:hover {
   color: inherit;
 }
 
+/* Unresolved local reference — note/claim/section id not in the index.
+ * Mirrors the editor's `unresolvedDecoration` (gray `#808080`, wavy
+ * underline) in vscode/src/decoration-provider.ts so editor and preview
+ * surface the same out-of-index signal. The selector wins over
+ * .scepter-claim/.scepter-note/.scepter-bare-claim/.scepter-section
+ * because both have specificity 10 and `scepter-unknown` is later in
+ * the cascade. */
+.scepter-ref.scepter-unknown {
+  color: #808080;
+  text-decoration: underline wavy;
+}
+
+.vscode-light .scepter-ref.scepter-unknown {
+  color: #707070;
+}
+
+.vscode-high-contrast .scepter-ref.scepter-unknown {
+  color: #b0b0b0;
+}
+
 /* Cross-project (alias-prefixed) references.
  * Distinct purple hue from local teal so a reader can tell at a glance
  * which references resolve in the current project vs a peer.

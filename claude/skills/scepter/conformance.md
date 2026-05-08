@@ -216,6 +216,46 @@ An unsourced user-attribution is a conformance failure, not neutral prose. The c
 
 Peer to reality-conformance. Reality-conformance verifies primitives against code; attribution-conformance verifies user-intent claims against session or event sources. Run both when the artifact under review mixes technical claims with scope/intent claims — which is most DD and spec work.
 
+## Identifier-Naming Conformance Pass
+
+**Scope-determining question:** "Does any identifier in the changed code embed knowledge-graph coordinates that should live in an annotation instead?" Peer to reality-conformance and attribution-conformance — all three check artifact discipline against ground truth in different dimensions. This pass verifies the producer obeyed the semantic-naming rule from `implementing.md` § Identifier Names Are Semantic.
+
+### When to Use
+
+Whenever the artifact under review is source code, especially when the producer derived from a DD or spec containing authoritative-delegation language ("classify follows ARCH038 §4.2 verbatim," "every cell copies from §X.Y of NOTE"). Producers reading those derivations frequently embed the spec coordinate into the identifier itself as a "naming aid"; this pass catches it before the rename cost compounds across call sites.
+
+### Methodology
+
+For every changed source file, scan identifiers for embedded knowledge-graph coordinates.
+
+1. **Extract identifiers** introduced or renamed in the diff: function names, method names, class names, type/interface names, top-level constants, file basenames.
+2. **Match each against the forbidden patterns** from `implementing.md` § Identifier Names Are Semantic:
+   - Note ID prefixes: `R\d+`, `DD\d+`, `ARCH\d+`, `S\d+`, `T\d+`, `Q\d+`, `D\d+` followed by alphabetic content
+   - Section markers: `Section\d+`, `Sec\d+`, `S\d+_\d+`, `Per[A-Z][a-z]+\d+`
+   - Claim coordinates: `AC\d{2}`, `DC\d{2}[a-z]?`, `OQ\d{2}`, `Phase\d+[A-Z]\d+`
+   - Concatenations of any of the above
+3. **For each match, check whether the linkage is also in annotations.** Run `grep -n` for the spec coordinate the identifier encodes. If the function already has the proper `@implements {DD059.§4.DC.06a}` or `@see {ARCH038.§4.2}`, the rename is purely cosmetic — MECHANICAL `[medium]`. If the annotation is absent, the rename plus the missing annotation are both required — escalate to MECHANICAL `[high]`.
+4. **Skip the canonical exception.** Test descriptions of the form `test('S002.§1.AC.01: ...', ...)` follow the documented test-marker convention from `claims.md` and are NOT identifier-naming violations.
+
+### Output
+
+Produce an identifier-naming table in the review findings:
+
+| Identifier | File:Line | Encoded Coordinate | Annotation Present? | Recommended Rename |
+|---|---|---|---|---|
+| `classifyPerArch038Section42` | `apply-dialect-postgres-atomic.ts:163` | ARCH038 §4.2 | yes (`@see {ARCH038.§4.2}` at L161) | `classifyByDispatchTable` |
+| `emitPerArch038Section42` | `apply-dialect-postgres-atomic.ts:379` | ARCH038 §4.2 | yes (`@see {ARCH038.§4.2}` at L377) | `emitByDispatchTable` |
+
+Tag each row **MECHANICAL**. Importance is `[medium]` when the annotation already carries the linkage (the rename is reversible, downstream call sites need updating but no behavior changes); `[high]` when the annotation is also absent (the producer failed both the naming rule and the annotation rule).
+
+### Critical Rule
+
+A function name encoding a spec coordinate is **not a stylistic preference**. It is a load-bearing failure: the encoded reference cannot participate in claim tracing, silently rots when the cited section renumbers, and pollutes call sites. The `@implements` / `@see` annotation is the only correct home for spec linkage. This pass exists because producers reach for the identifier as a naming aid when deriving from authoritative-delegation claims — the discipline is to resist that instinct and let the annotation do the work.
+
+### Relationship to Other Passes
+
+Peer to reality-conformance and attribution-conformance. Reality-conformance grounds primitives against `src/`; attribution-conformance grounds user-intent claims against session sources; identifier-naming conformance grounds identifier semantics against the code's own job description. Run all four passes (these three plus claim-to-claim conformance) when reviewing source code derived from a DD or spec.
+
 ## Claim Verification
 
 Claims (e.g., `§1.AC.01`, `R004.§3.AC.02`) are SCEpter's mechanism for sub-document traceability. When validating implementations, you MUST verify that claims have been carried forward correctly. **Read `claims.md` from this skill directory for the full claim syntax and rules.**

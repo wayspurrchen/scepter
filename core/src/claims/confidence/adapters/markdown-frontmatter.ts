@@ -14,6 +14,7 @@
  */
 
 import matter from 'gray-matter';
+import { stringifyFrontmatter } from '../../../notes/yaml-frontmatter.js';
 import type { ConfidenceAdapter } from '../adapter.js';
 import type {
   ConfidenceAnnotation,
@@ -161,10 +162,10 @@ function insert(content: string, payload: ConfidencePayload): string {
 
   if (!hadFrontmatter) {
     // Case (1): create a leading frontmatter block.
-    return matter.stringify(parsed.content, parsed.data);
+    return stringifyFrontmatter(parsed.content, parsed.data);
   }
   // Cases (2) and (3): re-stringify the existing frontmatter with the new key.
-  return matter.stringify(parsed.content, parsed.data);
+  return stringifyFrontmatter(parsed.content, parsed.data);
 }
 
 export const markdownFrontmatterAdapter: ConfidenceAdapter = {

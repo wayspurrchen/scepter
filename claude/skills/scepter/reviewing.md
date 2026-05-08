@@ -188,6 +188,24 @@ Tag each finding in your final report as `MECHANICAL` or `HUMAN_JUDGMENT` so the
 
 For MECHANICAL findings, recommend a specific producer prompt where you can — it shortens routing latency and makes the orchestrator's job mechanical.
 
+### Importance Tag (second axis, parallel to MECHANICAL/HUMAN_JUDGMENT)
+
+In addition to the routing tag above, tag each finding with an **importance level**. The two axes are independent: a MECHANICAL finding can be `[trivial]` or `[high]`; a HUMAN_JUDGMENT finding can be `[low]` or `[critical]`.
+
+| Tag | Meaning | Examples |
+|-----|---------|----------|
+| **`[trivial]`** | Bookkeeping, framing-only, retired/reserved positions; no consumer impact. Default posture: mention-and-forget; if action is needed at all, file as a single-line to-do in a rolling cleanup arc. | Inline-history wording; numbering reservations; cosmetic format adjustments with no readers. |
+| **`[low]`** | Pre-existing surface flagged for tracking; isolated impact; mechanical reversibility; or already-resolved cleanly. Default posture: file as quick to-do; user can skim. | Pre-existing test-fixture cast that survived a rename; resolved cleanly via a tiny cited fix; placeholder-pattern test that activates when an unrelated gate clears. |
+| **`[medium]`** | Substantive design decision affecting the implementation surface; cited authority resolves it; reversibility usually mechanical-to-medium. Worth user awareness; revisit if framing matters for a future arc. | Choice between two source-aligned signatures; phase-1 narrowing of an options surface that's natively additive; sub-disposition of a settled lean. |
+| **`[high]`** | User-authorized BLOCKED resolution; scope expansion (>50 LOC); architectural-invariant adjacent; wide consumer impact. The user should read the rationale before signing off. | Deferring an absent infrastructure primitive; authoring a missing-misallocation realization; back-compat default that affects all existing callers; a verification gap caught after a stage previously declared complete. |
+| **`[critical]`** | Spec violation; settled-decision conflict; load-bearing for downstream work. The user MUST review and explicitly disposition; do not auto-apply even if MECHANICAL. | Two settled specs in direct contradiction; a finding that would require revising a `:locked` claim or `:approved` note; a discovered defect that blocks the user's stated next step. |
+
+**Untagged importance defaults to `[medium]`.** Tag conservatively when uncertain — over-rating is louder than under-rating, but under-rating is what causes important items to be missed in a long ledger scan.
+
+**Why both axes:** the routing tag drives auto-apply vs. surface-to-user. The importance tag drives **scan order** when surfacing — high-importance findings should be readable first, low/trivial findings should be skippable. In a ledger of 20+ entries this difference is the difference between an actionable summary and an unreadable wall.
+
+**Mechanical-routed findings still benefit from importance tags:** a `[high]` MECHANICAL finding (e.g., a cast-removal that incidentally aligns a public type contract across multiple consumers) deserves a verification report, not a silent fix-and-forget; a `[trivial]` MECHANICAL finding can be applied silently and mentioned only in the summary.
+
 ## Common Misses
 
 | Miss | Why it happens | How to catch it |

@@ -6,6 +6,7 @@ import { stat } from 'fs/promises';
 import * as chokidar from 'chokidar';
 import { glob } from 'glob';
 import matter from 'gray-matter';
+import { stringifyFrontmatter } from './yaml-frontmatter';
 import type { Note } from '../types/note';
 import type { ConfigManager } from '../config/config-manager';
 import type { NoteTypeConfig } from '../types/config';
@@ -725,7 +726,7 @@ export class NoteFileManager extends EventEmitter {
     }
 
     // Rebuild content with updated frontmatter
-    return matter.stringify(parsed.content, parsed.data);
+    return stringifyFrontmatter(parsed.content, parsed.data);
   }
 
   /**

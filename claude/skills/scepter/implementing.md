@@ -177,6 +177,44 @@ export const extractWidgets = (_input, _config) => [];  // RETURNS NOTHING
 export const extractWidgets = (_input, _config) => [];
 ```
 
+### CRITICAL: Identifier Names Are Semantic, Not Knowledge-Graph Coordinates
+
+**NEVER name a function, method, class, type, module, or variable after the location of its source-of-truth document.** Spec linkage belongs in `@implements`, `@see`, `@depends-on`, and `@validates` annotations — never in the identifier itself.
+
+**Failure example:**
+```typescript
+private classifyPerArch038Section42(record: ChangeRecord): CostClass { ... }
+this.classifyPerArch038Section42(operation);
+```
+
+The function classifies a `ChangeRecord` against a tabular dispatch — that is what it IS. The identifier instead encodes "ARCH038 §4.2," the spec section the table is copied from. This is wrong for four reasons:
+
+1. **The text is not parseable as a claim.** `Arch038Section42` is not in `{ID.§N.PREFIX.NN}` form — it cannot participate in `scepter claims trace`, cannot be linted, cannot be picked up by `gaps`. The coupling is text-only and invisible to the tooling.
+2. **Spec coordinates renumber; identifiers don't.** When `ARCH038 §4.2` becomes `§5.1` or migrates to a different note, the annotation can be updated mechanically and `sce-linker` flags the mismatch. A stale identifier silently lies — every reader thinks the function still maps to §4.2 when it doesn't.
+3. **Grep for the note ID hits the identifier, not the spec linkage.** Searching for `ARCH038` to find every consumer returns the function name plus every call site, drowning real `@see {ARCH038...}` annotations in noise.
+4. **Call sites become illegible.** `this.classifyPerArch038Section42(operation)` describes nothing about what the call does. `this.classifyByDispatchTable(operation)` says it.
+
+**Right:**
+```typescript
+/**
+ * @implements {DD059.§4.DC.06a} authoritative-delegation to ARCH038 §4.2
+ * @see {ARCH038.§4.2} Postgres-atomic column (source-of-truth)
+ */
+private classifyByDispatchTable(record: ChangeRecord): CostClass { ... }
+```
+
+The annotation carries the source-of-truth coordinate. The identifier names what the code IS. The two roles do not collapse.
+
+**Forbidden patterns in identifier names:**
+- Note ID prefixes: `R012`, `DD059`, `ARCH038`, `S023`, `T045`, `Q078`, `D015`
+- Section markers: `Section42`, `Sec42`, `§4_2`, `S4_2`, `Per[Note][Section]`
+- Claim coordinates: `AC03`, `DC07a`, `OQ12`, `Phase1Q078`
+- Concatenations of the above: `R012Section1AC03`, `Arch038Sec42`, `classifyPerArch038Section42`, `emitPerArch038Section42`
+
+**Exception — claim-prefixed test descriptions.** Test names of the form `test('S002.§1.AC.01: eq matches identical values', ...)` are NOT subject to this rule. They follow the canonical test-marker convention documented in `claims.md` and participate in claim tracing as structured strings. Function and method names that produce or consume those tests, however, ARE subject.
+
+**General principle:** identifier-to-annotation coupling is one-way. The annotation system can target identifiers (`@implements {X} on functionFoo`); identifiers cannot target the annotation system. If the linkage matters, it lives in an annotation the tooling can read. The identifier exists to name what the code IS in the program domain — and nothing else.
+
 ### Reference Types
 
 ```typescript
