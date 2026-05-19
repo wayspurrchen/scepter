@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { DELETION_MARKER_RE } from 'scepter';
 import type { ClaimIndexCache, ClaimTreeError } from './claim-index';
 
 /**
@@ -61,6 +62,25 @@ export class DiagnosticsProvider {
       // Errors without a noteFilePath cannot be located on disk; skip them
       // rather than dumping into a synthetic untitled buffer.
       if (!err.noteFilePath) continue;
+
+      // Tombstoned references are a recognized lifecycle state, not a
+      // broken reference. Core suppresses `unresolved-reference` for
+      // tombstoned `derives=`/`superseded=` targets at the index level
+      // (claim-index.ts § Phase 1.5/1.6), and the marker's leading
+      // underscore disqualifies it from `parseClaimReferences`, so a
+      // tombstoned token cannot become an unresolved-reference error
+      // via the body-scan path either. This filter is a defensive
+      // belt-and-suspenders short-circuit: any error whose claimId or
+      // message embeds a deletion-marker token is dropped at the
+      // diagnostic surface.
+      // @implements {R015.§11.AC.01} unresolved-reference diagnostic MUST NOT fire on tombstoned refs
+      // @implements {DD020.§6.DC.01} short-circuit when parsed note-ID portion satisfies isDeletionMarker
+      if (
+        err.type === 'unresolved-reference' &&
+        (DELETION_MARKER_RE.test(err.claimId ?? '') || DELETION_MARKER_RE.test(err.message ?? ''))
+      ) {
+        continue;
+      }
 
       const absPath = this.index.resolveFilePath(err.noteFilePath);
       const line = Math.max(0, (err.line ?? 1) - 1);

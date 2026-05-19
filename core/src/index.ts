@@ -189,6 +189,22 @@ export type {
   ParsedNoteId,
 } from './parsers/note/index.js';
 
+// --- Lifecycle: Deletion Marker ---
+// @implements {DD020.§1.DC.04} canonical marker module consumed by every layer (incl. VS Code)
+// @implements {R015.§11.AC.01} extension consumes marker recognition for diagnostic suppression
+// @implements {R015.§11.AC.02} extension consumes parseDeletionMarker for hover provenance
+export {
+  DELETION_MARKER_RE,
+  formatDeletionMarker,
+  formatMarkerTimestamp,
+  isDeletionMarker,
+  parseDeletionMarker,
+} from './lifecycle/deletion-marker.js';
+
+export type {
+  TimestampPrecision,
+} from './lifecycle/deletion-marker.js';
+
 // --- Types (all domain types) ---
 export type {
   // Config

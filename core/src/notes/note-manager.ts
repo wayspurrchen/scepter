@@ -122,6 +122,15 @@ export class NoteManager extends EventEmitter {
   }
 
   /**
+   * Read note content with folder-note companions aggregated. Public delegation
+   * to NoteFileManager so callers (lint, index build, etc.) don't need access
+   * to the underlying file manager.
+   */
+  async getAggregatedContents(noteId: string): Promise<string | null> {
+    return this.noteFileManager.getAggregatedContents(noteId);
+  }
+
+  /**
    * Get or create the StatusValidator instance
    * @implements {T011} Lazy initialization ensures config is loaded
    */
@@ -770,12 +779,25 @@ export class NoteManager extends EventEmitter {
   }
 
   /**
-   * Deletes a note and updates all references to it with #deleted tag
+   * Soft-delete a note: relocate to `_deleted/`, append the `#deleted`
+   * tag, and leave inbound references intact (they are tagged via the
+   * `#deleted` lifecycle but not rewritten). This is the preserved
+   * default mode of `scepter delete` per {DD020.§4.DC.00}.
+   *
+   * Hard-delete (which rewrites inbound references to a deletion
+   * marker and removes the note unit outright) is NOT routed through
+   * this method. It runs through the lifecycle orchestrator at
+   * `core/src/lifecycle/operations/lifecycle-orchestrator.ts` directly
+   * from the `delete` command handler when the hard-delete flag is
+   * set. The split avoids a circular dependency between NoteManager
+   * and the lifecycle subsystem.
    *
    * @param noteId The note ID to delete
    * @param reason Optional reason for deletion
    * @returns The deleted note
    * @emits note:deleted
+   *
+   * @implements {DD020.§4.DC.00} soft-delete code path preserved unchanged from prior implementation
    */
   async deleteNote(noteId: string, reason?: string): Promise<Note> {
     // Get the note
@@ -1542,6 +1564,28 @@ export class NoteManager extends EventEmitter {
     // Same as initialize, but can be called manually
     this.isInitialized = false;
     await this.initialize();
+  }
+
+  /**
+   * Refresh in-memory state after a successful rewriter commit.
+   *
+   * Called by the delete and rename command handlers after the
+   * atomicity layer commits its staged changes. The observable
+   * post-condition (per {DD020.§3.DC.08}) is that subsequent
+   * CLI invocations (`trace`, `gaps`, `lint`, `show`) observe the
+   * post-operation state without manual re-indexing.
+   *
+   * `affectedFiles` is the set of file paths that were modified by
+   * the rewrite (the orchestrator already knows this from the
+   * `RewritePlan`). It is passed for potential future incremental
+   * refresh; in the current implementation we delegate to
+   * `refreshIndex()` for simplicity, which guarantees correctness at
+   * the cost of doing more work than strictly necessary.
+   *
+   * @implements {DD020.§3.DC.08} post-rewrite in-memory consistency via NoteManager
+   */
+  async refreshAfterRewrite(_affectedFiles: ReadonlyArray<string>): Promise<void> {
+    await this.refreshIndex();
   }
 
   /**

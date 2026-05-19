@@ -1,5 +1,6 @@
 import type { Reference, ReferenceGraph, ReferenceCounts } from '../types/reference';
 import type { SourceReferenceIndex } from './source-reference-index';
+import { isDeletionMarker } from '../lifecycle/deletion-marker';
 
 /**
  * Manages the reference graph between notes, providing efficient
@@ -13,18 +14,58 @@ export class ReferenceManager {
   private sourceIndex?: SourceReferenceIndex;
 
   /**
-   * Add a reference between two notes
+   * Add a reference between two notes.
+   *
+   * Tombstoned edges (target is a deletion-marker token) are stored
+   * alongside live edges but auto-flagged with `isTombstoned: true` so
+   * consumers can enumerate them separately via `getTombstonedEdges()`.
+   * The marker substitution that produces these edges is owned by the
+   * rewriter; this manager only recognizes the shape on insert.
+   *
+   * @implements {DD020.§5.DC.08} tombstoned edges recorded as a distinct edge type via isTombstoned flag
    */
   addReference(ref: Reference): void {
+    // Auto-detect tombstoned target if the caller didn't set the flag.
+    const stored: Reference = ref.isTombstoned === undefined && isDeletionMarker(ref.toId)
+      ? { ...ref, isTombstoned: true }
+      : ref;
+
     // Add to outgoing
-    const outgoing = this.graph.outgoing.get(ref.fromId) || [];
-    outgoing.push(ref);
-    this.graph.outgoing.set(ref.fromId, outgoing);
+    const outgoing = this.graph.outgoing.get(stored.fromId) || [];
+    outgoing.push(stored);
+    this.graph.outgoing.set(stored.fromId, outgoing);
 
     // Add to incoming
-    const incoming = this.graph.incoming.get(ref.toId) || [];
-    incoming.push(ref);
-    this.graph.incoming.set(ref.toId, incoming);
+    const incoming = this.graph.incoming.get(stored.toId) || [];
+    incoming.push(stored);
+    this.graph.incoming.set(stored.toId, incoming);
+  }
+
+  /**
+   * Enumerate every tombstoned edge in the graph.
+   *
+   * A tombstoned edge is a recorded reference whose target was once a
+   * live note and has since been hard-deleted; the marker substitution
+   * preserves the citation as provenance rather than dropping it. These
+   * edges do NOT resolve to a live note when traversed — the v1 contract
+   * is that they are queryable separately, not synthesizable into live
+   * entities. The synthetic deleted-note resolution described in
+   * {R015.§5.AC.05} is documentation-layer; recovery of the original ID
+   * and timestamp belongs to `parseDeletionMarker` consumers (e.g., the
+   * VS Code hover provider).
+   *
+   * @implements {DD020.§5.DC.08} enumerator surfacing tombstoned edges as a distinct query
+   */
+  getTombstonedEdges(): Reference[] {
+    const out: Reference[] = [];
+    for (const refs of this.graph.outgoing.values()) {
+      for (const ref of refs) {
+        if (ref.isTombstoned) {
+          out.push(ref);
+        }
+      }
+    }
+    return out;
   }
 
   /**

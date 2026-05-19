@@ -238,3 +238,4 @@ Specified in {R009.§7.AC.07} and {R009.§2.AC.09}; the rule (verification write
 - {R004.§7} — Stability and Verification Markers (deferred section; §7.AC.04 is addressed by §3 of this requirement)
 - {R004.§8} — Priority and Metadata on Claims (§8.AC.01-AC.03 are extended by §1 and §5 of this requirement)
 - {DD001} — Detailed Design for claims system (integration context)
+- {R015} — Note Reference Rewriting on Delete and Rename (introduces the **note-ID-level** tombstone lifecycle state `_deleted_<ID>_at_<timestamp>`, a parallel surface to the **claim-level** lifecycle vocabulary defined in §2 here. The two surfaces are deliberately distinct: §2's `:closed`/`:deferred`/`:removed`/`:superseded=` are claim-author-applied tags inline in the document; R015's tombstone is externally applied to inbound references when a whole note is retired. {R015.§10.AC.04} flags conflation of the two as an authoring failure mode.)

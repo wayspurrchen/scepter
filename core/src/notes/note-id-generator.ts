@@ -44,7 +44,16 @@ export class NoteIdGenerator extends EventEmitter {
   }
 
   /**
-   * Generate the next available ID for a note type
+   * Generate the next available ID for a note type.
+   *
+   * The counter is strictly monotonic (incremented per-call) and never
+   * decremented or reset by any lifecycle operation. Hard-delete and
+   * soft-delete do not recycle IDs; rename does not introduce
+   * recycling either (a renamed source ID is freed for explicit
+   * reclamation by a later `rename` per {DD020.§4.DC.13}, not by
+   * automatic generation).
+   *
+   * @implements {DD020.§4.DC.05} delete invocation does not recycle the deleted ID; monotonicity preserved
    */
   generateNextId(typeName: string): string {
     this.validateType(typeName);

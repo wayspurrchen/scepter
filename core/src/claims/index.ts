@@ -19,6 +19,7 @@ export type {
   ProjectionPresence,
   TraceabilityRow,
   TraceabilityMatrix,
+  BuildMatrixOptions,
   GapReport,
   GapFilterOptions,
   DerivationStatus,

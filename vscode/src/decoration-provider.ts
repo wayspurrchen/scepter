@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ClaimIndexCache } from './claim-index';
-import { findAllMatches, noteIdFromPath } from './patterns';
+import { findAllMatches, findDeletionMarkers, noteIdFromPath } from './patterns';
 
 // Resolved reference — dotted underline, subtle teal tint
 const resolvedDecoration = vscode.window.createTextEditorDecorationType({
@@ -45,6 +45,22 @@ const crossProjectUnresolvedDecoration = vscode.window.createTextEditorDecoratio
   textDecoration: 'underline wavy',
   color: '#C586C0',
   cursor: 'default',
+});
+
+// Tombstoned (deletion-marker) reference — dimmed strike-through styling so
+// the lifecycle state is visually distinct from live, unresolved, and
+// cross-project references. The marker is a recognized lifecycle state, not
+// a broken reference; the styling signals "retired" rather than "error."
+// Visual choice: muted gray (#888888) with line-through and italic, to read
+// as deliberately retired rather than as a syntax violation.
+// @implements {R015.§11.AC.04} editor visually distinguishes tombstoned references
+// @implements {DD020.§6.DC.04} decoration applies to DELETION_MARKER_RE ranges
+const tombstoneDecoration = vscode.window.createTextEditorDecorationType({
+  textDecoration: 'line-through',
+  color: '#888888',
+  fontStyle: 'italic',
+  opacity: '0.75',
+  cursor: 'help',
 });
 
 // Claim-definition badge — rendered as an `after` decoration anchored next to
@@ -119,10 +135,29 @@ export class DecorationProvider {
     const sections: vscode.DecorationOptions[] = [];
     const crossProjectResolved: vscode.DecorationOptions[] = [];
     const crossProjectUnresolved: vscode.DecorationOptions[] = [];
+    const tombstones: vscode.DecorationOptions[] = [];
     const claimBadges: vscode.DecorationOptions[] = [];
 
     for (let i = 0; i < doc.lineCount; i++) {
       const lineText = doc.lineAt(i).text;
+
+      // Tombstoned references are parser-invisible — collect them
+      // separately so the styling pass distinguishes them from live
+      // references. The marker scan runs before findAllMatches so the
+      // range covers the marker + any address tail.
+      // @implements {R015.§11.AC.04} editor styling distinguishes tombstoned references
+      // @implements {DD020.§6.DC.04} decoration scans DELETION_MARKER_RE per line
+      for (const tomb of findDeletionMarkers(lineText)) {
+        const range = new vscode.Range(i, tomb.start, i, tomb.end);
+        tombstones.push({
+          range,
+          hoverMessage: new vscode.MarkdownString(
+            `*Tombstoned reference* — deleted note \`${tomb.originalId}\` at \`${tomb.timestamp}\`. ` +
+            `Recognized lifecycle state, not a broken reference.`,
+          ),
+        });
+      }
+
       const matches = findAllMatches(lineText, isMarkdown, this.index.knownShortcodes);
 
       for (const match of matches) {
@@ -204,6 +239,7 @@ export class DecorationProvider {
     editor.setDecorations(sectionDecoration, sections);
     editor.setDecorations(crossProjectResolvedDecoration, crossProjectResolved);
     editor.setDecorations(crossProjectUnresolvedDecoration, crossProjectUnresolved);
+    editor.setDecorations(tombstoneDecoration, tombstones);
     editor.setDecorations(claimBadgeDecoration, claimBadges);
   }
 
@@ -267,6 +303,7 @@ export class DecorationProvider {
     sectionDecoration.dispose();
     crossProjectResolvedDecoration.dispose();
     crossProjectUnresolvedDecoration.dispose();
+    tombstoneDecoration.dispose();
     claimBadgeDecoration.dispose();
   }
 }

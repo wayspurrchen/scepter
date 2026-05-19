@@ -60,7 +60,7 @@ export async function ensureIndex(
       id: note.id,
       type: note.type,
       filePath: note.filePath || '',
-      content: (await noteManager.noteFileManager.getAggregatedContents(note.id)) || '',
+      content: (await noteManager.getAggregatedContents(note.id)) || '',
     })),
   );
 

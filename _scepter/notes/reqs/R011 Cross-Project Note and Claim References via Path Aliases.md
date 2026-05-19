@@ -294,6 +294,7 @@ The Claude Code skills, agent instructions, and CLI documentation read by AI age
 - {DD013} — VS Code Rich Views: Sidebar TreeView (the views referenced in §4.AC.09 that must remain peer-project-isolated)
 - {DD015} — Cross-Project Reference Resolution: Implementation Across Core, VS Code, and Agent Documentation (the design projection of this requirement; covers §1–§5 ACs with DD-level design decisions and a phased integration sequence)
 - {S001} — Skill Files as Documented Artifacts (the specification projection covering §5 ACs; carries forward all six §5.AC.01–§5.AC.06 via `derives=R011.§5.AC.NN` in S001 §4. Two valid coverage paths now exist for §5: DD015's Module Inventory rows (the implementation-side projection) and S001's §4 derived ACs (the specification-side projection on what the skill files MUST encode))
+- {R015} — Note Reference Rewriting on Delete and Rename (downstream consumer of the §2.AC.04 permanent authority boundary: {R015.§3.AC.05} and {R015.§8.AC.01} require the rewriter to skip alias-prefixed references under every operation, citing §2.AC.03/§2.AC.04 as the upstream rationale that the local project cannot mutate peer-project state)
 
 ## Status
 

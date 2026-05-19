@@ -281,6 +281,8 @@ scepter claims lint R004
 
 `lint` catches structural issues: non-monotonic numbering, forbidden forms (line-leading `AC01`-style typos, alphanumeric prefixes like `PH1.01`, multi-letter-segment prefixes like `FOO.AC.01`), unresolved references, and lifecycle/derivation problems. Same-note repeats and bare-id ambiguity are tolerated by design.
 
+**Tombstoned references are NOT lint errors.** A `derives=_deleted_<ID>_at_<TS>...` or inbound reference to a hard-deleted note is a recognized lifecycle state — `lint`, `trace`, and `gaps` silently accept them. A deriving claim whose target was tombstoned surfaces under `gaps --include-orphan-derives` (category `orphan-derives`), not under generic gap categories. The distinction matters for conformance review: an `orphan-derives` finding asks "should this deriving claim be re-derived, retired, or replaced?" — it is an authoring decision, not a coverage gap to fill with an `@implements`. See `claims.md` § Tombstoned References (Note-Level Lifecycle).
+
 ### Interpreting Trace Output for Validation
 
 After running `scepter claims trace`, assess:

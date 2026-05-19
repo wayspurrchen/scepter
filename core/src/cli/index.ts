@@ -24,6 +24,7 @@ import { searchCommand } from './commands/context/search.js';
 import { gatherCommand } from './commands/context/gather.js';
 import { archiveCommand } from './commands/context/archive.js';
 import { deleteCommand } from './commands/context/delete.js';
+import { renameCommand } from './commands/context/rename.js';
 import { restoreCommand } from './commands/context/restore.js';
 import { purgeCommand } from './commands/context/purge.js';
 import { convertCommand } from './commands/context/convert.js';
@@ -83,7 +84,10 @@ program.addCommand(createCommand);
 program.addCommand(searchCommand);
 program.addCommand(gatherCommand);
 program.addCommand(archiveCommand);
+// @implements {DD020.§4.DC.14} delete exposed as a CLI command accepting affected note ID(s) as positional argument
 program.addCommand(deleteCommand);
+// @implements {DD020.§4.DC.14} rename exposed as a CLI command accepting source + target note IDs as positional arguments
+program.addCommand(renameCommand);
 program.addCommand(restoreCommand);
 program.addCommand(purgeCommand);
 program.addCommand(convertCommand);

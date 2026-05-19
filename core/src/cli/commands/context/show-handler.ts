@@ -21,6 +21,10 @@ import type { ClaimIndexData, ClaimIndexEntry } from '../../../claims/index';
 import type { Note } from '../../../types/note';
 import type { SourceReference } from '../../../types/reference';
 import type { CommandContext } from '../base-command';
+import {
+  isDeletionMarker,
+  parseDeletionMarker,
+} from '../../../lifecycle/deletion-marker';
 
 import type { CommonFilterOptions } from './common-filters';
 
@@ -68,13 +72,40 @@ export async function showNotes(
     throw new Error('Note manager not initialized');
   }
 
+  // @implements {R015.§5.AC.07} ctx show <marker> resolves to deletion provenance
+  // @implements {DD020.§5.DC.09} marker arg routes to provenance summary
+  // Tombstoned arguments (deletion markers like `_deleted_R005_at_20260519`)
+  // are recognized before any other routing and produce a provenance summary
+  // rather than a "note not found" error. Phase 3 will populate the
+  // rewrite-log entry pointed at by this summary; for now the summary
+  // surfaces the recovered original ID and timestamp, plus the expected
+  // log location, so the consumer-recognition path is exercisable
+  // end-to-end before the rewriter exists.
+  const tombstonedIds: string[] = [];
+  const nonTombstonedIds: string[] = [];
+  for (const id of ids) {
+    if (isDeletionMarker(id)) {
+      tombstonedIds.push(id);
+    } else {
+      nonTombstonedIds.push(id);
+    }
+  }
+
+  let tombstoneOutput = '';
+  if (tombstonedIds.length > 0) {
+    tombstoneOutput = formatDeletionMarkerProvenance(tombstonedIds, projectManager);
+    if (nonTombstonedIds.length === 0) {
+      return { notes: [], notFound: [], output: tombstoneOutput };
+    }
+  }
+
   // @implements {R011.§3.AC.01} cross-project show with peer-source header
   // Cross-project IDs (alias-prefixed) are routed to the peer resolver
   // and rendered with a clearly visible peer header before any local
   // processing.
   const crossProjectIds: string[] = [];
   const localIds: string[] = [];
-  for (const id of ids) {
+  for (const id of nonTombstonedIds) {
     if (looksLikeCrossProjectId(id)) {
       crossProjectIds.push(id);
     } else {
@@ -86,7 +117,8 @@ export async function showNotes(
   if (crossProjectIds.length > 0) {
     crossProjectOutput = await resolveAndDisplayCrossProjectIds(crossProjectIds, projectManager);
     if (localIds.length === 0) {
-      return { notes: [], notFound: [], output: crossProjectOutput };
+      const combined = [tombstoneOutput, crossProjectOutput].filter(Boolean).join('\n\n');
+      return { notes: [], notFound: [], output: combined };
     }
   }
 
@@ -109,12 +141,12 @@ export async function showNotes(
     if (claimOutput !== null) {
       // If we had ONLY claim IDs, return the claim output (prepended with any cross-project output)
       if (noteIds.length === 0) {
-        const combined = [crossProjectOutput, claimOutput].filter(Boolean).join('\n\n');
+        const combined = [tombstoneOutput, crossProjectOutput, claimOutput].filter(Boolean).join('\n\n');
         return { notes: [], notFound: [], output: combined };
       }
       // Mixed: prepend cross-project + claim output, continue with note IDs below
       const noteResult = await showNotesCore(noteIds, options, context);
-      const combinedOutput = [crossProjectOutput, claimOutput, noteResult.output].filter(Boolean).join('\n\n');
+      const combinedOutput = [tombstoneOutput, crossProjectOutput, claimOutput, noteResult.output].filter(Boolean).join('\n\n');
       return { notes: noteResult.notes, notFound: noteResult.notFound, output: combinedOutput };
     }
   }
@@ -122,14 +154,53 @@ export async function showNotes(
   // Fall through: process note IDs (or all local IDs if none were claims)
   const idsToProcess = claimIds.length > 0 ? noteIds : localIds;
   const localResult = await showNotesCore(idsToProcess, options, context);
-  if (crossProjectOutput) {
+  const extraOutput = [tombstoneOutput, crossProjectOutput].filter(Boolean).join('\n\n');
+  if (extraOutput) {
     return {
       notes: localResult.notes,
       notFound: localResult.notFound,
-      output: [crossProjectOutput, localResult.output].filter(Boolean).join('\n\n'),
+      output: [extraOutput, localResult.output].filter(Boolean).join('\n\n'),
     };
   }
   return localResult;
+}
+
+/**
+ * Format a deletion-marker argument as a provenance summary.
+ *
+ * Minimum-viable output per {DD020.§5.DC.09} pending {R015.OQ.02} (whether
+ * the original note body is preserved alongside the log): the recovered
+ * original ID, the deletion timestamp, and the expected rewrite-log
+ * location. The rewrite-log entry itself is authored by Phase 3 — until
+ * then, this surface tells the consumer where to look once the rewriter
+ * runs.
+ *
+ * @implements {R015.§5.AC.07} ctx show <marker> returns provenance
+ * @implements {DD020.§5.DC.09} marker → provenance summary handler
+ */
+function formatDeletionMarkerProvenance(
+  tokens: string[],
+  projectManager: ProjectManager,
+): string {
+  const lines: string[] = [];
+  for (const token of tokens) {
+    const parsed = parseDeletionMarker(token);
+    if (parsed === null) {
+      // Defensive: caller filtered with isDeletionMarker; should not happen.
+      continue;
+    }
+    const projectPath = projectManager.projectPath;
+    // Expected lifecycle-log directory per {DD020.§3.DC.05}; actual log
+    // files are authored by Phase 3's rewrite-log writer.
+    const logDir = path.join(projectPath, '_scepter', 'lifecycle-log');
+    lines.push(chalk.bold(`${token}`));
+    lines.push(`  Lifecycle state: ${chalk.yellow('tombstoned')}`);
+    lines.push(`  Original note ID: ${chalk.cyan(parsed.originalId)}`);
+    lines.push(`  Deletion timestamp: ${parsed.timestamp}`);
+    lines.push(`  Rewrite log location: ${logDir}`);
+    lines.push('');
+  }
+  return lines.join('\n').trimEnd();
 }
 
 /**

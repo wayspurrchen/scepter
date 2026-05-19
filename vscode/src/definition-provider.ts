@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import { ClaimIndexCache } from './claim-index';
-import { matchAtPosition, noteIdFromPath, parseNormalizedAddress } from './patterns';
+import {
+  deletionMarkerAtPosition,
+  matchAtPosition,
+  noteIdFromPath,
+  parseNormalizedAddress,
+} from './patterns';
 
 export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
   constructor(private index: ClaimIndexCache) {}
@@ -13,6 +18,19 @@ export class ClaimDefinitionProvider implements vscode.DefinitionProvider {
     await this.index.waitUntilReady();
 
     const line = document.lineAt(position.line).text;
+
+    // Tombstoned references are a recognized lifecycle state. Go-to-
+    // definition returns null (recognized no-op) rather than falling
+    // through to the unknown-reference path that would surface a
+    // "could not find symbol" error in VS Code's peek UI. The hover
+    // provider surfaces the deletion provenance for users who want to
+    // inspect the marker.
+    // @implements {R015.§11.AC.03} go-to-definition on tombstoned reference is a recognized no-op
+    // @implements {DD020.§6.DC.03} definition provider detects via isDeletionMarker, returns null without erroring
+    if (deletionMarkerAtPosition(line, position.character)) {
+      return null;
+    }
+
     const match = matchAtPosition(line, position.character, this.index.knownShortcodes);
     if (!match) return null;
 

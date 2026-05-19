@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import { ClaimIndexCache, ClaimIndexEntry, NoteInfo, SectionEntry } from './claim-index';
-import { matchAtPosition, noteIdFromPath, parseNormalizedAddress } from './patterns';
+import {
+  deletionMarkerAtPosition,
+  matchAtPosition,
+  noteIdFromPath,
+  parseNormalizedAddress,
+  type DeletionMarkerMatch,
+} from './patterns';
 import {
   buildRefsPanelDescriptor,
   firstSentence,
@@ -70,6 +76,25 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     await this.index.waitUntilReady();
 
     const line = document.lineAt(position.line).text;
+
+    // Tombstoned references are parser-invisible — the marker's leading
+    // underscore fails the note-ID validator, so `matchAtPosition` will
+    // not return them. Scan for `_deleted_<ID>_at_<TIMESTAMP>` tokens
+    // separately and short-circuit with a deletion-provenance hover when
+    // the cursor is on one.
+    // @implements {R015.§11.AC.02} hover on tombstoned reference shows deletion event
+    // @implements {DD020.§6.DC.02} hover detects via isDeletionMarker, surfaces originalId + timestamp
+    const tombstone = deletionMarkerAtPosition(line, position.character);
+    if (tombstone) {
+      if (document.languageId === 'markdown') {
+        this.outputChannel.appendLine(
+          `[Hover] md L${position.line}:${position.character} tombstone=${tombstone.originalId}@${tombstone.timestamp}`,
+        );
+      }
+      const range = new vscode.Range(position.line, tombstone.start, position.line, tombstone.end);
+      return new vscode.Hover(this.buildTombstoneHover(tombstone), range);
+    }
+
     const match = matchAtPosition(line, position.character, this.index.knownShortcodes);
 
     // Diagnostic: log every hover attempt on markdown files
@@ -533,5 +558,65 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
 
     return md;
   }
+
+  /**
+   * Build a hover for a tombstoned reference (deletion marker).
+   *
+   * Surfaces the deletion event so the user knows the reference is a
+   * recognized lifecycle state rather than a broken-reference error.
+   * Minimum-viable content per {DD020.§6.DC.02}: the original note ID
+   * and the deletion timestamp recovered from the marker. The hover
+   * also names the rewrite-log directory so the user can locate the
+   * full lifecycle entry when needed.
+   *
+   * The trailing claim-address suffix (e.g. `.§1.AC.03` in
+   * `_deleted_R005_at_20260519.§1.AC.03`) is surfaced as the
+   * "Original claim" line so consumers reading a derives-target can
+   * see which specific claim was being addressed.
+   *
+   * @implements {R015.§11.AC.02} editor hover surfaces deletion provenance
+   * @implements {DD020.§6.DC.02} originalId + timestamp via parseDeletionMarker
+   */
+  private buildTombstoneHover(tombstone: DeletionMarkerMatch): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    md.isTrusted = true;
+    md.supportHtml = true;
+
+    const formattedTimestamp = formatMarkerTimestampForDisplay(tombstone.timestamp);
+
+    md.appendMarkdown(`**Tombstoned reference** — *deletion lifecycle state*\n\n`);
+    md.appendMarkdown(`Original note ID: \`${escapeHtml(tombstone.originalId)}\`\n\n`);
+    md.appendMarkdown(`Deletion timestamp: \`${escapeHtml(tombstone.timestamp)}\` (${escapeHtml(formattedTimestamp)})\n\n`);
+    if (tombstone.tail) {
+      md.appendMarkdown(`Original claim: \`${escapeHtml(tombstone.originalId + tombstone.tail)}\`\n\n`);
+    }
+    md.appendMarkdown(`---\n\n`);
+    md.appendMarkdown(
+      `This is a recognized lifecycle state, not a broken reference. ` +
+      `The referenced note was hard-deleted; inbound references were rewritten to this marker. ` +
+      `See \`_scepter/lifecycle-log/\` for the rewrite-log entry recording the deletion.`,
+    );
+    return md;
+  }
+}
+
+/**
+ * Format a compact-numeric marker timestamp for human display.
+ *
+ * Accepts the 8-digit (`YYYYMMDD`) or 12-digit (`YYYYMMDDHHMM`) forms
+ * produced by `formatMarkerTimestamp` and returns a hyphen-separated
+ * presentation: `2026-05-19` or `2026-05-19 14:30 UTC`. Falls back to
+ * the raw token when the input does not match the expected shape.
+ */
+function formatMarkerTimestampForDisplay(timestamp: string): string {
+  const dateOnly = /^(\d{4})(\d{2})(\d{2})$/.exec(timestamp);
+  if (dateOnly) {
+    return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}`;
+  }
+  const dateTime = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(timestamp);
+  if (dateTime) {
+    return `${dateTime[1]}-${dateTime[2]}-${dateTime[3]} ${dateTime[4]}:${dateTime[5]} UTC`;
+  }
+  return timestamp;
 }
 

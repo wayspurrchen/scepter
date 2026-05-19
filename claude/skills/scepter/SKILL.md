@@ -193,6 +193,28 @@ class AuthService { ... }
 
 **In documentation:** `This implements {R012.§1.AC.15} acceptance criteria.`
 
+## Note Lifecycle Vocabulary
+
+Four lifecycle moves retire or relocate a note. They are not interchangeable; pick the one whose intent matches the change.
+
+| Move | Command | Inbound refs | Recovery surface |
+|---|---|---|---|
+| **Archive** | `scepter archive <ID>` | Unchanged (still resolve) | Note moves under archive folder; remains referenceable |
+| **Soft-delete** | `scepter delete <ID>` (default) | Unchanged (still resolve) | Note moves under `_deleted/`; `restore`/`purge` recover or finalize |
+| **Hard-delete** | `scepter delete --hard <ID>` | Rewritten to `_deleted_<ID>_at_<TS>` marker | None — file is gone; marker is provenance only |
+| **Rename** | `scepter rename <OLD> <NEW>` | Rewritten to new ID silently | N/A — same note, new identifier |
+
+Default to archive when uncertain. Hard-delete is for when leaving inbound references silently pointing at a phantom note would be worse than tombstoning them loudly. Rename is for relocating identity, not retiring meaning.
+
+**Two distinct lifecycle surfaces exist; do not conflate them:**
+
+- **Claim-level** (`:removed`, `:superseded=TARGET`): an author-applied metadata tag on a single claim line. The note still exists; one claim within it is retired.
+- **Note-level** (`_deleted_<ID>_at_<TS>` deletion marker): a rewriter-applied substitution into every inbound reference when `scepter delete --hard` retires a whole note. The note's file is gone; the marker remains as the parser-invisible lifecycle state on every consumer.
+
+`:removed` is something an author writes into a claim line. The deletion marker is something the rewriter writes into every other note that cited the deleted note. They live at different layers. Authors do not hand-write deletion markers — the rewriter is the sole producer.
+
+For the detailed marker format, parser-invisibility property, consumer behavior, and the "tombstoned references are NOT broken references" discipline, see `claims.md` § Tombstoned References (Note-Level Lifecycle).
+
 ## The SCEpter Workflow Loop
 
 1. **Capture** — Decision made → create note. Requirement found → create note. Question arises → create note.

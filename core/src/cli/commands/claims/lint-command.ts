@@ -16,7 +16,7 @@ import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import { buildClaimTree, validateClaimTree } from '../../../parsers/claim/index.js';
 import type { ClaimTreeError } from '../../../parsers/claim/index.js';
-import { isLifecycleTag, isDerivationTag } from '../../../claims/index.js';
+import { isLifecycleTag } from '../../../claims/index.js';
 import type { ClaimIndex } from '../../../claims/index.js';
 import { formatLintResults, formatClaimTree as formatClaimTreeDisplay } from '../../formatters/claim-formatter.js';
 import type { ProjectManager } from '../../../project/project-manager.js';
@@ -26,7 +26,9 @@ export const lintCommand = new Command('lint')
   .argument('<noteId>', 'Note ID to lint (e.g., R004)')
   .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
-  .action(async (noteId: string, options: { reindex?: boolean; json?: boolean; projectDir?: string }) => {
+  // @implements {DD020.§5.DC.03} CLI surface exposes the opt-in tombstoned-target audit
+  .option('--include-tombstoned-derives', 'Surface claims whose derives= or superseded= target is tombstoned (silent by default)')
+  .action(async (noteId: string, options: { reindex?: boolean; json?: boolean; includeTombstonedDerives?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -41,7 +43,7 @@ export const lintCommand = new Command('lint')
 
           // Read note content — use aggregated contents so that folder notes
           // have claims from companion sub-files included.
-          const content = await noteManager.noteFileManager.getAggregatedContents(noteId);
+          const content = await noteManager.getAggregatedContents(noteId);
           if (content === null) {
             throw new Error(`Note not found: ${noteId}`);
           }
@@ -77,6 +79,12 @@ export const lintCommand = new Command('lint')
             context.projectManager,
           );
 
+          // @implements {DD020.§5.DC.02} opt-in tombstoned-target audit
+          // Silent by default; only collected when the flag is passed.
+          const tombstonedAuditErrors = options.includeTombstonedDerives
+            ? collectTombstonedTargetAudit(noteId, indexData)
+            : [];
+
           // Merge errors, deduplicating by line + type
           const allErrors = [...treeErrors];
           const seen = new Set(treeErrors.map((e) => `${e.line}:${e.type}`));
@@ -102,6 +110,13 @@ export const lintCommand = new Command('lint')
             }
           }
           for (const err of aliasReferenceErrors) {
+            const key = `${err.line}:${err.type}:${err.claimId}`;
+            if (!seen.has(key)) {
+              allErrors.push(err);
+              seen.add(key);
+            }
+          }
+          for (const err of tombstonedAuditErrors) {
             const key = `${err.line}:${err.type}:${err.claimId}`;
             if (!seen.has(key)) {
               allErrors.push(err);
@@ -137,6 +152,57 @@ export const lintCommand = new Command('lint')
   });
 
 /**
+ * Collect the opt-in tombstoned-target audit listing for a note.
+ *
+ * The audit enumerates every claim in the note whose `:derives=` or
+ * `:superseded=` target is rooted in a tombstoned (deletion-marker)
+ * note ID. These are recognized lifecycle state, NOT broken references,
+ * per {R015.§5.AC.01}. The audit is silent by default and only surfaces
+ * when the CLI's `--include-tombstoned-derives` flag is passed.
+ *
+ * Each entry is materialized as a `ClaimTreeError` with type
+ * `tombstoned-target-audit` so the existing lint-output formatter can
+ * render it alongside structural diagnostics. The category is non-fatal:
+ * it documents lifecycle state, not a code defect.
+ *
+ * @implements {DD020.§5.DC.02} tombstoned-target audit category
+ */
+function collectTombstonedTargetAudit(
+  noteId: string,
+  indexData: import('../../../claims/index.js').ClaimIndexData,
+): ClaimTreeError[] {
+  // Recognition is delegated to the index populator (claim-index.ts: Phase
+  // 1.5/1.6 populates `tombstonedDerivedFrom` and `tombstonedSupersededBy`
+  // via `isDeletionMarker` on the parsed leading token). We consume the
+  // pre-populated fields here.
+  const out: ClaimTreeError[] = [];
+
+  for (const [fullyQualified, entry] of indexData.entries) {
+    if (entry.noteId !== noteId) continue;
+
+    const derivesTargets = entry.tombstonedDerivedFrom ?? [];
+    for (const target of derivesTargets) {
+      out.push({
+        type: 'tombstoned-target-audit',
+        claimId: fullyQualified,
+        line: entry.line,
+        message: `Claim "${fullyQualified}" derives from tombstoned target "${target}" (the upstream note was hard-deleted).`,
+      });
+    }
+
+    if (entry.tombstonedSupersededBy) {
+      out.push({
+        type: 'tombstoned-target-audit',
+        claimId: fullyQualified,
+        line: entry.line,
+        message: `Claim "${fullyQualified}" is superseded by tombstoned target "${entry.tombstonedSupersededBy}" (the upstream note was hard-deleted).`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Validate lifecycle tags on claims in a note.
  *
  * Checks:
@@ -168,8 +234,15 @@ function validateLifecycleTags(
       });
     }
 
-    // Check supersession target resolves
-    if (entry.lifecycle?.type === 'superseded' && entry.lifecycle.target) {
+    // Check supersession target resolves.
+    // Tombstoned (deletion-marker) targets are a recognized lifecycle state
+    // per {R015.§5.AC.01} and {DD020.§5.DC.01}; they are captured on
+    // `entry.tombstonedSupersededBy` upstream and MUST NOT be flagged here.
+    if (
+      entry.lifecycle?.type === 'superseded' &&
+      entry.lifecycle.target &&
+      entry.tombstonedSupersededBy === undefined
+    ) {
       // Normalize target: strip § for index lookup
       const normalizedTarget = entry.lifecycle.target.replace(/§/g, '');
       if (!indexData.entries.has(normalizedTarget)) {

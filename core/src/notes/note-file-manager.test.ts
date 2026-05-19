@@ -835,6 +835,297 @@ Use JWT with refresh tokens`);
     });
   });
 
+  /**
+   * Folder-unit atomicity tests for archive and soft-delete.
+   *
+   * These tests verify {DD020.§3.DC.11}–{DD020.§3.DC.14}: when a
+   * folder-form note (per {R008}) is archived or soft-deleted, the
+   * entire folder unit — root .md file plus every companion file —
+   * relocates together as a single atomic transaction. The pre-refactor
+   * implementation moved only the root .md file and left companions
+   * behind in the source folder; these tests pin the corrected
+   * behavior.
+   *
+   * @validates {DD020.§3.DC.11} atomicity guarantee on archive + soft-delete on the full note unit
+   * @validates {DD020.§3.DC.12} note unit definition for R008 folder-form notes
+   * @validates {DD020.§3.DC.13} folder-unit-aware paths beneath archiveNoteFile and deleteNoteFile committed as a single staged transaction
+   * @validates {DD020.§3.DC.14} existing-path bug-fix: companion files now move with the folder; single-file behavior unchanged
+   */
+  describe('folder-unit atomicity (archive + soft-delete)', () => {
+    it('archive: folder-form note relocates entire folder including companions', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Folder note',
+        content: 'Folder note content',
+        tags: ['auth'],
+        created: new Date(),
+        isFolder: true,
+      };
+
+      await manager.createNoteFile(note);
+
+      const mainFilePath = await manager.findNoteFile('D001');
+      expect(mainFilePath).toBeTruthy();
+      const folderPath = path.dirname(mainFilePath!);
+
+      // Add companion files inside the folder.
+      await writeFile(path.join(folderPath, 'companion-notes.md'), '# Companion notes\nDetails.');
+      await writeFile(path.join(folderPath, 'data.json'), '{"key":"value"}');
+      await ensureDir(path.join(folderPath, 'images'));
+      await writeFile(path.join(folderPath, 'images', 'diagram.txt'), 'pretend this is a diagram');
+
+      const folderName = path.basename(folderPath);
+      const typeFolder = path.dirname(folderPath);
+
+      // Archive the folder-form note.
+      const archivedMainPath = await manager.archiveNoteFile('D001', 'cleanup');
+
+      // Original folder is gone.
+      expect(await fileExists(folderPath)).toBe(false);
+
+      // Target folder lives under _archive/<folderName>/.
+      const targetFolder = path.join(typeFolder, '_archive', folderName);
+      expect(await fileExists(targetFolder)).toBe(true);
+
+      // Main file moved with updated frontmatter.
+      expect(archivedMainPath).toBe(path.join(targetFolder, 'D001.md'));
+      expect(await fileExists(archivedMainPath)).toBe(true);
+      const mainContent = await readFile(archivedMainPath);
+      expect(mainContent).toContain('status: archived');
+      expect(mainContent).toContain('archived_at:');
+      expect(mainContent).toContain('archive_prior_status:');
+      expect(mainContent).toContain('archive_reason: cleanup');
+
+      // Companion files moved with the folder (the bug being fixed).
+      expect(await fileExists(path.join(targetFolder, 'companion-notes.md'))).toBe(true);
+      expect(await fileExists(path.join(targetFolder, 'data.json'))).toBe(true);
+      expect(await fileExists(path.join(targetFolder, 'images', 'diagram.txt'))).toBe(true);
+
+      // Companion content unchanged.
+      expect(await readFile(path.join(targetFolder, 'companion-notes.md')))
+        .toBe('# Companion notes\nDetails.');
+      expect(await readFile(path.join(targetFolder, 'data.json')))
+        .toBe('{"key":"value"}');
+    });
+
+    it('archive: emits file:archived event with paths pointing at the relocated main file', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Folder note',
+        content: 'Folder note content',
+        tags: [],
+        created: new Date(),
+        isFolder: true,
+      };
+      await manager.createNoteFile(note);
+      const originalMain = (await manager.findNoteFile('D001'))!;
+
+      const handler = vi.fn();
+      manager.on('file:archived', handler);
+
+      const archivedPath = await manager.archiveNoteFile('D001');
+
+      expect(handler).toHaveBeenCalledWith({
+        noteId: 'D001',
+        oldPath: originalMain,
+        newPath: archivedPath,
+        reason: undefined,
+      });
+    });
+
+    it('archive: rolls back without touching source folder when target already exists', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Folder note',
+        content: 'Folder note content',
+        tags: [],
+        created: new Date(),
+        isFolder: true,
+      };
+      await manager.createNoteFile(note);
+
+      const mainFilePath = (await manager.findNoteFile('D001'))!;
+      const folderPath = path.dirname(mainFilePath);
+      await writeFile(path.join(folderPath, 'companion.md'), 'companion body');
+
+      const folderName = path.basename(folderPath);
+      const typeFolder = path.dirname(folderPath);
+
+      // Pre-create a conflicting target so archive must refuse.
+      const conflictFolder = path.join(typeFolder, '_archive', folderName);
+      await ensureDir(conflictFolder);
+      await writeFile(path.join(conflictFolder, 'placeholder.md'), 'existing');
+
+      await expect(manager.archiveNoteFile('D001')).rejects.toThrow(/already exists/);
+
+      // Source folder and all its files survive untouched.
+      expect(await fileExists(mainFilePath)).toBe(true);
+      expect(await fileExists(path.join(folderPath, 'companion.md'))).toBe(true);
+      const mainContent = await readFile(mainFilePath);
+      expect(mainContent).not.toContain('status: archived');
+    });
+
+    it('soft-delete: folder-form note relocates entire folder including companions', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Folder note',
+        content: 'Folder note content',
+        tags: ['auth'],
+        created: new Date(),
+        isFolder: true,
+      };
+
+      await manager.createNoteFile(note);
+
+      const mainFilePath = (await manager.findNoteFile('D001'))!;
+      const folderPath = path.dirname(mainFilePath);
+
+      // Add companion files inside the folder.
+      await writeFile(path.join(folderPath, 'rationale.md'), '# Rationale\nWhy.');
+      await writeFile(path.join(folderPath, 'attachment.bin'), 'binary blob');
+
+      const folderName = path.basename(folderPath);
+      const typeFolder = path.dirname(folderPath);
+
+      const deletedMainPath = await manager.deleteNoteFile('D001', 'no longer needed');
+
+      // Original folder is gone.
+      expect(await fileExists(folderPath)).toBe(false);
+
+      // Target folder lives under _deleted/<folderName>/.
+      const targetFolder = path.join(typeFolder, '_deleted', folderName);
+      expect(await fileExists(targetFolder)).toBe(true);
+
+      expect(deletedMainPath).toBe(path.join(targetFolder, 'D001.md'));
+      const mainContent = await readFile(deletedMainPath);
+      expect(mainContent).toContain('status: deleted');
+      expect(mainContent).toContain('deleted_at:');
+      expect(mainContent).toContain('delete_prior_status:');
+      expect(mainContent).toContain('delete_reason: no longer needed');
+
+      // Companions moved with the folder.
+      expect(await fileExists(path.join(targetFolder, 'rationale.md'))).toBe(true);
+      expect(await fileExists(path.join(targetFolder, 'attachment.bin'))).toBe(true);
+      expect(await readFile(path.join(targetFolder, 'rationale.md')))
+        .toBe('# Rationale\nWhy.');
+      expect(await readFile(path.join(targetFolder, 'attachment.bin')))
+        .toBe('binary blob');
+    });
+
+    it('soft-delete: emits file:deleted event with requiresReferenceUpdate flag', async () => {
+      const note: Note = {
+        id: 'R001',
+        type: 'Requirement',
+        title: 'Folder req',
+        content: 'Folder requirement',
+        tags: [],
+        created: new Date(),
+        isFolder: true,
+      };
+      await manager.createNoteFile(note);
+      const originalMain = (await manager.findNoteFile('R001'))!;
+
+      const handler = vi.fn();
+      manager.on('file:deleted', handler);
+
+      const deletedPath = await manager.deleteNoteFile('R001');
+
+      expect(handler).toHaveBeenCalledWith({
+        noteId: 'R001',
+        oldPath: originalMain,
+        newPath: deletedPath,
+        reason: undefined,
+        requiresReferenceUpdate: true,
+      });
+    });
+
+    it('soft-delete: rolls back without touching source folder when target already exists', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Folder note',
+        content: 'Folder note content',
+        tags: [],
+        created: new Date(),
+        isFolder: true,
+      };
+      await manager.createNoteFile(note);
+
+      const mainFilePath = (await manager.findNoteFile('D001'))!;
+      const folderPath = path.dirname(mainFilePath);
+      await writeFile(path.join(folderPath, 'companion.md'), 'companion body');
+
+      const folderName = path.basename(folderPath);
+      const typeFolder = path.dirname(folderPath);
+
+      const conflictFolder = path.join(typeFolder, '_deleted', folderName);
+      await ensureDir(conflictFolder);
+      await writeFile(path.join(conflictFolder, 'placeholder.md'), 'existing');
+
+      await expect(manager.deleteNoteFile('D001')).rejects.toThrow(/already exists/);
+
+      // Source folder and all its files survive untouched.
+      expect(await fileExists(mainFilePath)).toBe(true);
+      expect(await fileExists(path.join(folderPath, 'companion.md'))).toBe(true);
+      const mainContent = await readFile(mainFilePath);
+      expect(mainContent).not.toContain('status: deleted');
+    });
+
+    it('archive: folder-form note with no companions still relocates atomically', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Lonely folder',
+        content: 'No companions',
+        tags: [],
+        created: new Date(),
+        isFolder: true,
+      };
+      await manager.createNoteFile(note);
+
+      const mainFilePath = (await manager.findNoteFile('D001'))!;
+      const folderPath = path.dirname(mainFilePath);
+      const folderName = path.basename(folderPath);
+      const typeFolder = path.dirname(folderPath);
+
+      const archivedPath = await manager.archiveNoteFile('D001');
+
+      expect(await fileExists(folderPath)).toBe(false);
+      const targetFolder = path.join(typeFolder, '_archive', folderName);
+      expect(await fileExists(targetFolder)).toBe(true);
+      expect(archivedPath).toBe(path.join(targetFolder, 'D001.md'));
+      const content = await readFile(archivedPath);
+      expect(content).toContain('status: archived');
+    });
+
+    it('archive: leaves no _scepter/_lifecycle-staging directory after a successful commit', async () => {
+      const note: Note = {
+        id: 'D001',
+        type: 'Decision',
+        title: 'Folder note',
+        content: 'Folder note content',
+        tags: [],
+        created: new Date(),
+        isFolder: true,
+      };
+      await manager.createNoteFile(note);
+      const mainFilePath = (await manager.findNoteFile('D001'))!;
+      await writeFile(path.join(path.dirname(mainFilePath), 'companion.md'), 'c');
+
+      await manager.archiveNoteFile('D001');
+
+      const stagingRoot = path.join(tempDir, '_scepter', '_lifecycle-staging');
+      if (await fileExists(stagingRoot)) {
+        const entries = await fs.readdir(stagingRoot);
+        expect(entries).toEqual([]);
+      }
+    });
+  });
+
   describe('restoreNoteFile', () => {
     it('should restore archived file to original location', async () => {
       const note: Note = {

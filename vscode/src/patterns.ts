@@ -10,7 +10,9 @@
  */
 
 import {
+  DELETION_MARKER_RE,
   parseClaimReferences,
+  parseDeletionMarker,
   parseNoteMentions,
   type ClaimReference,
   type ClaimAddressParsed,
@@ -53,6 +55,119 @@ export interface ClaimMatch {
    */
   selfScoped: boolean;
 }
+
+/**
+ * Deletion-marker match in a single line of text.
+ *
+ * Markers (per R015 §2.AC.01 / DD020 §1) take the form
+ * `_deleted_<NOTE_ID>_at_<TIMESTAMP>` and are parser-invisible —
+ * `parseClaimReferences` does NOT recognize them because the marker's
+ * leading underscore fails the note-ID validator. The editor surfaces
+ * scan for them separately so hover, definition, decoration, and
+ * diagnostic providers can present the tombstoned-reference lifecycle
+ * state rather than treating it as a broken reference.
+ *
+ * The match's `originalId` and `timestamp` are recovered from the marker
+ * via `parseDeletionMarker`. The `tail` field captures any address suffix
+ * after the marker token (e.g. `.§1.AC.03` in
+ * `_deleted_R005_at_20260519.§1.AC.03`), so consumers that want the
+ * full original-claim address can reconstruct it as
+ * `${originalId}${tail}`.
+ *
+ * @implements {R015.§11.AC.01} extension recognizes deletion markers
+ * @implements {R015.§11.AC.02} extension surfaces deletion provenance
+ * @implements {DD020.§6.DC.01} marker recognition for diagnostic short-circuit
+ * @implements {DD020.§6.DC.02} marker recognition for hover provenance
+ * @implements {DD020.§6.DC.04} marker recognition for decoration styling
+ */
+export interface DeletionMarkerMatch {
+  /** The matched marker token in source order (including any address tail). */
+  raw: string;
+  /** 0-based column offset of the marker's first character. */
+  start: number;
+  /** 0-based column offset one past the marker's last character (inclusive of tail). */
+  end: number;
+  /** The original note ID recovered from the marker (capture group 1). */
+  originalId: string;
+  /** The compact-numeric deletion timestamp recovered from the marker (capture group 2). */
+  timestamp: string;
+  /** The address suffix after the marker token, if any (e.g. `.§1.AC.03`). Empty string when absent. */
+  tail: string;
+}
+
+/**
+ * Find every deletion marker in a line of text.
+ *
+ * Scans `lineText` for `DELETION_MARKER_RE` and returns each match as a
+ * `DeletionMarkerMatch`. The address suffix after the marker (claim
+ * address tail like `.§1.AC.03`) is included in `tail` and `end` so
+ * downstream providers can range over the entire tombstoned reference
+ * rather than only the marker token.
+ *
+ * The function is non-overlapping: markers cannot be nested.
+ *
+ * @implements {DD020.§1.DC.04} sole consumer-side use of DELETION_MARKER_RE in the extension
+ */
+export function findDeletionMarkers(lineText: string): DeletionMarkerMatch[] {
+  const matches: DeletionMarkerMatch[] = [];
+  // Use a global flag locally so we can iterate every match without
+  // mutating the shared canonical regex's lastIndex state.
+  const re = new RegExp(DELETION_MARKER_RE.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(lineText)) !== null) {
+    const start = m.index;
+    const markerEnd = start + m[0].length;
+    // Capture the trailing claim-address suffix (e.g. ".§1.AC.03") that
+    // follows the marker without whitespace. The tail is bounded by the
+    // first whitespace, brace, comma, or closing bracket character.
+    let tailEnd = markerEnd;
+    while (tailEnd < lineText.length) {
+      const ch = lineText[tailEnd];
+      if (ch === ' ' || ch === '\t' || ch === '}' || ch === ',' || ch === ']' || ch === ')' || ch === '"' || ch === "'" || ch === '`') {
+        break;
+      }
+      tailEnd++;
+    }
+    const tail = lineText.slice(markerEnd, tailEnd);
+    matches.push({
+      raw: lineText.slice(start, tailEnd),
+      start,
+      end: tailEnd,
+      originalId: m[1],
+      timestamp: m[2],
+      tail,
+    });
+  }
+  return matches;
+}
+
+/**
+ * Return the deletion marker at a given character position, or null.
+ *
+ * Used by hover and go-to-definition providers to detect when the cursor
+ * is over a tombstoned reference.
+ *
+ * @implements {DD020.§6.DC.02} hover detects tombstoned references at cursor position
+ * @implements {DD020.§6.DC.03} definition provider detects tombstoned references at cursor position
+ */
+export function deletionMarkerAtPosition(
+  lineText: string,
+  charOffset: number,
+): DeletionMarkerMatch | null {
+  for (const m of findDeletionMarkers(lineText)) {
+    if (charOffset >= m.start && charOffset <= m.end) {
+      return m;
+    }
+  }
+  return null;
+}
+
+/**
+ * Re-export `parseDeletionMarker` for the VS Code surface so providers
+ * can recover provenance from raw tokens without taking an indirect
+ * import path through scepter.
+ */
+export { parseDeletionMarker };
 
 // --- Normalization ---
 

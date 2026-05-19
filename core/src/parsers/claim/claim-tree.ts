@@ -94,7 +94,23 @@ export interface ClaimTreeError {
     | 'peer-target-not-found'
     // @implements {R004.§3.AC.05} mismatched self-prefix surfaced as diagnostic
     // @implements {S002.§8.AC.04} mismatched-self-prefix added to error union
-    | 'mismatched-self-prefix';
+    | 'mismatched-self-prefix'
+    // R006-era derivation-graph diagnostics; surfaced as a typing-completeness
+    // fix during DD020 Phase 2 (the diagnostics existed in lint-command.ts but
+    // were never added to this union).
+    | 'derives-superseded-conflict'
+    | 'self-derivation'
+    | 'invalid-derivation-target'
+    | 'derivation-from-removed'
+    | 'derivation-from-superseded'
+    | 'circular-derivation'
+    | 'deep-derivation-chain'
+    | 'partial-derivation-coverage'
+    // DD020 §5.DC.02: opt-in audit listing claims whose derives= or
+    // superseded= target is tombstoned (a known lifecycle state, not a
+    // broken reference). Silent by default; surfaced when the lint CLI's
+    // tombstoned-target-audit flag is passed.
+    | 'tombstoned-target-audit';
   claimId: string;
   line: number;
   message: string;

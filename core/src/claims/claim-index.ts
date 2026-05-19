@@ -27,6 +27,7 @@ import { parseNoteId } from '../parsers/note/shared-note-utils.js';
 import type { SourceReference } from '../types/reference.js';
 import { parseClaimMetadata } from './claim-metadata.js';
 import type { LifecycleState } from './claim-metadata.js';
+import { isDeletionMarker } from '../lifecycle/deletion-marker.js';
 
 /**
  * Detects an alias-prefixed cross-project target in a metadata value.
@@ -71,6 +72,29 @@ export interface ClaimIndexEntry {
   lifecycle?: LifecycleState; // interpreted: lifecycle tag
   parsedTags: string[];      // interpreted: freeform tags
   derivedFrom: string[];     // resolved FQIDs from derives=TARGET metadata
+  /**
+   * Raw `:derives=TARGET` target strings whose note-ID portion is a
+   * deletion marker (e.g., `_deleted_R005_at_20260519.§1.AC.03`).
+   *
+   * These targets are recognized lifecycle state, NOT broken references.
+   * They are kept separate from `derivedFrom` (which holds resolved live
+   * FQIDs) so the trace matrix and gap report can branch on them per
+   * R015 §5.AC.05 and the orphan-derives surface (see DD020 §5.DC.07,
+   * realized in traceability.ts:findGaps).
+   *
+   * @implements {DD020.§5.DC.01} consumer-side tombstone recognition
+   * @implements {R015.§5.AC.01} linter does not flag tombstoned derives=
+   */
+  tombstonedDerivedFrom: string[];
+  /**
+   * Raw `:superseded=TARGET` target string when the target's note-ID
+   * portion is a deletion marker. Same rationale as `tombstonedDerivedFrom`.
+   * Distinct from `lifecycle.target` (which carries the live target
+   * string only when resolution is meaningful).
+   *
+   * @implements {R015.§5.AC.01} linter does not flag tombstoned superseded=
+   */
+  tombstonedSupersededBy?: string;
   noteType: string;          // e.g., "Requirement"
   noteFilePath: string;
 }
@@ -363,6 +387,7 @@ export class ClaimIndex {
           parsedTags: parsed.tags,
           // @implements {R006.§2.AC.01} Raw derivation targets, resolved in Phase 1.5
           derivedFrom: parsed.derivedFrom,
+          tombstonedDerivedFrom: [],
           noteType: note.type,
           noteFilePath: note.filePath,
         };
@@ -388,7 +413,21 @@ export class ClaimIndex {
       if (entry.derivedFrom.length === 0) continue;
 
       const resolved: string[] = [];
+      const tombstoned: string[] = [];
       for (const target of entry.derivedFrom) {
+        // Tombstoned (deletion-marker) targets are a recognized lifecycle
+        // state, not broken references. The note-ID portion of TARGET is
+        // the leading token before the first `.`. If it's a deletion
+        // marker, capture the raw target on `tombstonedDerivedFrom` and
+        // skip resolution — no error, no `derivativesMap` entry.
+        // @implements {DD020.§5.DC.01} consumer-side tombstone recognition
+        // @implements {R015.§5.AC.01} no broken-ref error on tombstoned derives=
+        const leadingToken = target.split('.', 1)[0];
+        if (isDeletionMarker(leadingToken)) {
+          tombstoned.push(target);
+          continue;
+        }
+
         // Cross-project derives= is rejected per R011.§2.AC.03 / R006 §Non-Goals.
         // The derivation graph is per-project; an alias-prefixed target would
         // create a hidden federation that breaks the per-project invariant.
@@ -429,16 +468,30 @@ export class ClaimIndex {
       }
       // Replace raw targets with resolved FQIDs
       entry.derivedFrom = resolved;
+      // Tombstoned derivation targets are tracked separately so consumers
+      // (orphan-derives, lint audit) can surface them without polluting
+      // the live derivation graph.
+      entry.tombstonedDerivedFrom = tombstoned;
     }
 
-    // Phase 1.6: Cross-project supersession rejection.
+    // Phase 1.6: Cross-project supersession rejection + tombstone capture.
     // @implements {R011.§2.AC.04} cross-project superseded= rejected (permanent)
+    // @implements {DD020.§5.DC.01} consumer-side tombstone recognition for superseded=
     // The local project lacks authority to assert lifecycle facts about a
     // peer's claims. This boundary is permanent — see R011.§2.AC.04.
+    // Tombstoned supersession targets are a recognized lifecycle state per
+    // {R015.§5.AC.01}; they are captured on `tombstonedSupersededBy` and
+    // do NOT produce a cross-project error.
     for (const entry of this.data.entries.values()) {
       if (entry.lifecycle?.type !== 'superseded') continue;
       const target = entry.lifecycle.target;
-      if (typeof target === 'string' && CROSS_PROJECT_TARGET_RE.test(target)) {
+      if (typeof target !== 'string') continue;
+      const leadingToken = target.split('.', 1)[0];
+      if (isDeletionMarker(leadingToken)) {
+        entry.tombstonedSupersededBy = target;
+        continue;
+      }
+      if (CROSS_PROJECT_TARGET_RE.test(target)) {
         this.data.errors.push({
           type: 'cross-project-superseded',
           claimId: entry.fullyQualified,

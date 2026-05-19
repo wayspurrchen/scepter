@@ -6,6 +6,17 @@ export interface Reference {
   modifier?: string;   // Optional modifier (+, >, <, $, *)
   sourceType?: 'note' | 'source';  // Type of reference
   tags?: string[];     // Optional tags from reference format {ID#tag1,tag2}
+  /**
+   * True when this edge's target is a deletion-marker token (e.g.,
+   * `_deleted_R005_at_20260519`). Tombstoned edges are stored in the
+   * graph as a distinct edge type so consumers can enumerate them
+   * separately from live edges. A tombstoned edge does NOT resolve to
+   * a live note when traversed; it records that the target was once a
+   * live note and has since been hard-deleted.
+   *
+   * @implements {DD020.§5.DC.08} reference graph records tombstoned edges as a distinct edge type
+   */
+  isTombstoned?: boolean;
 }
 
 export interface SourceReference extends Reference {

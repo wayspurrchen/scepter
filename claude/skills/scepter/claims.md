@@ -512,6 +512,56 @@ When a claim is retired via `:removed`, the original claim text MUST be replaced
 
 The ID stays (monotonic, never recycled). The text goes. A future reader sees that something was here, that it was removed, and doesn't waste time evaluating a dead claim. Any references to the removed claim in other notes or code should be updated or removed — the linter warns about these.
 
+### Tombstoned References (Note-Level Lifecycle)
+
+`:removed` and `:superseded=` are **claim-level** lifecycle tags applied to a single claim ID. The deletion marker is the **note-level** counterpart: when `scepter delete --hard <NOTE_ID>` retires a whole note, every inbound reference to that note (or to any claim within it) is rewritten to a deletion marker of the form:
+
+```
+_deleted_<ORIGINAL_NOTE_ID>_at_<TIMESTAMP>
+```
+
+For example, an inbound `:derives=R005.§1.AC.01` rewrites to `:derives=_deleted_R005_at_20260519.§1.AC.01` after `scepter delete --hard R005`. The timestamp portion is `YYYYMMDD` under `timestampPrecision: date` and `YYYYMMDDHHMM` (or finer) under `timestampPrecision: datetime`. The two settings (marker timestamp and rewrite-log filename) share one config value. Per R015.
+
+**The marker is parser-invisible.** The leading underscore makes it fail the note-ID validator (`/^[A-Z]{1,5}\d{3,5}$/`), so no consumer mistakes a tombstoned token for a live note ID at the parser stage. Recognition is done via `isDeletionMarker(token)` / `DELETION_MARKER_RE` / `parseDeletionMarker(token)` — exported from `scepter` and used by the linter, trace, gaps, reference manager, `scepter ctx show`, and the VS Code editor surfaces.
+
+**Tombstoned references are NOT broken references.** They are a recognized lifecycle state. Consumers MUST silently accept them:
+
+- `scepter claims lint` does NOT emit `invalid-derivation-target`, `unresolved-reference`, or `cross-project-derives` on a tombstoned token. An audit flag surfaces them as `tombstoned-target-audit` for review without blocking.
+- `scepter claims trace` omits tombstoned edges from the live matrix by default. A flag exposes them in a deleted-origin column.
+- `scepter claims gaps` does not surface a deriving claim under generic gaps when its `derives=` target is tombstoned. It surfaces under the distinct `orphan-derives` category — the deriving claim has lost its anchor and needs an authoring decision (re-derive against a live claim, retire the deriving claim, etc.), not a stub implementation.
+- `scepter ctx show _deleted_R005_at_20260519` resolves the marker as deletion provenance (original ID, timestamp, rewrite-log location) rather than reporting an unknown note ID.
+- VS Code: the unresolved-reference squiggle does not fire; hover surfaces the deletion event; go-to-definition is a recognized no-op; the reference renders with a tombstone styling distinct from live references.
+
+**Claim-level vs note-level distinction (read carefully):**
+
+| Surface | Where applied | What it asserts |
+|---|---|---|
+| `:removed` | Metadata suffix on a single claim line | This specific claim is retired; the claim ID is preserved (monotonic), the text is `[Removed]`. The note still exists. |
+| `:superseded=TARGET` | Metadata suffix on a single claim line | This specific claim is replaced by TARGET. The note still exists. |
+| `_deleted_<ID>_at_<TS>` | Externally substituted into inbound references | The whole note `<ID>` was hard-deleted. The marker token replaces the note-ID portion of every inbound reference; the deleted note's file is gone. |
+
+The first two are author-applied to the claim being retired. The marker is rewriter-applied to every consumer of the deleted note. Do not write a marker by hand — the rewriter is the sole producer.
+
+### Lifecycle Move: Choosing Between archive, soft-delete, hard-delete, and rename
+
+When retiring or relocating a note, four lifecycle moves are available. They are not interchangeable. Each one expresses a different intent about what should happen to inbound references and to the note's future visibility.
+
+| Move | Command | Inbound refs | Note's file | When to use |
+|---|---|---|---|---|
+| **Archive** | `scepter archive <ID>` | Unchanged (still resolve to the note) | Moved under an archive folder; still referenceable | The note is no longer active work but is still meaningful context. Preserves the full referenceable surface. |
+| **Soft-delete** | `scepter delete <ID>` (default) | Unchanged (still resolve to the note) | Moved under `_deleted/`; still referenceable via `restore`/`purge`/`#deleted` workflow | You may want to bring the note back. Soft-delete is the recoverable mode. |
+| **Hard-delete** | `scepter delete --hard <ID>` | Rewritten to a deletion marker; tombstoned everywhere | Hard-unlinked (gone from disk; no graveyard) | The note's existence was a mistake or is no longer meaningful, AND you want the loud lifecycle signal that prevents downstream readers from acting on stale derives=. The marker remains as provenance. |
+| **Rename** | `scepter rename <OLD> <NEW>` | Rewritten to the new ID silently (no marker) | Renamed in place | The note is the same note under a new identifier. The new ID must not collide with a live note. |
+
+**Discipline:**
+
+- Default to **archive** when uncertain. Archive is the most conservative lifecycle move — it preserves the referenceable note and is reversible.
+- Use **soft-delete** when the note is wrong-and-might-come-back: keeps the recovery surface intact.
+- Use **hard-delete** when downstream derives= and inbound refs need a loud signal that the source is gone. The marker is parser-invisible to live consumers but visible to authors and reviewers via the `orphan-derives` gap category, the `tombstoned-target-audit` lint flag, and the VS Code hover/decoration surfaces. Hard-delete is the right move when leaving inbound references silently pointing at a phantom note would be worse than tombstoning them.
+- Use **rename** to relocate a note's identity without retiring it. Rename rewrites references silently — peer projects citing the old ID via alias get a warning recommending operator-side notification.
+
+`scepter delete --hard` and `scepter rename` both run a two-phase rewriter with a dry-run preview (preview-flag spec-layer) and a dirty-tree guard (override-flag spec-layer). The rewrite-log under `_scepter/lifecycle-log/` records every modified region; the schema supports replay-in-reverse for a future undo surface.
+
 ### Enumerating Projections
 
 Before finalizing a requirement or DD, verify every visible projection has coverage:
@@ -661,3 +711,6 @@ The verification steps (1, 2, 5) are not optional — they're how you confirm th
 | `superseded=vendor-lib/R005.§1.AC.01` (cross-project supersession) | Local supersession target only. Linter emits `cross-project-superseded`. This boundary is permanent — local lacks authority over peer lifecycle |
 | `a/b/R001` (transitive alias) | Single alias prefix only. Aliases don't chain — if you need to reach project C through project B, declare C in your local `projectAliases` directly |
 | Hovering an unfamiliar `<lowercase>/<noteId>` reference and assuming it's local | It's a cross-project citation. Check `scepter.config.json` `projectAliases` to see where it points. |
+| Treating a `_deleted_<ID>_at_<TS>` token as a broken-reference lint error | Tombstoned references are a recognized lifecycle state, not a lint violation. Linter, trace, gaps, and the VS Code editor all silently accept them. See "Tombstoned References (Note-Level Lifecycle)". |
+| Hand-writing a deletion marker into source code or a note | The rewriter is the sole producer of markers. Hand-written markers bypass the rewrite-log and break replay-in-reverse. Use `scepter delete --hard` or `scepter rename` instead. |
+| Conflating `:removed` (claim-level retirement) with `_deleted_..._at_...` (note-level tombstone) | `:removed` retires one claim; the marker tombstones inbound references to a whole hard-deleted note. Different surfaces, different authors (you vs the rewriter). |

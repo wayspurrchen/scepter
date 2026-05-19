@@ -11,6 +11,7 @@ import type { Note } from '../types/note';
 import type { ConfigManager } from '../config/config-manager';
 import type { NoteTypeConfig } from '../types/config';
 import { createFolderStructure, detectFolderNote, scanFolderContents, scanFolderContentsSync } from './folder-utils';
+import { StagingArea, type StagedOperation } from '../lifecycle/atomicity/staging';
 
 export class NoteFileManager extends EventEmitter {
   private noteIndex: Map<string, string> = new Map(); // noteId -> filePath
@@ -439,138 +440,294 @@ export class NoteFileManager extends EventEmitter {
   }
 
   /**
-   * Archive a note file - move to _archive subfolder
+   * Archive a note file - move to _archive subfolder.
+   *
+   * For folder-form notes (per {R008}), the entire folder unit — root .md
+   * file plus every companion file — is relocated atomically as a single
+   * transaction via the staging-area primitive. For single-file notes the
+   * existing direct file-move behavior is preserved byte-equivalent.
+   *
+   * @implements {DD020.§3.DC.11} Atomicity guarantee applies to archive operation on the full note unit
+   * @implements {DD020.§3.DC.12} Note unit definition (folder + companions for folder-form, single file otherwise) per R008
+   * @implements {DD020.§3.DC.13} Folder-unit-aware path beneath archiveNoteFile committed as a single staged transaction
+   * @implements {DD020.§3.DC.14} Existing-path bug-fix: companion files now move with the folder; single-file behavior unchanged
    */
   async archiveNoteFile(noteId: string, reason?: string): Promise<string> {
-    const filePath = await this.findNoteFile(noteId, { includeArchived: true });
-    if (!filePath) {
-      throw new Error(`Note file not found: ${noteId}`);
-    }
-
-    // Check if already archived
-    if (filePath.includes('/_archive/')) {
-      throw new Error(`Note is already archived: ${noteId}`);
-    }
-
-    // Read current content to update metadata
-    const content = await fs.readFile(filePath, 'utf-8');
-    
-    // Parse frontmatter to get current status
-    const parsed = matter(content);
-    const currentStatus = parsed.data.status || 'active';
-
-    // Update metadata
-    const now = new Date();
-    const updates: Record<string, any> = {
-      status: 'archived',
-      archived_at: this.formatTimestamp(now),
-      archive_prior_status: currentStatus
-    };
-    
-    // Only add reason if provided
-    if (reason) {
-      updates.archive_reason = reason;
-    }
-    
-    const updatedContent = this.updateFrontmatter(content, updates);
-
-    // Create archive path
-    const dir = path.dirname(filePath);
-    const filename = path.basename(filePath);
-    const archiveDir = path.join(dir, '_archive');
-    const archivePath = path.join(archiveDir, filename);
-
-    // Ensure archive directory exists
-    await fs.ensureDir(archiveDir);
-
-    // Write updated content to archive location
-    await fs.writeFile(archivePath, updatedContent);
-
-    // Remove original file
-    await fs.unlink(filePath);
-
-    // Update indexes
-    this.noteIndex.set(noteId, archivePath);
-    this.fileToNoteId.delete(filePath);
-    this.fileToNoteId.set(archivePath, noteId);
-
-    // Emit event
-    this.emit('file:archived', {
-      noteId,
-      oldPath: filePath,
-      newPath: archivePath,
-      reason
-    });
-
-    return archivePath;
+    return this.relocateNoteUnit(noteId, 'archive', reason);
   }
 
   /**
-   * Delete a note file - move to _deleted subfolder  
+   * Delete a note file - move to _deleted subfolder (soft-delete).
+   *
+   * For folder-form notes (per {R008}), the entire folder unit — root .md
+   * file plus every companion file — is relocated atomically as a single
+   * transaction via the staging-area primitive. For single-file notes the
+   * existing direct file-move behavior is preserved byte-equivalent.
+   *
+   * @implements {DD020.§3.DC.11} Atomicity guarantee applies to soft-delete operation on the full note unit
+   * @implements {DD020.§3.DC.12} Note unit definition (folder + companions for folder-form, single file otherwise) per R008
+   * @implements {DD020.§3.DC.13} Folder-unit-aware path beneath deleteNoteFile (soft-delete) committed as a single staged transaction
+   * @implements {DD020.§3.DC.14} Existing-path bug-fix: companion files now move with the folder; single-file behavior unchanged
    */
   async deleteNoteFile(noteId: string, reason?: string): Promise<string> {
-    const filePath = await this.findNoteFile(noteId, { includeDeleted: true });
+    return this.relocateNoteUnit(noteId, 'delete', reason);
+  }
+
+  /**
+   * Shared implementation for archive and soft-delete relocation.
+   *
+   * Detects whether the note is folder-form vs single-file and dispatches
+   * to the appropriate path. The folder-form path stages every file in
+   * the unit through StagingArea and commits atomically; the single-file
+   * path preserves the legacy direct file operations to remain
+   * byte-equivalent for that case.
+   */
+  private async relocateNoteUnit(
+    noteId: string,
+    mode: 'archive' | 'delete',
+    reason?: string,
+  ): Promise<string> {
+    const findOpts = mode === 'archive'
+      ? { includeArchived: true }
+      : { includeDeleted: true };
+    const filePath = await this.findNoteFile(noteId, findOpts);
     if (!filePath) {
       throw new Error(`Note file not found: ${noteId}`);
     }
 
-    // Check if already deleted
-    if (filePath.includes('/_deleted/')) {
+    if (mode === 'archive' && filePath.includes('/_archive/')) {
+      throw new Error(`Note is already archived: ${noteId}`);
+    }
+    if (mode === 'delete' && filePath.includes('/_deleted/')) {
       throw new Error(`Note already deleted: ${noteId}`);
     }
 
-    // Read current content to update metadata
+    // Detect folder-form: parent directory matches the noteId pattern AND
+    // resolves as a folder-based note via the folder-utils detection.
+    const containingDir = path.dirname(filePath);
+    const containingDirName = path.basename(containingDir);
+    const dirIdMatch = containingDirName.match(/^([A-Z]+\d+)/);
+    let isFolderForm = false;
+    if (dirIdMatch && dirIdMatch[1] === noteId) {
+      const detection = await detectFolderNote(containingDir);
+      isFolderForm = detection.isFolder === true;
+    }
+
+    if (isFolderForm) {
+      return this.relocateFolderUnit(noteId, filePath, containingDir, mode, reason);
+    }
+    return this.relocateSingleFile(noteId, filePath, mode, reason);
+  }
+
+  /**
+   * Single-file relocation path. Preserves the legacy direct file
+   * operations — content read, frontmatter update, write to subfolder,
+   * unlink original — so that the observable behavior for single-file
+   * notes is byte-equivalent to the pre-refactor implementation.
+   */
+  private async relocateSingleFile(
+    noteId: string,
+    filePath: string,
+    mode: 'archive' | 'delete',
+    reason?: string,
+  ): Promise<string> {
+    const subDirName = mode === 'archive' ? '_archive' : '_deleted';
+    const eventName = mode === 'archive' ? 'file:archived' : 'file:deleted';
+
     const content = await fs.readFile(filePath, 'utf-8');
-    
-    // Parse frontmatter to get current status
+    const updatedContent = this.applyRelocationFrontmatter(content, mode, reason);
+
+    const dir = path.dirname(filePath);
+    const filename = path.basename(filePath);
+    const targetDir = path.join(dir, subDirName);
+    const targetPath = path.join(targetDir, filename);
+
+    await fs.ensureDir(targetDir);
+    await fs.writeFile(targetPath, updatedContent);
+    await fs.unlink(filePath);
+
+    this.noteIndex.set(noteId, targetPath);
+    this.fileToNoteId.delete(filePath);
+    this.fileToNoteId.set(targetPath, noteId);
+
+    if (mode === 'archive') {
+      this.emit(eventName, {
+        noteId,
+        oldPath: filePath,
+        newPath: targetPath,
+        reason,
+      });
+    } else {
+      this.emit(eventName, {
+        noteId,
+        oldPath: filePath,
+        newPath: targetPath,
+        reason,
+        requiresReferenceUpdate: true,
+      });
+    }
+
+    return targetPath;
+  }
+
+  /**
+   * Folder-form relocation path. Enumerates every file in the unit
+   * (root .md + companion files), stages all moves through StagingArea,
+   * and commits atomically. On failure the staging area is rolled back
+   * and the source folder remains untouched.
+   */
+  private async relocateFolderUnit(
+    noteId: string,
+    mainFilePath: string,
+    folderPath: string,
+    mode: 'archive' | 'delete',
+    reason?: string,
+  ): Promise<string> {
+    const subDirName = mode === 'archive' ? '_archive' : '_deleted';
+    const eventName = mode === 'archive' ? 'file:archived' : 'file:deleted';
+
+    // The folder lives at <type-folder>/<folder-name>/; the subfolder
+    // (_archive/ or _deleted/) is created as a sibling of <folder-name>
+    // inside <type-folder>, and the entire folder is relocated under it.
+    const folderName = path.basename(folderPath);
+    const typeFolder = path.dirname(folderPath);
+    const targetSubDir = path.join(typeFolder, subDirName);
+    const targetFolderPath = path.join(targetSubDir, folderName);
+
+    // Refuse if a folder of the same name already exists in the target
+    // location. This mirrors the StagingArea rename semantics
+    // (`overwrite: false`) and gives a clear error before staging starts.
+    if (await fs.pathExists(targetFolderPath)) {
+      const verb = mode === 'archive' ? 'archive' : 'delete';
+      throw new Error(
+        `Cannot ${verb} folder-form note ${noteId}: target path already exists at ${targetFolderPath}`,
+      );
+    }
+
+    // Read main file content and update its frontmatter. The main file
+    // will be staged as a `write` op (new content) at the new location;
+    // companion files are staged as `rename` ops (no content change).
+    const mainContent = await fs.readFile(mainFilePath, 'utf-8');
+    const updatedMainContent = this.applyRelocationFrontmatter(mainContent, mode, reason);
+
+    const mainFilename = path.basename(mainFilePath);
+    const newMainFilePath = path.join(targetFolderPath, mainFilename);
+
+    // Enumerate companion files (relative paths under folderPath).
+    const companions = await scanFolderContents(folderPath);
+
+    const operations: StagedOperation[] = [];
+
+    // Write the main file's updated content directly at the new location.
+    // The original main file is left behind inside the source folder and
+    // will be cleaned up by the final `remove-folder` op below.
+    operations.push({
+      kind: 'write',
+      targetPath: newMainFilePath,
+      content: updatedMainContent,
+    });
+
+    // Rename each companion file from its original location to the
+    // mirrored path inside the relocated folder.
+    for (const rel of companions) {
+      operations.push({
+        kind: 'rename',
+        from: path.join(folderPath, rel),
+        to: path.join(targetFolderPath, rel),
+      });
+    }
+
+    // After all per-file operations the source folder contains only the
+    // original main file (companions were renamed out; the new main
+    // content was written to a different path). Recursively remove the
+    // source folder to complete the relocation.
+    operations.push({
+      kind: 'remove-folder',
+      targetPath: folderPath,
+    });
+
+    const staging = new StagingArea(this.projectPath);
+    try {
+      await staging.prepare(operations);
+      await staging.commit();
+    } catch (err) {
+      // Best-effort rollback. The staging area handles its own cleanup;
+      // target files are not touched until commit, so the source folder
+      // remains intact on prepare-time failure. A commit-time partial
+      // failure leaves the staging directory in place for inspection
+      // (per DD020.§3.DC.02), and we propagate the error.
+      try {
+        await staging.rollback();
+      } catch {
+        // rollback errors after a partial commit are deliberately
+        // swallowed; the staging directory survives for operator
+        // inspection.
+      }
+      throw err;
+    }
+
+    // Update indexes: the main file moved to its new path. Companion
+    // files are not tracked in noteIndex/fileToNoteId so no per-companion
+    // index update is needed.
+    this.noteIndex.set(noteId, newMainFilePath);
+    this.fileToNoteId.delete(mainFilePath);
+    this.fileToNoteId.set(newMainFilePath, noteId);
+
+    if (mode === 'archive') {
+      this.emit(eventName, {
+        noteId,
+        oldPath: mainFilePath,
+        newPath: newMainFilePath,
+        reason,
+      });
+    } else {
+      this.emit(eventName, {
+        noteId,
+        oldPath: mainFilePath,
+        newPath: newMainFilePath,
+        reason,
+        requiresReferenceUpdate: true,
+      });
+    }
+
+    return newMainFilePath;
+  }
+
+  /**
+   * Apply the frontmatter updates corresponding to an archive or
+   * soft-delete relocation. Shared between the single-file and
+   * folder-form paths so that the metadata semantics are identical.
+   */
+  private applyRelocationFrontmatter(
+    content: string,
+    mode: 'archive' | 'delete',
+    reason?: string,
+  ): string {
     const parsed = matter(content);
     const currentStatus = parsed.data.status || 'active';
-
-    // Update metadata
     const now = new Date();
+
+    if (mode === 'archive') {
+      const updates: Record<string, any> = {
+        status: 'archived',
+        archived_at: this.formatTimestamp(now),
+        archive_prior_status: currentStatus,
+      };
+      if (reason) {
+        updates.archive_reason = reason;
+      }
+      return this.updateFrontmatter(content, updates);
+    }
+
     const updates: Record<string, any> = {
       status: 'deleted',
       deleted_at: this.formatTimestamp(now),
-      delete_prior_status: currentStatus
+      delete_prior_status: currentStatus,
     };
-    
-    // Only add reason if provided
     if (reason) {
       updates.delete_reason = reason;
     }
-    
-    const updatedContent = this.updateFrontmatter(content, updates);
-
-    // Create delete path
-    const dir = path.dirname(filePath);
-    const filename = path.basename(filePath);
-    const deleteDir = path.join(dir, '_deleted');
-    const deletePath = path.join(deleteDir, filename);
-
-    // Ensure delete directory exists
-    await fs.ensureDir(deleteDir);
-
-    // Write updated content to delete location
-    await fs.writeFile(deletePath, updatedContent);
-
-    // Remove original file
-    await fs.unlink(filePath);
-
-    // Update indexes
-    this.noteIndex.set(noteId, deletePath);
-    this.fileToNoteId.delete(filePath);
-    this.fileToNoteId.set(deletePath, noteId);
-
-    // Emit event with reference update info
-    this.emit('file:deleted', {
-      noteId,
-      oldPath: filePath,
-      newPath: deletePath,
-      reason,
-      requiresReferenceUpdate: true
-    });
-
-    return deletePath;
+    return this.updateFrontmatter(content, updates);
   }
 
   /**
@@ -681,6 +838,213 @@ export class NoteFileManager extends EventEmitter {
       this.noteIndex.delete(noteId);
       this.fileToNoteId.delete(filePath);
     }
+  }
+
+  /**
+   * Resolve a note's filesystem layout — file vs folder, main file path
+   * and (for folder-form) folder path. This is the read-side surface
+   * the lifecycle command paths use to plan filesystem mutations
+   * without touching disk.
+   *
+   * Returns `null` when the note is not in the index.
+   *
+   * @implements {DD020.§2.DC.16} filesystem-path scanner resolves note's filesystem entry via NoteFileManager.noteIndex
+   * @implements {DD020.§2.DC.17} resolution surface for folder-vs-file disposition under hard-delete
+   */
+  resolveNoteLayout(noteId: string): { kind: 'file'; filePath: string } | { kind: 'folder'; folderPath: string; mainFilePath: string } | null {
+    const filePath = this.noteIndex.get(noteId);
+    if (!filePath) {
+      return null;
+    }
+    const containingDir = path.dirname(filePath);
+    const containingDirName = path.basename(containingDir);
+    const dirIdMatch = containingDirName.match(/^([A-Z]+\d+)/);
+    if (dirIdMatch && dirIdMatch[1] === noteId) {
+      return { kind: 'folder', folderPath: containingDir, mainFilePath: filePath };
+    }
+    return { kind: 'file', filePath };
+  }
+
+  /**
+   * Hard-unlink a note from disk. The file (for file-based notes) or
+   * the entire folder including all companion files (for folder-based
+   * notes per {R008}) is removed outright. Hard-delete does NOT
+   * relocate to `_deleted/`; that location is reserved for soft-delete.
+   *
+   * Uses the staging-area primitive so the removal commits atomically
+   * with any sibling staged operations the caller has queued.
+   *
+   * Index entries for the noteId are cleared on commit; the caller is
+   * responsible for invoking the rewriter and the index refresh that
+   * surround this primitive.
+   *
+   * @implements {DD020.§3.DC.15} hard-delete removes the note unit outright; folder-form removes companions; bypasses `_deleted/`
+   * @implements {DD020.§3.DC.13} folder-unit-aware operation consumed by hard-delete code path
+   * @implements {R015.§3.AC.15} hard-delete file disposition
+   */
+  async removeNoteEntry(noteId: string): Promise<void> {
+    const layout = this.resolveNoteLayout(noteId);
+    if (!layout) {
+      throw new Error(`Note file not found: ${noteId}`);
+    }
+
+    const operations: StagedOperation[] = [];
+    if (layout.kind === 'file') {
+      operations.push({ kind: 'remove', targetPath: layout.filePath });
+    } else {
+      operations.push({ kind: 'remove-folder', targetPath: layout.folderPath });
+    }
+
+    const staging = new StagingArea(this.projectPath);
+    try {
+      await staging.prepare(operations);
+      await staging.commit();
+    } catch (err) {
+      try {
+        await staging.rollback();
+      } catch {
+        // Swallow rollback errors — staging directory remains for inspection.
+      }
+      throw err;
+    }
+
+    // Index cleanup.
+    const mainFilePath = layout.kind === 'file' ? layout.filePath : layout.mainFilePath;
+    this.noteIndex.delete(noteId);
+    this.fileToNoteId.delete(mainFilePath);
+
+    this.emit('file:removed', {
+      noteId,
+      kind: layout.kind,
+      path: layout.kind === 'file' ? layout.filePath : layout.folderPath,
+    });
+  }
+
+  /**
+   * Rename a note's filesystem entry from `sourceId` to `targetId`.
+   *
+   * For file-based notes the file is renamed in place (preserving the
+   * title portion of the basename). For folder-based notes the folder
+   * is renamed AND the inner main file is renamed; companion files
+   * move with the folder as a unit per {R008}.
+   *
+   * Uses the staging-area primitive so the rename commits atomically
+   * with any sibling staged operations the caller has queued (e.g.,
+   * frontmatter rewrites of the renamed note's `id` field).
+   *
+   * Returns the new main file path. The caller is responsible for
+   * invoking the rewriter and the index refresh that surround this
+   * primitive; this method only owns the filesystem rename.
+   *
+   * @implements {DD020.§3.DC.13} folder-unit-aware operation consumed by rename code path
+   * @implements {DD020.§4.DC.06} renames file for file-based notes; folder + inner main for folder-based notes; companions move with folder
+   */
+  async renameNoteEntry(sourceId: string, targetId: string): Promise<string> {
+    const layout = this.resolveNoteLayout(sourceId);
+    if (!layout) {
+      throw new Error(`Note file not found: ${sourceId}`);
+    }
+
+    const operations: StagedOperation[] = [];
+    let newMainFilePath: string;
+
+    if (layout.kind === 'file') {
+      const newPath = this.renameIdInPath(layout.filePath, sourceId, targetId);
+      if (newPath === layout.filePath) {
+        throw new Error(
+          `Cannot rename ${sourceId}: filesystem entry does not start with the source ID at ${layout.filePath}`,
+        );
+      }
+      operations.push({ kind: 'rename', from: layout.filePath, to: newPath });
+      newMainFilePath = newPath;
+    } else {
+      const newFolderPath = this.renameIdInPath(layout.folderPath, sourceId, targetId);
+      if (newFolderPath === layout.folderPath) {
+        throw new Error(
+          `Cannot rename ${sourceId}: folder name does not start with the source ID at ${layout.folderPath}`,
+        );
+      }
+      const oldMainBasename = path.basename(layout.mainFilePath);
+      const newMainBasename = this.renameIdInBasename(oldMainBasename, sourceId, targetId);
+      newMainFilePath = path.join(newFolderPath, newMainBasename);
+
+      // Stage folder rename first, then inner main-file rename. The
+      // staging-area commit applies them sequentially.
+      operations.push({ kind: 'rename', from: layout.folderPath, to: newFolderPath });
+      if (oldMainBasename !== newMainBasename) {
+        operations.push({
+          kind: 'rename',
+          from: path.join(newFolderPath, oldMainBasename),
+          to: newMainFilePath,
+        });
+      }
+    }
+
+    const staging = new StagingArea(this.projectPath);
+    try {
+      await staging.prepare(operations);
+      await staging.commit();
+    } catch (err) {
+      try {
+        await staging.rollback();
+      } catch {
+        // Swallow rollback errors — staging directory remains for inspection.
+      }
+      throw err;
+    }
+
+    // Index update. We swap the cache from source to target.
+    const oldMainPath = layout.kind === 'file' ? layout.filePath : layout.mainFilePath;
+    this.noteIndex.delete(sourceId);
+    this.fileToNoteId.delete(oldMainPath);
+    this.noteIndex.set(targetId, newMainFilePath);
+    this.fileToNoteId.set(newMainFilePath, targetId);
+
+    this.emit('file:renamed', {
+      sourceId,
+      targetId,
+      oldPath: oldMainPath,
+      newPath: newMainFilePath,
+    });
+
+    return newMainFilePath;
+  }
+
+  /**
+   * Helper: rename the leading <sourceId> in a path's basename to
+   * <targetId>, preserving the directory and trailing parts. Returns
+   * the input unchanged if the basename does not start with sourceId
+   * followed by a non-alphanumeric boundary.
+   */
+  private renameIdInPath(filePath: string, sourceId: string, targetId: string): string {
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath);
+    const newBase = this.renameIdInBasename(base, sourceId, targetId);
+    if (newBase === base) {
+      return filePath;
+    }
+    if (dir === '.' || dir === '') {
+      return newBase;
+    }
+    return path.join(dir, newBase);
+  }
+
+  /**
+   * Helper: replace a leading <sourceId> with <targetId> in a basename,
+   * respecting word-boundary rules so longer ID-shaped substrings are
+   * not modified.
+   */
+  private renameIdInBasename(basename: string, sourceId: string, targetId: string): string {
+    if (!basename.startsWith(sourceId)) {
+      return basename;
+    }
+    if (basename.length > sourceId.length) {
+      const boundary = basename[sourceId.length];
+      if (/[A-Za-z0-9]/.test(boundary)) {
+        return basename;
+      }
+    }
+    return targetId + basename.slice(sourceId.length);
   }
 
   /**

@@ -479,6 +479,17 @@ export function formatTraceabilityMatrix(
     renderSection(referencedRows, 'Referenced claims', refProjections);
   }
 
+  // @implements {DD020.§5.DC.05} dedicated tombstoned column when opt-in flag set
+  if (matrix.tombstonedRefs && matrix.tombstonedRefs.size > 0) {
+    lines.push('');
+    lines.push(chalk.bold.gray('Tombstoned references:'));
+    for (const [sourceClaim, presences] of matrix.tombstonedRefs) {
+      for (const p of presences) {
+        lines.push(`  ${chalk.cyan(sourceClaim)}  →  ${chalk.gray(p.claimId ?? p.noteId)}`);
+      }
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -764,8 +775,16 @@ export function formatGapReport(
       lines.push(`  ${chalk.gray('Metadata:')} ${gap.metadata.join(', ')}`);
     }
 
-    lines.push(`  ${chalk.green('Present in:')} ${gap.presentIn.join(', ')}`);
-    lines.push(`  ${chalk.yellow('Missing from:')} ${gap.missingFrom.join(', ')}`);
+    // @implements {DD020.§5.DC.07} orphan-derives category rendered distinctly
+    if (gap.category === 'orphan-derives') {
+      lines.push(`  ${chalk.cyan('Category:')} orphan-derives`);
+      if (gap.tombstonedDerivedFrom && gap.tombstonedDerivedFrom.length > 0) {
+        lines.push(`  ${chalk.gray('Tombstoned source(s):')} ${gap.tombstonedDerivedFrom.join(', ')}`);
+      }
+    } else {
+      lines.push(`  ${chalk.green('Present in:')} ${gap.presentIn.join(', ')}`);
+      lines.push(`  ${chalk.yellow('Missing from:')} ${gap.missingFrom.join(', ')}`);
+    }
 
     // @implements {R006.§3.AC.02} Show derivation coverage status
     // @implements {R006.§3.AC.03} Expand derivation tree when showDerived is active
@@ -863,6 +882,9 @@ function formatErrorType(type: string): string {
       return chalk.yellow('[DERIVES-FROM-REMOVED]');
     case 'derivation-from-superseded':
       return chalk.yellow('[DERIVES-FROM-SUPERSEDED]');
+    case 'tombstoned-target-audit':
+      // @implements {DD020.§5.DC.02} tombstoned-target audit displayed as info-level marker
+      return chalk.cyan('[TOMBSTONED-TARGET]');
     default:
       return chalk.gray(`[${type.toUpperCase()}]`);
   }

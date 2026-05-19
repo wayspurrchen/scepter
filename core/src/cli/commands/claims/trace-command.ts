@@ -194,7 +194,9 @@ export const traceCommand = new Command('trace')
   .option('--where <pair>', 'Filter to claims where KEY=VALUE in folded metadata (repeatable)', collectStrings, [])
   .option('--has-key <key>', 'Filter to claims with at least one value for KEY (repeatable)', collectStrings, [])
   .option('--missing-key <key>', 'Filter to claims with no value for KEY (repeatable)', collectStrings, [])
-  .action(async (id: string, options: { importance?: number; sort?: string; width?: number; full?: boolean; excerpts?: boolean; showDerived?: boolean; reindex?: boolean; json?: boolean; verbose?: boolean; where?: string[]; hasKey?: string[]; missingKey?: string[]; projectDir?: string }) => {
+  // @implements {DD020.§5.DC.06} CLI surface exposes the tombstoned-references column toggle
+  .option('--include-tombstoned', 'Surface tombstoned (hard-deleted) references as a dedicated column (suppressed by default)')
+  .action(async (id: string, options: { importance?: number; sort?: string; width?: number; full?: boolean; excerpts?: boolean; showDerived?: boolean; reindex?: boolean; json?: boolean; verbose?: boolean; where?: string[]; hasKey?: string[]; missingKey?: string[]; includeTombstoned?: boolean; projectDir?: string }) => {
     try {
       await BaseCommand.execute(
         {
@@ -356,7 +358,10 @@ export const traceCommand = new Command('trace')
           }
 
           // Note-level trace: show traceability matrix
-          const matrix = buildTraceabilityMatrix(id, data);
+          // @implements {DD020.§5.DC.05} opt-in tombstoned column on the trace matrix
+          const matrix = buildTraceabilityMatrix(id, data, {
+            includeTombstoned: options.includeTombstoned === true,
+          });
 
           // @implements {R005.§1.AC.02} Filter rows by minimum importance level
           // @implements {DD014.§3.DC.57} --importance preserved unchanged at user-facing level
