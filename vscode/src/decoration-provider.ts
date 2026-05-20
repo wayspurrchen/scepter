@@ -203,10 +203,24 @@ export class DecorationProvider {
             // form they wrote.
             const isQualified = /^[A-Z]/.test(match.normalizedId);
             const display = isQualified ? match.normalizedId : `§${match.normalizedId}`;
+            // Distinguish two failure modes per {R012.§2.AC.13}: parent
+            // note known but section heading unregistered vs. note unknown.
+            let cause: string;
+            if (isQualified) {
+              const dotIdx = match.normalizedId.indexOf('.');
+              const noteId = dotIdx > 0 ? match.normalizedId.slice(0, dotIdx) : match.normalizedId;
+              const sectionPart = dotIdx > 0 ? match.normalizedId.slice(dotIdx + 1) : '';
+              const noteInfo = this.index.lookupNote(noteId);
+              cause = noteInfo
+                ? `${noteId} is indexed but has no \`§${sectionPart}\` section heading registered`
+                : `note \`${noteId}\` not indexed`;
+            } else {
+              cause = 'section not registered in the current document';
+            }
             unresolvedList.push({
               range,
               hoverMessage: new vscode.MarkdownString(
-                `*SCEpter section* \`${display}\` — not found in index`
+                `*SCEpter section* \`${display}\` — ${cause}`,
               ),
             });
           }

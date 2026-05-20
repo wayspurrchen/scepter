@@ -136,10 +136,29 @@ const TABLE_SEPARATOR_RE = /^\|[\s:]*-+[\s:|-]*\|\s*$/;
 const TABLE_CLAIMS_OFF_RE = /<!--\s*no-table-claims\s*-->/;
 
 /**
- * Matches a section identifier at the start of text.
- * Captures optional section symbol prefix + number. Can be nested (§3.1).
+ * Matches a section identifier at the start of a heading's text.
+ *
+ * Accepts both `§N` and bare-numeric forms per {R004.§1.AC.01}:
+ *   - `§1 Title`, `§1.3 Title` — § form (one optional space after §)
+ *   - `1 Title`, `1. Title`, `1.1 Title`, `1.1. Title` — bare form
+ *
+ * After the captured numeric group, the input must end OR continue with
+ * a separator that confirms the digits were a section identifier rather
+ * than a numeric prefix to alphabetic text. Two trailing alternatives:
+ *   (a) literal `.` followed by whitespace-or-end — consumes a trailing
+ *       `## 1. Title` dot without including it in the capture.
+ *   (b) lookahead for whitespace, `:`, `)`, or end-of-string.
+ *
+ * Both alternatives reject digit-letter adjacency, so `1Foo`,
+ * `1.5xPerformance`, `1.5x Performance`, and ISO dates like `2025-10-06`
+ * MUST NOT match. (The literal `.(?=\s|$)` alternative prevents
+ * backtracking into a shorter capture for the `1.5x` case.)
+ *
+ * @implements {R004.§1.AC.01} § is optional emphasis on section headings
+ * @implements {R004.§3.AC.01} bare-numeric headings recognized as sections
+ * @implements {S002.§2.AC.02} regex shape mirrored in the spec
  */
-const SECTION_ID_RE = /^§(\d+(?:\.\d+)*)\b/;
+const SECTION_ID_RE = /^(?:§\s?)?(\d+(?:\.\d+)*)(?:\.(?=\s|$)|(?=[\s:)]|$))/;
 
 /**
  * Matches a claim identifier at the start of text.

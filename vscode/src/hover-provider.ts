@@ -157,6 +157,10 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
       if (sectionEntry) {
         return new vscode.Hover(await this.buildSectionHover(sectionEntry), range);
       }
+      // Section ref recognized but not registered — distinguish the cause
+      // per {R012.§2.AC.13}: did the note exist (heading just wasn't parsed
+      // as numeric section), or is the whole note unknown?
+      return new vscode.Hover(this.buildUnresolvedSectionHover(match.normalizedId), range);
     }
 
     // --- Fallback: reference recognized but not in index ---
@@ -418,6 +422,9 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     return md;
   }
 
+  // @implements {R012.§2.AC.10} section hover surfaces FQID, parent note, heading, file:line, body excerpt
+  // @implements {R012.§2.AC.11} body excerpt rendered as markdown so embedded refs stay clickable
+  // @implements {R012.§2.AC.12} "Contains N claims" surfaced when the section has claims defined within
   private async buildSectionHover(entry: SectionEntry): Promise<vscode.MarkdownString> {
     const md = new vscode.MarkdownString();
     md.isTrusted = true;
@@ -435,13 +442,71 @@ export class ClaimHoverProvider implements vscode.HoverProvider {
     const openCmd = `command:vscode.open?${encodeURIComponent(JSON.stringify([uri, { selection: { startLineNumber: entry.line, startColumn: 1 } }]))}`;
     md.appendMarkdown(`[${entry.noteFilePath}:${entry.line}](${openCmd})\n\n`);
 
+    const claimCount = this.countClaimsInSection(entry);
+    if (claimCount > 0) {
+      md.appendMarkdown(`*Contains ${claimCount} claim${claimCount === 1 ? '' : 's'}.*\n\n`);
+    }
+
     const sectionText = await this.index.readSectionContent(entry, 200);
     if (sectionText) {
       md.appendMarkdown(`---\n\n`);
-      md.appendCodeblock(sectionText.trim(), 'markdown');
+      md.appendMarkdown(sectionText.trim());
       md.appendMarkdown(`\n`);
     }
 
+    return md;
+  }
+
+  /**
+   * Count claims defined within a section (including its subsections).
+   * A claim belongs to the section when its `sectionPath` starts with the
+   * section's `sectionPath` prefix.
+   */
+  private countClaimsInSection(entry: SectionEntry): number {
+    const prefix = entry.sectionPath;
+    let count = 0;
+    for (const claim of this.index.claimsForNote(entry.noteId)) {
+      if (!claim.sectionPath || claim.sectionPath.length < prefix.length) continue;
+      let matchesPrefix = true;
+      for (let i = 0; i < prefix.length; i++) {
+        if (claim.sectionPath[i] !== prefix[i]) { matchesPrefix = false; break; }
+      }
+      if (matchesPrefix) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Build a hover for a section ref that parsed but didn't resolve.
+   *
+   * Distinguishes the two failure modes the user can act on:
+   *   - The parent note exists but the section heading isn't registered
+   *     (heading text lacks the recognized `§N` / `N.` form).
+   *   - The parent note itself isn't in the index.
+   *
+   * @implements {R012.§2.AC.13} unresolved-section hover names the cause distinctly
+   */
+  private buildUnresolvedSectionHover(normalizedId: string): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    md.isTrusted = true;
+    md.supportHtml = true;
+
+    const dotIdx = normalizedId.indexOf('.');
+    const noteId = dotIdx > 0 ? normalizedId.slice(0, dotIdx) : normalizedId;
+    const sectionPart = dotIdx > 0 ? normalizedId.slice(dotIdx + 1) : '';
+    const display = sectionPart ? `${noteId}.§${sectionPart}` : `§${normalizedId}`;
+
+    const noteInfo = this.index.lookupNote(noteId);
+    if (noteInfo) {
+      md.appendMarkdown(`**${display}** — *section heading not registered*\n\n`);
+      md.appendMarkdown(
+        `${noteId} is indexed but it has no \`§${sectionPart}\` section. ` +
+        `SCEpter recognizes section headings via \`§N\` or bare-numeric \`N\` / \`N.\` prefix (per {R004.§1.AC.01}).`,
+      );
+      return md;
+    }
+    md.appendMarkdown(`**${display}** — *not in current index*\n\n`);
+    md.appendMarkdown(`Note \`${noteId}\` is not indexed. Run **SCEpter: Refresh Claim Index** to rebuild.`);
     return md;
   }
 

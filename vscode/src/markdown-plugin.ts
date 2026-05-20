@@ -600,7 +600,18 @@ function buildDataAttrs(
       attrs.push(`data-note-file="${escAttr(sectionEntry.noteFilePath)}"`);
       attrs.push(`title="${escAttr(sectionEntry.fqid)} — ${escAttr(sectionEntry.heading)}"`);
     } else {
-      attrs.push(`title="Section §${escAttr(normalizedId)} — not in index"`);
+      // @implements {R012.§3.AC.11} preview tooltip names unresolved-section cause
+      const dotIdx = normalizedId.indexOf('.');
+      const noteId = dotIdx > 0 ? normalizedId.slice(0, dotIdx) : normalizedId;
+      const sectionPart = dotIdx > 0 ? normalizedId.slice(dotIdx + 1) : '';
+      const display = sectionPart ? `${noteId}.§${sectionPart}` : `§${normalizedId}`;
+      const noteInfo = noteId !== normalizedId ? index.lookupNote(noteId) : null;
+      const cause = noteInfo
+        ? `${noteId} has no §${sectionPart} section heading registered`
+        : sectionPart
+          ? `note ${noteId} not indexed`
+          : `section not in current document`;
+      attrs.push(`title="Section ${escAttr(display)} — ${escAttr(cause)}"`);
     }
   }
 

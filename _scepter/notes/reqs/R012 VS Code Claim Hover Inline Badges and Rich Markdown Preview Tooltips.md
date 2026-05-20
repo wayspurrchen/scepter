@@ -76,7 +76,7 @@ The same badge primitive — count plus source-vs-note color encoding — also s
 
 ### §2 Editor Hover (Raw Markdown)
 
-The editor hover provider MUST surface claim, note, and section information when the user hovers a reference in a `.md` file. The hover MUST distinguish between "the user is reading this claim's own definition" (original-claim mode) and "the user is hovering a citation elsewhere" (reference-to-claim mode), and MUST handle range expansions, cross-project citations, snippet truncation for long citing lines, and unknown references gracefully.
+The editor hover provider MUST surface claim, note, and section information when the user hovers a reference in a `.md` file. The hover MUST distinguish between "the user is reading this claim's own definition" (original-claim mode) and "the user is hovering a citation elsewhere" (reference-to-claim mode), and MUST handle range expansions, section references, cross-project citations, snippet truncation for long citing lines, and unknown references gracefully. The section-hover surface is specified at §2.AC.10-§2.AC.13.
 
 §2.AC.01 When the cursor sits on a claim's own definition heading or paragraph (same file, same line as the indexed `entry.line`), the hover MUST render in **original-claim mode**: a single-pane layout with the FQID, note type, note title, importance/lifecycle/derivation badges, and the refs panel. The body excerpt MUST be omitted — the user is already reading it.
 
@@ -95,6 +95,14 @@ The editor hover provider MUST surface claim, note, and section information when
 §2.AC.08 When the SCEpter reference recognized at the cursor is not present in the claim index, the hover MUST surface a fallback message naming the matched id and instructing the user to refresh the index. Recognition without resolution MUST NOT silently produce a null hover.
 
 §2.AC.09 The hover MUST log every attempted hover on a markdown file to the extension's output channel with the line, character, match kind, and surrounding text snippet. This is the primary diagnostic surface for users debugging "why didn't my hover fire?"
+
+§2.AC.10 When the cursor sits on a section reference (e.g., `{ARCH002.§1}`, `{R005.§3.2}`, or an adjacent-section-bound `ARCH002 §1`) that resolves to an indexed section, the hover MUST render a **section hover** containing: (a) the section's fully qualified ID (`ARCH002.§1`), (b) the parent note's type and title, (c) the section's heading text, (d) a file:line link that opens the parent note at the section heading's line, and (e) a body excerpt of the section content. The five elements are the same information the reader would scroll to in the parent note; the hover surfaces it at the point of reference.
+
+§2.AC.11 The section-hover body excerpt MUST be rendered as markdown (the same render path that claim-hover body excerpts use per §7.AC.08, allowing the editor's `MarkdownString` to display its content with normal styling) and MUST NOT be wrapped in a fixed-width code block. Rendering as markdown preserves embedded claim and note references inside the excerpt as clickable links, and lets sub-headings inside the section render with their normal heading styling rather than as plain code text.
+
+§2.AC.12 When the section contains at least one claim defined inside it (a claim whose `noteId` matches the section's `noteId` and whose `sectionPath` starts with the section's `sectionPath`), the section hover MAY display a "Contains N claims" line (count of such claims) above the body excerpt. The line is informational; absence MUST NOT be treated as "no claims" — the body excerpt continues to surface them inline.
+
+§2.AC.13 When a section reference fails to resolve in the index (the parent note exists but the section heading was not registered — for example, because the heading's syntactic form was not recognized by the section parser), the unresolved-hover fallback message MUST name the specific cause ("section heading not registered in the claim index" or equivalent) rather than the generic "not in index" message used for arbitrary unknown ids. The intent is that a user encountering this state in a peer project whose authoring convention diverges from the parser's accepted forms can identify the heading-registration failure as the cause without having to inspect the parser source.
 
 ### §3 Markdown Preview Tooltip
 
@@ -126,6 +134,8 @@ The markdown preview's webview MUST display a rich hover tooltip when the user h
 The body region's render budget is the resolver's transitive walk; per §7.AC.06 amendment, the note body in this surface is uncapped (no 50-line truncation) because the scroll container bounds visual height regardless of body size. When `window.__scepterBodyMap[noteId]` has no entry (e.g., the note is reachable only at depth > maxDepth or the body-map cap was hit), the note hover MUST fall back gracefully — header, subline, and footer still render; the body region renders an empty state or the legacy capped-excerpt path if available.
 
 §3.AC.10 While the user is actively scrolling inside an open tooltip (any `.scepter-tooltip`), nested tooltip spawns (level >= 1) MUST be suppressed. A `mouseenter` on a `.scepter-ref` element inside a tooltip during active scroll MUST NOT open a child tooltip; the user is reading the current content, not requesting exploration. Active scrolling MUST be detected from BOTH wheel events on the tooltip AND `scroll` events on the inner `.scepter-scroll` containers (the latter covers scrollbar-drag and arrow-key scrolling that wheel events miss). The suppression window MUST extend on each scroll signal and lift after a short idle interval (default: 300ms). Top-level (level 0) hovers spawned from the markdown body itself MUST NOT be gated — those are user-initiated exploration unrelated to tooltip-internal scrolling. The intent is the read-vs-explore disambiguation: scrolling means reading, hovering from outside means exploring.
+
+§3.AC.11 When the markdown preview's webview tooltip targets a section reference, it MUST mirror the editor section-hover content specified in §2.AC.10-§2.AC.13: the same FQID, parent note type and title, section heading text, file:line link, body excerpt rendered through the SCEpter plugin (so embedded claim and note references inside the section remain hoverable, clickable, and badge-bearing per §7), an optional "Contains N claims" line under the same condition as §2.AC.12, and the same specific unresolved-cause message specified in §2.AC.13 when the section heading is not registered. Cross-surface visual coherence MUST be preserved per the Overview's Core Principle; pixel-identity is not required.
 
 ### §4 Refs Panel Content Layout
 
@@ -325,15 +335,15 @@ A future test plan derived from this requirement may add scripted manual test ca
 | Section | Count |
 |---------|-------|
 | §1 Inline Crossref-Count Badge | 11 |
-| §2 Editor Hover (Raw Markdown) | 9 |
-| §3 Markdown Preview Tooltip | 10 |
+| §2 Editor Hover (Raw Markdown) | 13 |
+| §3 Markdown Preview Tooltip | 11 |
 | §4 Refs Panel Content Layout | 10 |
 | §5 Range-Syntax Expansion | 6 |
 | §6 Adjacent-Section Binding | 5 |
 | §7 Excerpt Rendering Pipeline | 8 |
 | §8 Performance and Bounded Resource Usage | 8 |
 | §9 Click Navigation Across Surfaces | 6 |
-| **Total** | **73** |
+| **Total** | **78** |
 
 ## References
 
@@ -362,3 +372,5 @@ A future test plan derived from this requirement may add scripted manual test ca
 - 2026-05-05 (UX): Active-scroll suppression for nested tooltips. §3.AC.10 added: while the user is scrolling inside an open tooltip, mouseenters on `.scepter-ref` elements MUST NOT spawn child tooltips. Detected from wheel events on the tooltip and scroll events on `.scepter-scroll` containers; 300ms idle window. Top-level hovers from the markdown body remain unaffected. Implementation: `vscode/media/preview-script.js` adds `noteTooltipScrollActivity` / `isScrollingInTooltip` plus a guard at the top of `showTooltip`. Total AC count rose from 72 to 73.
 
 - 2026-05-05 (later): The first cut of the preview hover extension above hit the same starvation pattern as the 2026-05-03 incident — Cmd+Shift+V hung for many seconds before the preview surfaced. Two architectural violations of §7/§8 were the cause: (1) the aggregated note-badge in `buildDataAttrs` ran an inline O(claims × crossRefs) computation per note span, recreating the per-span eager-pass shape; (2) `resolveTransitive`'s new note-id branch rendered uncapped note bodies through the SCEpter plugin without sub-budgets, fanning out across many seeds with no wall-clock guard. Three new ACs codify the invariants this fix lands: §8.AC.06 (per-span data-attr computation must be O(1) amortized; aggregations cache at the index, not the span; nested-render skip for invisible work), §8.AC.07 (`resolveTransitive` wall-clock budget — 250ms — independent of depth/maxBodies caps), §8.AC.08 (uncapped note rendering bounded by per-walk count cap of 4 and per-body line ceiling of 5000). Implementation: `vscode/src/claim-index.ts` adds `noteBadgeCache` + `getNoteBadge(noteId)` cleared on `refresh()` and `switchProject()`; `vscode/src/claim-body-resolver.ts` adds `TRANSITIVE_BUDGET_MS`, `TRANSITIVE_MAX_UNCAPPED_NOTE_BODIES`, `UNCAPPED_NOTE_HARD_LINE_CEILING` and threads them through `resolveTransitive`; `vscode/src/markdown-plugin.ts` routes the note badge through the cache and skips emission when `env._scepterLineOffset` is set. Total AC count rose from 69 to 72.
+
+- 2026-05-20: Section-hover render contract made explicit. §2 grew four new ACs (§2.AC.10 section-hover content surface — FQID, parent note type/title, heading text, file:line, body excerpt; §2.AC.11 body excerpt rendered as markdown rather than codeblock so embedded refs remain clickable; §2.AC.12 optional "Contains N claims" line when the section has claims defined inside it; §2.AC.13 specific unresolved-cause message when the section heading is not registered in the index) and §3 grew §3.AC.11 mirroring the same content in the preview tooltip. The §2 intro narrative now points at the section-hover AC range. These ACs were implicit before — the buildSectionHover code path exists but had no claim coverage — and become the binding spec for the section-hover render-quality follow-up that pairs with the heading-registration parser relaxation in {R004.§1.AC.01}. Total AC count rose from 73 to 78.

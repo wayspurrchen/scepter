@@ -134,7 +134,7 @@ The claim prefix MUST be alphabetic-only. Alphanumeric prefixes (e.g., `PH1.01`,
 
 A claim ID has exactly one letter-prefix segment. Two letter segments before the number (e.g., `FOO.AC.01`, `BAR.AC.01`) are invalid syntax — the grammar reserves dot-segmentation for note ID, sections, and claim, and a second letter segment has no grammatical role. Authors who want to combine an entity scope with a claim character MUST use sections for the entity and a single prefix for the character (e.g., `§1.AC.01` inside `## §1 Foo`). Authors who prefer a single namespace MUST pick either the entity (`FOO.01`) or the character (`AC.01`), not both.
 
-§1.AC.01 The parser MUST extract section IDs from markdown headings that start with `§` followed by a numeric pattern (e.g., `§1`, `§3.1`). The `§` prefix is REQUIRED — bare numbers in headings are not treated as sections.
+§1.AC.01 The parser MUST extract section IDs from markdown headings whose text begins with a section-numeric pattern, with or without a leading `§`. Both `§N` (e.g., `§1`, `§3.1`) and bare numeric forms (e.g., `1 Title`, `1. Title`, `1.1 Title`, `1.1. Title`) MUST be recognized as the same section identifier. The `§` symbol is optional emphasis on section headings, paralleling its optional role on inline references ({R004.§2.AC.03}). The numeric group MUST be followed by a separator (whitespace, `.`, `:`, `)`, or end-of-text) to count as a section identifier — patterns where the digits abut alphabetic text without a separator (`1Foo`, `1.5xPerformance`) MUST NOT match.
 
 §1.AC.02 The parser MUST extract claim IDs from markdown headings containing letter-prefix-dot-number patterns (e.g., `AC.01`, `SEC.03`).
 
@@ -180,7 +180,7 @@ The system MUST NOT require any format beyond standard markdown headings with a 
 
 LLMs SHOULD be guided (via prompting and scaffolding) to use descriptive labels alongside IDs and to use distinct short names per section where appropriate. The CLI MUST NOT enforce label conventions — only ID uniqueness and monotonicity.
 
-§3.AC.01 Any markdown heading starting with `§` followed by a numeric pattern (e.g., `§1`, `§3.1`) defines a section claim covering all content until the next heading at the same or higher level. The `§` prefix is REQUIRED for section recognition — bare numbers in headings (dates, numbered lists) are not treated as sections.
+§3.AC.01 Any markdown heading whose text begins with a section-numeric pattern — with or without a leading `§` — defines a section claim covering all content until the next heading at the same or higher level. Accepted heading forms include `## §1 Title`, `## §1.3 Title`, `## 1 Title`, `## 1. Title`, `### 1.1 Title`, and `### 1.1. Title`. Headings whose digits abut alphabetic text without a separator (`## 1Foo`, `## 1.5x Performance`) MUST NOT be recognized as sections. Per {R004.§1.AC.01}, the `§` is optional emphasis and presence MUST NOT change the parsed section identifier — `## §1 Title` and `## 1 Title` MUST register the same section.
 
 §3.AC.02 Any markdown heading containing a letter-prefix-dot-number pattern defines an atomic claim (leaf node).
 

@@ -33,7 +33,8 @@ describe('Claim Tree', () => {
       expect(s1.line).toBe(5);
     });
 
-    it('should NOT parse section headings without § prefix', () => {
+    it('should parse section headings with bare-numeric prefix (no §)', () => {
+      // @validates {R004.§1.AC.01} bare-numeric heading forms recognized
       const content = [
         '### 1 First Section',
         '',
@@ -41,27 +42,74 @@ describe('Claim Tree', () => {
       ].join('\n');
 
       const result = buildClaimTree(content);
-      expect(result.sections.size).toBe(0);
-      expect(result.roots).toHaveLength(0);
+      expect(result.sections.size).toBe(2);
+      expect(result.sections.has('1')).toBe(true);
+      expect(result.sections.has('2')).toBe(true);
+
+      const s1 = result.sections.get('1')!;
+      expect(s1.sectionNumber).toBe(1);
+      expect(s1.heading).toBe('1 First Section');
     });
 
-    it('should ignore timestamp headings and bare numbered headings', () => {
+    it('should parse bare-numeric headings with trailing dot (`## 1.`)', () => {
+      // @validates {R004.§3.AC.01} `## 1. Title` accepted as section §1
+      const content = [
+        '## 1. The Consumer Layer Stack',
+        '',
+        '### 1.1 Layer 1',
+        '',
+        '## 6. What Binds Each Layer',
+        '',
+        '### 6.1 Framework commitments',
+        '',
+        '### 6.2 Instance commitments',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      expect(result.sections.has('1')).toBe(true);
+      expect(result.sections.has('1.1')).toBe(true);
+      expect(result.sections.has('6')).toBe(true);
+      expect(result.sections.has('6.1')).toBe(true);
+      expect(result.sections.has('6.2')).toBe(true);
+    });
+
+    it('should produce identical section ids for `§N` and bare-numeric forms', () => {
+      // @validates {R004.§1.AC.01} §1 and 1 parse to the same identifier
+      const withSection = buildClaimTree('## §1 Title').sections.get('1');
+      const withBare = buildClaimTree('## 1 Title').sections.get('1');
+      const withBareDot = buildClaimTree('## 1. Title').sections.get('1');
+      expect(withSection?.sectionNumber).toBe(1);
+      expect(withBare?.sectionNumber).toBe(1);
+      expect(withBareDot?.sectionNumber).toBe(1);
+    });
+
+    it('should NOT parse headings where digits abut alphabetic text', () => {
+      // @validates {R004.§1.AC.01} separator required after numeric group
+      const content = [
+        '## 1Foo No separator',
+        '',
+        '## 1.5xPerformance Improvements',
+        '',
+        '## 1.5x Performance Improvements',
+      ].join('\n');
+
+      const result = buildClaimTree(content);
+      expect(result.sections.size).toBe(0);
+    });
+
+    it('should NOT parse ISO-date headings as sections', () => {
+      // @validates {R004.§1.AC.01} `-` is not a section separator
       const content = [
         '## §1 Real Section',
         '',
         '### 2025-10-06: Task Created',
         '',
-        '### 1. Note Doesn\'t Exist',
-        '',
-        '### 2. Already in Target Format',
-        '',
-        'Content.',
+        '### 2026-05-19 Progress',
       ].join('\n');
 
       const result = buildClaimTree(content);
       expect(result.sections.size).toBe(1);
       expect(result.sections.has('1')).toBe(true);
-      expect(result.roots).toHaveLength(1);
     });
 
     it('should parse nested sections like §3.1', () => {
