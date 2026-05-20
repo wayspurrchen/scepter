@@ -446,6 +446,25 @@ export function parseClaimReferences(
     while ((bracedMatch = bracedRe.exec(line)) !== null) {
       const inner = bracedMatch[1].trim();
 
+      // Reject braced content with internal whitespace. Valid SCEpter
+      // refs have no spaces in the id portion or in metadata values —
+      // the metadata-value regex (`/^[A-Za-z0-9=_.§/-]+$/`) already
+      // forbids them. Any internal whitespace is a strong indicator
+      // that the braces are JS/JSON object syntax (e.g.
+      // `{ 1: v1ToV2, 3: v3ToV4 }`), template-literal interpolation,
+      // or other non-SCEpter content. This sits alongside the
+      // backtick-context skip below for cases where the author did
+      // not wrap the snippet in inline code.
+      if (/\s/.test(inner)) continue;
+
+      // Skip braced refs that sit inside an inline code span
+      // (delimited by backticks on the same line). The braceless
+      // scan below already does the equivalent check at the token
+      // level; mirroring it for braced matches keeps the two surfaces
+      // consistent and stops false positives like
+      // `` `{ 1: v1ToV2, 3: v3ToV4 }` `` from being treated as refs.
+      if (isInsideInlineCode(line, bracedMatch.index)) continue;
+
       // Try range expansion first
       const rangeAddresses = tryExpandRange(inner, options);
       if (rangeAddresses) {
@@ -656,6 +675,26 @@ function isInsideBraces(line: string, startCol: number, length: number): boolean
     if (line[i] === '}') braceDepth--;
   }
   return braceDepth > 0;
+}
+
+/**
+ * Check whether the position `col` falls inside a backtick-delimited
+ * inline code span on `line`. Uses simple unescaped-backtick parity
+ * (an odd count of `` ` `` before `col` means the position is inside
+ * an open span). Escaped backticks (`` \` ``) are not honored — markdown
+ * itself doesn't treat them specially inside code spans, and SCEpter
+ * notes don't depend on the distinction.
+ *
+ * Multi-backtick code spans (`` ``foo`` ``) are not specifically
+ * modeled — they're rare in SCEpter notes and the parity check still
+ * approximately bounds them.
+ */
+function isInsideInlineCode(line: string, col: number): boolean {
+  let count = 0;
+  for (let i = 0; i < col; i++) {
+    if (line[i] === '`') count++;
+  }
+  return count % 2 === 1;
 }
 
 /**

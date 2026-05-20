@@ -349,6 +349,38 @@ describe('Claim Parser', () => {
       expect(refs).toHaveLength(1);
       expect(refs[0].address.metadata).toEqual(['P0', 'security']);
     });
+
+    it('should NOT match braced content with internal whitespace (JS object syntax)', () => {
+      const content = 'The chain is defined as { 1: v1ToV2, 3: v3ToV4 } — gap at v2.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(0);
+    });
+
+    it('should still match braced refs with padding whitespace (trimmed)', () => {
+      // Padding around a valid ref is fine — the trimmed inner is a valid
+      // token. Only INTERNAL whitespace between content tokens disqualifies
+      // a braced span (the JS-object-syntax case above).
+      const content = 'Configured via { REQ004.AC.01 } in the manifest.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(1);
+      expect(refs[0].address.claimPrefix).toBe('AC');
+      expect(refs[0].address.claimNumber).toBe(1);
+    });
+
+    it('should NOT match braced refs wrapped in inline code (backticks)', () => {
+      const content = 'See `{REQ004.AC.01}` for the literal reference token.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(0);
+    });
+
+    it('should still match braced refs outside backticks on the same line', () => {
+      // Two spans: one in code (skipped), one in prose (matched).
+      const content = 'The literal `{REQ004.AC.01}` resolves to {REQ004.AC.01}.';
+      const refs = parseClaimReferences(content);
+      expect(refs).toHaveLength(1);
+      expect(refs[0].address.claimPrefix).toBe('AC');
+      expect(refs[0].address.claimNumber).toBe(1);
+    });
   });
 
   describe('parseClaimReferences — braceless references', () => {

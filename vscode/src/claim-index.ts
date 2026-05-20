@@ -505,8 +505,20 @@ export class ClaimIndexCache {
       if (withNote) return withNote;
     }
 
-    // Self-scoped refs never fall through to cross-note suffix search.
-    if (opts?.selfScoped) return undefined;
+    // Self-scoped refs (no NOTE. prefix, e.g. `§AC.39`, `AC.01`) MAY use
+    // suffix search WITHIN the current note — that lets a paragraph-form
+    // claim defined under `## §7` resolve from a bare hover in the same
+    // file (FQID `ARCH017.7.AC.39`, hovered as `§AC.39`). They MUST NOT
+    // fall through to cross-note suffix search per T002 — that's the
+    // behavior 2b5651c was protecting against (self-scoped `§5.AC.04` in
+    // a non-SCEpter review doc snapping to `S040.5.AC.04`).
+    if (opts?.selfScoped) {
+      if (!contextNoteId) return undefined;
+      const inNote = this.resolveBare(id, contextNoteId).find(
+        (e) => e.noteId === contextNoteId,
+      );
+      return inNote;
+    }
 
     // Try bare suffix match
     const bare = this.resolveBare(id, contextNoteId);
@@ -527,7 +539,12 @@ export class ClaimIndexCache {
     if (this.sections.has(id)) return true;
     if (contextNoteId && this.entries.has(`${contextNoteId}.${id}`)) return true;
     if (contextNoteId && this.sections.has(`${contextNoteId}.${id}`)) return true;
-    if (opts?.selfScoped) return false;
+    // Self-scoped: in-note suffix search is OK; cross-note is blocked.
+    if (opts?.selfScoped) {
+      if (!contextNoteId) return false;
+      const fqids = this.suffixIndex.get(id) ?? [];
+      return fqids.some((fqid) => this.entries.get(fqid)?.noteId === contextNoteId);
+    }
     if (this.suffixIndex.has(id)) return true;
     return false;
   }
