@@ -211,6 +211,22 @@ The index MUST be rebuildable from source documents at any time. It MUST NOT req
 
 §4.AC.05 Fuzzy claim address resolution MUST require the raw reference string to contain a claim prefix pattern (uppercase letters followed by a dot and digits, e.g., `AC.01`) before attempting suffix-based matching against index entries. Bare numeric strings (e.g., `"10"`, `"3.1"`) MUST NOT fuzzy-match claim IDs ending with those numbers.
 
+§4.AC.06:4 Monotonicity of claim numbering ({R004.§1.AC.05}) MUST be enforced per `(note, section, claimPrefix)` bucket, NOT per note. Section transitions reset the expected starting number — `§1.AC.07` followed by `§2.AC.01` is correct authoring, not a violation. The audit observed that whole-note monotonicity flagged every section boundary as non-monotonic in notes that consistently restart AC numbering per section, producing high-volume false-positive lint output that drowned the real within-section reordering signals. (Audit source: peer-project audit catalog Class 4.)
+
+§4.AC.07:5 The resolver MUST distinguish unresolved-reference failure modes with discrete error codes rather than collapsing them into one `unresolved-reference` catch-all. The minimum taxonomy:
+
+- `reference-to-unknown-note` — the cited note ID does not exist in the index (never created, hard-deleted without tombstone, or other vanish).
+- `reference-to-undefined-claim` — the cited note exists in the index but does not define the cited claim ID. Includes the case where the note is narrative-only with no `§N.PREFIX.NN` claims authored, and the case where the note has claims but not the specific one cited.
+- `reference-to-archived` — the cited note exists but has been archived (see {R005.§4} for the archive-lifecycle rule this code is paired with).
+- `malformed-claim-reference` — the cited token does not parse as a valid reference at all (grammar violation).
+- `derivation-target-bare-note-id` — see {R006.§1.AC.05}.
+
+The audit observed that the single `unresolved-reference` code produced misleading author-facing diagnostics: a citation of an archived note's claim was indistinguishable from a citation of a never-created note, which is indistinguishable from a citation of a claim ID that was simply never defined in an existing narrative note. The remediation in each case is different (restore/un-archive the note, write the missing claim definition, fix the typo) and the conflated message blocked authors from picking the right remediation. (Audit source: peer-project audit catalog Classes 5, 6, 7.)
+
+§4.AC.08:5 The linter and the trace command MUST share a single normative resolver for claim references. A reference that resolves successfully in the trace command MUST resolve successfully in the linter (and produce no `unresolved-reference`-family error), and conversely a reference that fails to resolve in the linter MUST fail in the trace command (and surface explicitly per §5.AC.05). Authors MUST NOT be able to observe a reference that one consumer treats as live and another treats as broken. The resolver's outputs are `RESOLVED(canonical_id)`, `AMBIGUOUS(candidates)`, or `UNRESOLVED(reason)` where `reason` is one of the error codes in §4.AC.07; each consumer renders the outcome in its own surface but the outcome itself is owned by the resolver, not the consumer. (Audit source: peer-project audit catalog cross-cutting observation. Today's behavior: `scepter claims trace R030.PRI.01` resolves a section-less form to `R030.7.PRI.01` while `scepter claims lint S034` emits `unresolved-reference` for the same form, producing 91 conflicting signals on a single note.)
+
+§4.AC.09:4 Section-less claim references (e.g., `R030.PRI.01` where the canonical form is `R030.§7.PRI.01`) MUST be resolved or rejected by a single rule, applied identically by lint and trace per §4.AC.08. The default stance: section-less references MUST resolve when exactly one section in the cited note defines a claim with the matching prefix-and-number, and MUST produce `unresolved-reference` with an `ambiguous` qualifier when multiple sections define the matching claim. The rule mirrors the existing same-note scope-resolution behavior ({R004.§1.AC.03}, §1.AC.04) and extends it across notes for the cross-note case. The audit observed that authors heavily use the section-less form in practice — 91 incidences on a single peer-project note — and the cost of rejecting the form outright is higher than the cost of supporting the unique-match disambiguation. (Audit source: peer-project audit catalog Class 2.)
+
 ### §5 Traceability Matrix
 
 The system MUST compute a traceability matrix showing, for each claim, which projections contain a reference to it. Projections are identified by document type (Requirement, Specification, Architecture, etc.) and source code. {S002.§3} fixes the trace/gaps consumer behavior — what counts as a cross-projection presence, how range-expanded references contribute to the matrix, and how alias-prefixed references resolve.
@@ -225,6 +241,8 @@ The system MUST detect gaps: claims present at one projection but absent from do
 
 [Removed — 2026-03-09] §5.AC.04 Removed. Relationship type inference was too opinionated. How projections relate to each other is left to the user/agent, not hardcoded into the system.
 
+§5.AC.05:4 When the trace command renders a row for a claim citation that fails to resolve per §4.AC.08, the row MUST surface the failure explicitly rather than silently omitting the citation or rendering the row as if the citation were live. The exact user-facing rendering (a dedicated unresolved row, a sentinel value in the relevant projection column, an `<UNRESOLVED — see lint>` annotation, or equivalent) is specification-layer; what is asserted here is that a malformed or unresolvable reference MUST NOT produce trace output that is indistinguishable from a well-formed reference's. The audit observed that bare `derives=NOTE_ID` produced no `Derived from:` line at all in trace output — the absence of the line was identical to the absence of any `derives=` metadata, so authors could not see from trace output that their derivation declaration was being silently dropped. (Audit source: peer-project audit catalog Class 1.)
+
 ### §6 CLI Tooling for Mechanical Consistency
 
 The system MUST provide CLI commands that handle the mechanical operations LLMs are unreliable at: numbering, ID assignment, structural validation, and scaffolding. The CLI's claim-aware command behavior — what `lint`, `trace`, `gaps`, `show`, and friends are required to produce against each reference and definition shape — is in the consumer cross-tab at {S002.§3}.
@@ -238,6 +256,8 @@ LLMs write content freely in documents. The CLI repairs drift after each editing
 [Removed — 2026-03-09] §6.AC.03 Removed. Headings without IDs are allowed — they simply aren't addressable. The fix command does not force IDs onto headings.
 
 §6.AC.04 The CLI MUST support both direct document editing by LLMs and CLI-mediated creation. The scaffolding command creates initial structure; subsequent edits may be direct.
+
+§6.AC.05:4 The `forbidden-form` linter detection (per §1.AC.06, §1.AC.07, §1.AC.08, §6.AC.02) MUST fire only when the offending token appears in a claim-reference or claim-definition syntactic context: inside `{...}` braces, after `derives=`, after `superseded=`, after the `@implements` / `@validates` / `@depends-on` / `@addresses` / `@see` code-comment annotations, at heading-leading position (per §3.AC.02), or at bold-paragraph-leading position (per §3.AC.05). The detection MUST NOT fire on standalone tokens appearing in markdown body text — table cells, prose, code blocks, and headings that lack a claim-shape — even when the token matches a `<PREFIX><DIGITS>` regex. The audit observed that the broader detection regex matched author-defined taxonomy IDs (e.g., `EF01`, `SF03`) used as stable identifiers in master-concern-inventory tables and exhaustive-analysis headings, producing high-volume false-positive output that obscured real claim-reference grammar violations. (Audit source: peer-project audit catalog Class 3.)
 
 ### §7 Confidence Markers
 
@@ -357,12 +377,12 @@ Specified in {S002.§3.1.AC.02}.
 | §1 Claim Syntax and Addressing | 8 | AC.07-08 added: alphabetic-only prefix rule, single-letter-segment rule |
 | §2 Reference Matching and Configuration | 5 | |
 | §3 Claim Definition via Section Headings | 5 | AC.05 added: self-prefixed definitions |
-| §4 Claim Index and Cross-Reference Graph | 5 | AC.04-05 added: section-only ref filtering, fuzzy match guarding |
-| §5 Traceability Matrix | 2 | AC.03, AC.04 removed |
-| §6 CLI Tooling for Mechanical Consistency | 3 | AC.03 removed |
+| §4 Claim Index and Cross-Reference Graph | 9 | AC.04-05 added: section-only ref filtering, fuzzy match guarding. AC.06-09 added 2026-05-20: per-section monotonicity, unresolved-reference taxonomy split, shared resolver between lint/trace, section-less reference resolution rule (audit Classes 2, 4, 5, 6, 7) |
+| §5 Traceability Matrix | 3 | AC.03, AC.04 removed. AC.05 added 2026-05-20: trace surfaces unresolved citations explicitly (audit Class 1) |
+| §6 CLI Tooling for Mechanical Consistency | 4 | AC.03 removed. AC.05 added 2026-05-20: `forbidden-form` context restriction (audit Class 3) |
 | §7 Confidence Markers | 4 | AC.04 superseded by {R005.§3.AC.04} |
 | §8 Priority and Metadata on Claims | 3 | |
-| **Total** | **35** | 3 removed from original 33, 5 added (§4.AC.04-05, §1.AC.07-08, §3.AC.05) |
+| **Total** | **41** | 3 removed from original 33, 11 added (§1.AC.07-08, §3.AC.05, §4.AC.04-09, §5.AC.05, §6.AC.05) |
 
 ## References
 
@@ -375,3 +395,5 @@ Specified in {S002.§3.1.AC.02}.
 - StrictDoc — Richest within-document claim structure (SDoc format)
 - core/src/claims/confidence.ts — Numeric-level file confidence annotation system (🤖/👤 + 1-5)
 - {R005.§3} — Claim-level verification events (complements file-level confidence)
+- {DD001} — Claim-Level Addressability and Traceability (primary detailed design for this requirement)
+- {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (realizes §4.AC.07 error-code taxonomy split, §4.AC.08 shared lint/trace resolver, §4.AC.09 section-less reference resolution, §5.AC.05 trace surfaces unresolved citations; added 2026-05-20)

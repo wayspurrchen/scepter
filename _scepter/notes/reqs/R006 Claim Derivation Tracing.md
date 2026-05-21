@@ -47,6 +47,8 @@ The metadata parser MUST recognize `derives=TARGET` as a semantic keyword in cla
 
 §1.AC.04 Derivation metadata MUST NOT conflict with lifecycle metadata — a claim can simultaneously be derived and have a lifecycle state (e.g., `DC.01:derives=R005.§1.AC.01:closed`).
 
+§1.AC.05:4 A `derives=TARGET` value MUST be a claim-level address — note-id + section + claim-prefix + claim-number — and MUST NOT be a bare note ID (`derives=R005`, `derives=ARCH028`). The derivation graph operates at claim granularity: a derived claim points at a specific source claim, not at a whole note. Bare-note-id `derives=` values MUST produce a distinct linter error code (`derivation-target-bare-note-id`) separate from the `unresolvable-derivation-target` code emitted when a claim-shaped address fails to resolve in the index, so the author-facing diagnostic distinguishes "you gave me a note ID, but I need a claim ID" from "I could not find the claim you cited." The two failure modes have different remediations and the conflated message has been observed in audited consumer projects to silently produce missing trace-derivation lines. The rejection stance reflects an authoring discipline ("a subclaim can point to the top of a claim, but it is not encouraged") rather than a permanent grammar invariant; reconsideration is permitted via a future requirement that would relax this rule alongside introducing a `note-level` derivation projection. Until then, the rule stands. (Audit source: peer-project audit catalog Class 1.)
+
 ### §2 Index Support for Derivation Relationships
 
 The claim index MUST track derivation relationships as a queryable graph, alongside the existing cross-reference graph.
@@ -79,6 +81,8 @@ The traceability matrix MUST show derivation relationships.
 
 §4.AC.03 In the default trace view (without `--show-derived`), derived claims appearing in a note MUST show a `←SOURCE` indicator to identify their derivation source.
 
+§4.AC.04:4 When a claim carries a `derives=TARGET` value that fails to resolve in the index (bare-note-id per §1.AC.05, undefined claim per §1.AC.03, missing note, or any other resolver failure), the trace command MUST surface the failure explicitly rather than silently omitting the derivation slot. The user-facing rendering is specification-layer; what is asserted here is that the trace consumer MUST NOT present a malformed-derives claim as if it had no upstream — the audit observed that a bare `derives=ARCH028` produces no `Derived from:` line at all, indistinguishable from a claim that has no `derives=` metadata. Trace and lint MUST agree on which `derives=` values resolve; if lint emits an error for a target, trace MUST present the same target as unresolved (e.g., `Derived from: <UNRESOLVED — see lint>` or equivalent), and conversely if trace renders a derivation link, lint MUST NOT emit an error for that target. (Audit source: peer-project audit catalog Class 1 cross-cutting observation.)
+
 ### §5 Lint Validation for Derivation
 
 The linter MUST validate derivation metadata.
@@ -88,6 +92,10 @@ The linter MUST validate derivation metadata.
 §5.AC.02 The linter MUST warn on derivation chains deeper than 2 hops (e.g., A derives B, B derives C, C derives D — D is 3 hops from A).
 
 §5.AC.03 The linter MUST warn when a source claim has derivatives but some derivatives are missing Source projection coverage (partial derivation coverage).
+
+§5.AC.04:5 The linter and the trace command MUST share a single normative resolver for `derives=TARGET` values. A `derives=` value that resolves successfully in one consumer MUST resolve successfully in the other, and conversely a `derives=` value that fails to resolve in one MUST fail in the other. Failure-mode distinctions (bare-note-id per §1.AC.05, unresolvable-claim-shape per §1.AC.03, cross-project-derives per {R011.§2.AC.03}, derivation-from-removed per {R005.§2.AC.05}, derivation-from-superseded) MUST be produced by the resolver as discrete outcomes that each consumer renders in its own surface — the resolver, not the consumer, owns the failure-mode taxonomy. The audit observed that lint emitted `unresolvable-derivation-target` while trace silently omitted the derivation line, producing conflicting signals to authors who could not tell whether the bare-note-id form was supported or rejected. (Audit source: peer-project audit catalog cross-cutting observation.)
+
+§5.AC.05:4 A CLI command MUST exist for listing the dependents of a given claim — every claim that declares `derives=TARGET` pointing at the queried claim, plus every inline reference and `superseded=TARGET` that targets the queried claim. The command surface is specification-layer (proposed name: `scepter claims dependents <claim>`); what is asserted here is that the ergonomic exists. The motivating use case from the audit: when an author tags a parent claim `:removed` or `:superseded=...`, the system today requires a post-hoc lint pass to surface the orphaned children; a direct dependents-listing command lets the author inspect impact before tagging. (Audit source: peer-project audit catalog Classes 9 and 10.)
 
 ## Edge Cases
 
@@ -126,14 +134,14 @@ The linter MUST validate derivation metadata.
 
 ## Acceptance Criteria Summary
 
-| Category | Count |
-|----------|-------|
-| §1 Derivation Metadata Recognition | 4 |
-| §2 Index Support | 4 |
-| §3 Derivation-Aware Gap Detection | 3 |
-| §4 Derivation Display in Trace | 3 |
-| §5 Lint Validation | 3 |
-| **Total** | **17** |
+| Category | Count | Notes |
+|----------|-------|-------|
+| §1 Derivation Metadata Recognition | 5 | §1.AC.05 added 2026-05-20: bare-note-id `derives=` rejection (audit Class 1) |
+| §2 Index Support | 4 | |
+| §3 Derivation-Aware Gap Detection | 3 | |
+| §4 Derivation Display in Trace | 4 | §4.AC.04 added 2026-05-20: trace surfaces unresolved derives explicitly (audit Class 1 cross-cutting) |
+| §5 Lint Validation | 5 | §5.AC.04 added 2026-05-20: lint/trace shared resolver. §5.AC.05 added 2026-05-20: `claims dependents` ergonomic (audit Classes 9, 10) |
+| **Total** | **21** | |
 
 ## References
 
@@ -143,3 +151,4 @@ The linter MUST validate derivation metadata.
 - {R009} — Claim Metadata Key-Value Store — `derives=` tokens become implicit events per {R009.§4.AC.04}; queryable via the generalized surface, derivation semantics still governed by this requirement.
 - {DD001} — Detailed design for {R004} (integration context)
 - {DD002} — Detailed design for {R005} (metadata parser integration context)
+- {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (realizes §1.AC.05 bare-note-id rejection, §4.AC.04 trace surfaces unresolved derives, §5.AC.04 shared resolver between lint/trace, §5.AC.05 `claims dependents` command; added 2026-05-20)

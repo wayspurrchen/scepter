@@ -56,6 +56,12 @@ The rewriter is invoked from lifecycle commands acting against notes. Four opera
 
 §1.AC.04 The `archive` operation MUST relocate the note unit — the file for single-file notes; the folder and ALL companion files for folder-form notes — to the archive location without rewriting any inbound references. Archived notes remain valid reference targets, and `scepter claims lint` MUST NOT flag a reference to an archived note as broken.
 
+§1.AC.04a:4 The claim index MUST keep archived notes in-index for resolution purposes — their claims MUST be addressable, references to them MUST resolve, and `scepter trace` MUST be able to render a row for an archived-note claim — but archived notes MUST NOT count toward projection coverage in `scepter gaps` (an archived note's `@implements` annotations and inline citations are inert). The audit observed a peer project where an archived note (R057 in the peer's namespace) was pulled out of the active claim index, producing 164 `unresolved-reference` errors across active notes that legitimately cited the archived note for context. The remediation is to keep the note resolvable but mark it as not contributing to coverage. (Audit source: peer-project audit catalog Class 5.)
+
+§1.AC.04b:4 When a reference target is an archived note (per §1.AC.04a), the resolver MUST produce a discrete error code (`reference-to-archived`, per {R004.§4.AC.07}) — distinct from `reference-to-unknown-note` (the note never existed) and from `reference-to-undefined-claim` (the note exists but the cited claim is undefined). The discrete code is what allows lint to downgrade severity (an archived-but-cited reference is a soft signal, not a hard error) and what allows the VS Code extension to render the diagnostic with a different style. (Audit source: peer-project audit catalog Class 5 — the conflated `unresolved-reference` code blocked authors from distinguishing the archived case from the missing-note case.)
+
+§1.AC.04c:3 The `archive` command MUST warn the user when invoked against a note that has N > 0 inbound references, surfacing the count and at minimum the IDs of the citing notes. The warning is informational — archive proceeds without rewrite per §1.AC.04 — but it makes the lifecycle decision explicit: the author sees the inbound-reference footprint before archiving, and can elect to convert to hard-delete instead if leaving the references in place would mislead future readers. (Audit source: peer-project audit catalog Class 5 — the lifecycle-hygiene burden currently falls on the author after the fact; surfacing it at archive time prevents that.)
+
 §1.AC.05 The compound case "delete X, then rename Y → X to reclaim the slot" MUST be supported as a sequence of the two primitives without an additional command. The deletion-marker form for the original X (per §2) is by construction not confusable with the new occupant of the X slot, so pre-existing references that pointed at the original X remain tombstoned while new references to the post-rename X resolve as live.
 
 §1.AC.06 Each operation MUST be exposed as a CLI command that accepts the note ID as a positional argument.
@@ -353,20 +359,20 @@ The VS Code extension's reference-resolution surface MUST recognize tombstoned r
 
 ## Acceptance Criteria Summary
 
-| Section | Count |
-|---------|-------|
-| §1 Operations and Scope | 6 |
-| §2 Deletion-Marker Format | 5 |
-| §3 Reference Forms That MUST Be Covered | 16 |
-| §4 Per-Operation Behavior Summary | 3 |
-| §5 Consumer Behavior for Tombstoned References | 7 |
-| §6 Safety and Atomicity | 9 |
-| §7 Architectural Extensibility | 2 |
-| §8 Cross-Project Safety | 3 |
-| §9 CLI Surface | 9 |
-| §10 Agent-Facing Documentation Updates | 4 |
-| §11 VS Code Extension Behavior | 4 |
-| **Total** | **68** |
+| Section | Count | Notes |
+|---------|-------|-------|
+| §1 Operations and Scope | 9 | §1.AC.04a–c added 2026-05-20: archived notes stay in index, `reference-to-archived` discrete error code, archive command warns on inbound refs (audit Class 5) |
+| §2 Deletion-Marker Format | 5 | |
+| §3 Reference Forms That MUST Be Covered | 16 | |
+| §4 Per-Operation Behavior Summary | 3 | |
+| §5 Consumer Behavior for Tombstoned References | 7 | |
+| §6 Safety and Atomicity | 9 | |
+| §7 Architectural Extensibility | 2 | |
+| §8 Cross-Project Safety | 3 | |
+| §9 CLI Surface | 9 | |
+| §10 Agent-Facing Documentation Updates | 4 | |
+| §11 VS Code Extension Behavior | 4 | |
+| **Total** | **71** | 3 added 2026-05-20 (§1.AC.04a–c) for audit Class 5 |
 
 ## References
 
@@ -376,6 +382,8 @@ The VS Code extension's reference-resolution surface MUST recognize tombstoned r
 - {R011} — Cross-Project Note and Claim References via Path Aliases (the alias-prefix grammar §3.AC.05 and §8 protect; the citation-not-federation invariant motivates the rewriter's hands-off behavior for peer references)
 - {S002} — Claim Reference Grammar — Forms, Permutations, and Consumer Behavior (the authoritative cross-tab spec for every reference and definition shape; the form taxonomy in §3 of this requirement maps onto S002's canonical surface)
 - {DD019} — Meta Store Overlay Model and verification.json Rename (the path convention §6.AC.03 inherits — SCEpter project state lives under `_scepter/`, including the rewrite log directory)
+- {DD020} — Reference Rewriting on Delete and Rename - Implementation Blueprint (primary detailed design realizing the §1–§9 rewriter behavior)
+- {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (consumes the §1.AC.04a–c archive-lifecycle behavior — archived notes stay in-index for resolution, distinct `reference-to-archived` error code; AC.04a is realized by {DD021.§10.DC.05} (resolver `includeArchived` option), {DD021.§10.DC.16} (`ensureIndex` loads archived notes), and {DD021.§10.DC.17} (`ClaimIndexEntry.archived` field); AC.04b is realized by {DD021.§10.DC.06} (`reference-to-archived` failure code); added 2026-05-20)
 - {T004} — Remove stubbed deleted reference-update subsystem (followup cleanup surfaced during the R015/DD020 implementation cycle; scheduled removal of the existing `#deleted` reference-update path that builds in-memory maps without persisting; runs independently after this requirement lands)
 
 ## Status

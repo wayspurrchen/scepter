@@ -591,8 +591,30 @@ export async function formatClaimTrace(
   }
 
   // @implements {R006.§4.AC.01} Show derivation source
-  if (entry.derivedFrom && entry.derivedFrom.length > 0) {
-    lines.push(`  ${chalk.gray('Derived from:')} ${entry.derivedFrom.join(', ')}`);
+  // @implements {DD021.§10.DC.12} Silent omission of `Derived from:` is FORBIDDEN —
+  //   surface unresolved derives= entries as sentinels alongside resolved ones.
+  // @implements {DD020.§5.DC.01} Tombstoned derives= rendered with distinct sentinel
+  {
+    const parts: string[] = [];
+
+    // Resolved derives entries (today's behavior preserved).
+    for (const fqid of entry.derivedFrom ?? []) {
+      parts.push(fqid);
+    }
+
+    // Unresolved derives entries — sentinel rendering per DC.12.
+    for (const ut of entry.unresolvedDerivationTargets ?? []) {
+      parts.push(chalk.red(`<UNRESOLVED — ${ut.code}: ${ut.rawTarget}>`));
+    }
+
+    // Tombstoned derives entries — tombstone sentinel.
+    for (const tt of entry.tombstonedDerivedFrom ?? []) {
+      parts.push(chalk.cyan(`<TOMBSTONED — ${tt}>`));
+    }
+
+    if (parts.length > 0) {
+      lines.push(`  ${chalk.gray('Derived from:')} ${parts.join(', ')}`);
+    }
   }
 
   // @implements {R005.§3.AC.07} Show full verification history in single-claim trace
@@ -885,6 +907,37 @@ function formatErrorType(type: string): string {
     case 'tombstoned-target-audit':
       // @implements {DD020.§5.DC.02} tombstoned-target audit displayed as info-level marker
       return chalk.cyan('[TOMBSTONED-TARGET]');
+    // ---- New resolver-emitted codes per {DD021.§10.DC.02} ----
+    // @implements {DD021.§10.DC.13} color-coded display of new failure codes
+    case 'reference-to-unknown-note':
+      return chalk.red('[UNKNOWN-NOTE]');
+    case 'reference-to-undefined-claim':
+      return chalk.red('[UNDEFINED-CLAIM]');
+    case 'reference-to-archived':
+      // @implements {R015.§1.AC.04b} archived-citation rendered as warning (soft signal)
+      return chalk.yellow('[ARCHIVED-REF]');
+    case 'malformed-claim-reference':
+      return chalk.red('[MALFORMED-REF]');
+    case 'derivation-target-bare-note-id':
+      return chalk.red('[BARE-NOTE-DERIVES]');
+    case 'derivation-target-cross-project':
+      return chalk.red('[CROSS-PROJ-DERIVES]');
+    case 'derivation-target-removed':
+      // Matches today's `derivation-from-removed` yellow per §5.4 color discipline
+      return chalk.yellow('[DERIVES-FROM-REMOVED]');
+    case 'derivation-target-superseded':
+      // Matches today's `derivation-from-superseded` yellow per §5.4 color discipline
+      return chalk.yellow('[DERIVES-FROM-SUPERSEDED]');
+    case 'derivation-target-ambiguous':
+      return chalk.red('[DERIVES-AMBIGUOUS]');
+    // ---- Legacy cross-project codes: gray -> red for transition-window consistency ----
+    // Per §5 ISSUE 11: today's `cross-project-derives`/`-superseded` fall
+    // through to default `chalk.gray`; bring them in line with the new
+    // `derivation-target-cross-project` red coloring during transition.
+    case 'cross-project-derives':
+      return chalk.red('[CROSS-PROJECT-DERIVES]');
+    case 'cross-project-superseded':
+      return chalk.red('[CROSS-PROJECT-SUPERSEDED]');
     default:
       return chalk.gray(`[${type.toUpperCase()}]`);
   }

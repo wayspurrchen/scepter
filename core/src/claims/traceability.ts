@@ -541,6 +541,17 @@ export function findGaps(
 
   // For each claim, determine which types reference it
   for (const entry of index.entries.values()) {
+    // Skip archived claims from gap analysis. Archived-note entries remain in
+    // the index per {R015.§1.AC.04a} so the resolver MUST resolve to them and
+    // trace MUST render a row for them, but their @implements annotations and
+    // inline citations are inert for projection-coverage tally. Paired with
+    // ensure-index.ts B.5 so the gap surface stays correct: before B.5 archived
+    // notes weren't in the index (couldn't contribute to gaps anyway); after
+    // B.5+B.5b, they are in the index AND filtered out of gaps. Net behavior
+    // at the gap surface is identical.
+    // @implements {R015.§1.AC.04a} archived notes inert for projection coverage
+    if (entry.archived) continue;
+
     // Skip claims based on lifecycle filtering
     if (entry.lifecycle) {
       if (excludeClosed && entry.lifecycle.type === 'closed') continue;

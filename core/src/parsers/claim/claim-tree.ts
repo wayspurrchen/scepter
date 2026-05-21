@@ -75,18 +75,27 @@ export interface ClaimTreeResult {
  * @implements {R011.§2.AC.03} 'cross-project-derives' rejected: derivation is per-project
  * @implements {R011.§2.AC.04} 'cross-project-superseded' rejected: lifecycle authority is per-project
  * @implements {DD015.§1.DC.09} two distinct error types so DiagnosticsProvider can apply correct severity and carry R011 rationale
+ * @implements {DD021.§10.DC.09} ClaimTreeError.type union extended with 9 new resolver-emitted codes; legacy 5 retained as parallel-emit alias surface during transition window
  */
 export interface ClaimTreeError {
   type:
     | 'duplicate'
     | 'non-monotonic'
     | 'ambiguous'
+    // @deprecated Replaced by reference-to-* and malformed-claim-reference codes from
+    // DD021.§10.DC.02. Retained as parallel-emit alias surface during the DC.09
+    // transition window. Consumers grepping on this code continue to match.
     | 'unresolved-reference'
     | 'forbidden-form'
     | 'multiple-lifecycle'
     | 'invalid-supersession-target'
     | 'reference-to-removed'
+    // @deprecated Replaced by derivation-target-bare-note-id, -ambiguous,
+    // -removed, -superseded codes from DD021.§10.DC.02. Retained for
+    // transition window per DC.09.
     | 'unresolvable-derivation-target'
+    // @deprecated Renamed to derivation-target-cross-project per DD021.§10.DC.02.
+    // Retained for transition window per DC.09.
     | 'cross-project-derives'
     | 'cross-project-superseded'
     | 'alias-unknown'
@@ -101,7 +110,11 @@ export interface ClaimTreeError {
     | 'derives-superseded-conflict'
     | 'self-derivation'
     | 'invalid-derivation-target'
+    // @deprecated Renamed to derivation-target-removed per DD021.§10.DC.02.
+    // Retained for transition window per DC.09.
     | 'derivation-from-removed'
+    // @deprecated Renamed to derivation-target-superseded per DD021.§10.DC.02.
+    // Retained for transition window per DC.09.
     | 'derivation-from-superseded'
     | 'circular-derivation'
     | 'deep-derivation-chain'
@@ -110,7 +123,32 @@ export interface ClaimTreeError {
     // superseded= target is tombstoned (a known lifecycle state, not a
     // broken reference). Silent by default; surfaced when the lint CLI's
     // tombstoned-target-audit flag is passed.
-    | 'tombstoned-target-audit';
+    | 'tombstoned-target-audit'
+    // ---- New resolver-emitted codes per DD021.§10.DC.02 ----
+    // The cited noteId is absent from the index entirely.
+    | 'reference-to-unknown-note'
+    // The cited noteId exists but no entry matches the cited claim suffix.
+    | 'reference-to-undefined-claim'
+    // The citation resolves to an archived-note entry AND the consumer treats
+    // archived as a failure. Synthesized by lint per (c) pattern per
+    // {R015.§1.AC.04b}.
+    | 'reference-to-archived'
+    // The raw input failed to parse as a ClaimAddress at the grammar level.
+    | 'malformed-claim-reference'
+    // `derives=` value is a bare note ID; claim-level address required.
+    | 'derivation-target-bare-note-id'
+    // `derives=` value is alias-prefixed; cross-project derivation rejected
+    // (new code; legacy `cross-project-derives` parallel-emits during transition).
+    | 'derivation-target-cross-project'
+    // `derives=` resolved to a `:removed` claim (parallels legacy
+    // `derivation-from-removed` during transition).
+    | 'derivation-target-removed'
+    // `derives=` resolved to a `:superseded` claim (parallels legacy
+    // `derivation-from-superseded` during transition).
+    | 'derivation-target-superseded'
+    // `derives=` resolved ambiguously (section-less multi-match); no legacy
+    // equivalent.
+    | 'derivation-target-ambiguous';
   claimId: string;
   line: number;
   message: string;

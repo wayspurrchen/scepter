@@ -28,6 +28,9 @@ import type { SourceReference } from '../types/reference.js';
 import { parseClaimMetadata } from './claim-metadata.js';
 import type { LifecycleState } from './claim-metadata.js';
 import { isDeletionMarker } from '../lifecycle/deletion-marker.js';
+// @implements {DD021.§10.DC.08} Every resolution flows through the shared resolver.
+import { resolveReference } from './reference-resolver.js';
+import type { ResolverOutcome, ResolverFailureCode } from './reference-resolver.js';
 
 /**
  * Detects an alias-prefixed cross-project target in a metadata value.
@@ -40,6 +43,45 @@ import { isDeletionMarker } from '../lifecycle/deletion-marker.js';
  */
 const CROSS_PROJECT_TARGET_RE = /^[a-z][a-z0-9-]*[a-z0-9]\//;
 
+/**
+ * Format a per-code message for the new DD021.§10.DC.02 taxonomy emissions
+ * at the cross-ref scan and derivation-resolution sites. The lint command's
+ * rendering layer ({DD021.§10.DC.13}) will replace these with richer messages
+ * during the C.12 update; this stub provides a sensible default during the
+ * Phase B transition.
+ *
+ * @implements {DD021.§10.DC.13} (partial — final messages in lint-command.ts)
+ */
+function formatNewCodeMessage(
+  code: string,
+  rawRef: string,
+  targetNoteId: string | undefined,
+  fromNoteId: string,
+): string {
+  switch (code) {
+    case 'reference-to-unknown-note':
+      return `Reference "${rawRef}" cites note ${targetNoteId ?? '?'} which does not exist in the project.`;
+    case 'reference-to-undefined-claim':
+      return `Reference "${rawRef}" cites note ${targetNoteId ?? '?'}, which exists but does not define this claim.`;
+    case 'reference-to-archived':
+      return `Reference "${rawRef}" resolves to archived note ${targetNoteId ?? '?'}. Consider rewriting the citation or un-archiving the target.`;
+    case 'malformed-claim-reference':
+      return `Reference "${rawRef}" does not match the claim grammar.`;
+    case 'derivation-target-bare-note-id':
+      return `\`derives=${rawRef}\` is a bare note ID; \`derives=\` requires a claim-level address.`;
+    case 'derivation-target-cross-project':
+      return `\`derives=${rawRef}\` is alias-prefixed; cross-project derivation is rejected (R006.§Non-Goals / R011.§2.AC.03).`;
+    case 'derivation-target-removed':
+      return `Claim derives from "${rawRef}" which is tagged \`:removed\`.`;
+    case 'derivation-target-superseded':
+      return `Claim derives from "${rawRef}" which is tagged \`:superseded\`. Consider re-deriving from the replacement.`;
+    case 'derivation-target-ambiguous':
+      return `\`derives=${rawRef}\` is ambiguous; multiple candidates match (use the fully qualified form to disambiguate).`;
+    default:
+      return `Reference "${rawRef}" in note ${fromNoteId}.`;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Interfaces
 // ---------------------------------------------------------------------------
@@ -49,12 +91,22 @@ export interface NoteWithContent {
   type: string;
   filePath: string;
   content: string;
+  /**
+   * Note's tag set, surfaced from `Note.tags`. Used by `ClaimIndex.build()`
+   * to populate `ClaimIndexEntry.archived` per {DD021.§10.DC.17} from
+   * `tags.includes('archived')`. Optional for backward compatibility with
+   * older callers; when absent, entries have `archived: false`.
+   *
+   * @implements {DD021.§10.DC.17} NoteWithContent.tags plumbing
+   */
+  tags?: string[];
 }
 
 /**
  * @implements {R005.§1.AC.01} importance field from inline importance parsing
  * @implements {R005.§2.AC.01} lifecycle field from lifecycle tag parsing
  * @implements {R006.§2.AC.01} derivedFrom field from derives=TARGET metadata
+ * @implements {DD021.§10.DC.17} `archived: boolean` field populated from `note.tags.includes('archived')`; resolver branches on archive state per {R015.§1.AC.04a}.
  */
 export interface ClaimIndexEntry {
   noteId: string;
@@ -72,6 +124,24 @@ export interface ClaimIndexEntry {
   lifecycle?: LifecycleState; // interpreted: lifecycle tag
   parsedTags: string[];      // interpreted: freeform tags
   derivedFrom: string[];     // resolved FQIDs from derives=TARGET metadata
+  /**
+   * Raw `:derives=TARGET` target strings whose resolution failed (NOT
+   * tombstoned — those go to `tombstonedDerivedFrom`). Populated alongside
+   * `derivedFrom` during Phase 1.5 derivation resolution when the resolver
+   * returns `unresolved` or `ambiguous`. Each entry carries the raw author-
+   * written target plus the resolver's failure code so the trace renderer
+   * can surface a sentinel per {DD021.§10.DC.12} ("Silent omission of the
+   * `Derived from:` line for a malformed `derives=` is FORBIDDEN").
+   *
+   * The data model carries the NEW taxonomy code (ResolverFailureCode) only.
+   * The legacy `unresolvable-derivation-target` parallel-emit is an output
+   * concern of `claim-index.ts` Phase 1.5 (it pushes to `data.errors`),
+   * not an index-state concern. Renderer reads from this field; lint
+   * output's parallel-emit handles the legacy companion separately.
+   *
+   * @implements {DD021.§10.DC.12} trace surfaces unresolved derives= entries
+   */
+  unresolvedDerivationTargets: Array<{ rawTarget: string; code: ResolverFailureCode }>;
   /**
    * Raw `:derives=TARGET` target strings whose note-ID portion is a
    * deletion marker (e.g., `_deleted_R005_at_20260519.§1.AC.03`).
@@ -95,6 +165,20 @@ export interface ClaimIndexEntry {
    * @implements {R015.§5.AC.01} linter does not flag tombstoned superseded=
    */
   tombstonedSupersededBy?: string;
+  /**
+   * Whether the source note is archived (carries the `archived` tag).
+   * Populated at entry construction from `NoteWithContent.tags`.
+   *
+   * Archived-note entries remain in the index per {R015.§1.AC.04a}
+   * (resolver MUST resolve to them) but are filtered from gap-coverage
+   * calculations per {R015.§1.AC.04a} ("@implements annotations and
+   * inline citations are inert"). The resolver branches on this field
+   * for the (c) consumer-synthesis pattern per {DD021.§10.DC.05},
+   * {DD021.§10.DC.06}, and {R015.§1.AC.04b}.
+   *
+   * @implements {DD021.§10.DC.17} archived field on ClaimIndexEntry
+   */
+  archived: boolean;
   noteType: string;          // e.g., "Requirement"
   noteFilePath: string;
 }
@@ -106,7 +190,25 @@ export interface ClaimCrossReference {
   toNoteId: string;
   line: number;
   filePath: string;
-  unresolved?: boolean;      // true when the target claim could not be resolved in the index
+  /**
+   * @deprecated since {DD021.§10.DC.08} migration. Computed from
+   * `resolverOutcome.kind === 'unresolved'`. Retained for transition-window
+   * consumers per {DD021.§10.DC.09}.
+   */
+  unresolved?: boolean;
+  /**
+   * Full outcome from `resolveReference()` per {DD021.§10.DC.01}. Populated
+   * for every edge post-{DD021.§10.DC.08} migration. Consumers branch on
+   * `resolverOutcome.kind` for resolved/ambiguous/unresolved discrimination.
+   * Closes {DD021.§7.OQ.02} (full outcome on edge vs separate diagnostics).
+   *
+   * Type imported via `import type` to avoid circular module dependency:
+   * `reference-resolver.ts` imports `ClaimIndexEntry` from this file; this
+   * field's type is forward-imported as a type only.
+   *
+   * @implements {DD021.§7.OQ.02} disposition (resolver outcome on edge)
+   */
+  resolverOutcome?: import('./reference-resolver.js').ResolverOutcome;
 }
 
 /**
@@ -220,50 +322,12 @@ function deriveKnownShortcodes(noteIds: string[]): Set<string> {
   return shortcodes;
 }
 
-/**
- * Resolve a claim address to a fully qualified ID in the index.
- *
- * The address may be partial (e.g. just "AC.01") or fully qualified
- * (e.g. "R004.3.AC.01"). We try exact match first, then fall back
- * to searching entries that end with the partial pattern.
- */
-function resolveClaimAddress(
-  raw: string,
-  entries: Map<string, ClaimIndexEntry>,
-  currentNoteId: string,
-): string | null {
-  // Exact match on fully qualified
-  if (entries.has(raw)) {
-    return raw;
-  }
-
-  // Try prefixing with current note ID
-  const withCurrentNote = `${currentNoteId}.${raw}`;
-  if (entries.has(withCurrentNote)) {
-    return withCurrentNote;
-  }
-
-  // Fuzzy: find entries ending with the raw pattern, scoped to current note only.
-  // Bare references like "AC.01" should resolve to the current note's own claims
-  // (e.g., "ARCH018.1.AC.01"), not to claims from unrelated notes. Cross-note
-  // references must include an explicit note ID (handled by exact match above).
-  // @implements {R004.§4.AC.05} Fuzzy matching requires claim prefix pattern
-  // Guard: only attempt fuzzy matching when raw contains a claim prefix pattern
-  // (uppercase letters + dot + digits). Bare numbers like "10" or section paths
-  // like "3.1" must NOT fuzzy-match claim IDs ending in ".10" or ".1".
-  if (!/[A-Z]+\.\d{2,3}/.test(raw)) {
-    return null;
-  }
-  const suffix = `.${raw}`;
-  const currentPrefix = `${currentNoteId}.`;
-  for (const key of entries.keys()) {
-    if (key.startsWith(currentPrefix) && key.endsWith(suffix)) {
-      return key;
-    }
-  }
-
-  return null;
-}
+// Note: the previous `resolveClaimAddress()` helper was REMOVED in Phase D.16
+// per {DD021.§10.DC.08} — "no fallback resolution path may exist outside the
+// shared module." Every resolution now flows through `resolveReference()` in
+// `core/src/claims/reference-resolver.ts`. The R004.§4.AC.05 fuzzy-match
+// invariant the helper realized is preserved by the resolver's Step 3 +
+// Step 3b same-note scope branches.
 
 // ---------------------------------------------------------------------------
 // ClaimIndex
@@ -388,6 +452,10 @@ export class ClaimIndex {
           // @implements {R006.§2.AC.01} Raw derivation targets, resolved in Phase 1.5
           derivedFrom: parsed.derivedFrom,
           tombstonedDerivedFrom: [],
+          // @implements {DD021.§10.DC.12} unresolved derives= surfaced for trace rendering
+          unresolvedDerivationTargets: [],
+          // @implements {DD021.§10.DC.17} archived field populated from note tags
+          archived: note.tags?.includes('archived') ?? false,
           noteType: note.type,
           noteFilePath: note.filePath,
         };
@@ -403,7 +471,7 @@ export class ClaimIndex {
     }
 
     // Phase 1.5: Derivation Resolution
-    // @implements {R006.§1.AC.03} Derivation targets resolved via resolveClaimAddress()
+    // @implements {R006.§1.AC.03} Derivation targets resolved via resolveReference() per DD021.§10.DC.08
     // @implements {R006.§2.AC.01} Resolve derivedFrom targets to FQIDs
     // @implements {R006.§2.AC.04} Build reverse derivativesMap
     // Must happen after ALL entries are populated — a derived claim in DD003
@@ -428,34 +496,44 @@ export class ClaimIndex {
           continue;
         }
 
-        // Cross-project derives= is rejected per R011.§2.AC.03 / R006 §Non-Goals.
-        // The derivation graph is per-project; an alias-prefixed target would
-        // create a hidden federation that breaks the per-project invariant.
-        // Emit a distinct error and skip resolution.
-        // @implements {R011.§2.AC.03} cross-project derives= rejected
-        if (CROSS_PROJECT_TARGET_RE.test(target)) {
-          this.data.errors.push({
-            type: 'cross-project-derives',
-            claimId: entry.fullyQualified,
-            line: entry.line,
-            message: `Claim "${entry.fullyQualified}" declares derives=${target}, but cross-project derivation is rejected. The derivation graph is per-project (R006.§Non-Goals). R011.§2.AC.03 permits reconsideration via a future requirement that relaxes both R006 and R011.§2.AC.03 together; in this version, derives= MUST point at a local claim.`,
-            noteId: entry.noteId,
-            noteFilePath: entry.noteFilePath,
-          });
-          continue;
-        }
-        // Normalize: strip § for index lookup
-        const normalized = target.replace(/§/g, '');
-        const resolvedId = resolveClaimAddress(normalized, this.data.entries, entry.noteId);
+        // Route every derives= target through the shared resolver per DC.08.
+        // The resolver's pre-checks handle:
+        //   - bare-note-id (DC.04) -> derivation-target-bare-note-id
+        //   - alias-prefix (with derivesPosition: true) -> derivation-target-cross-project
+        //   - malformed string -> malformed-claim-reference
+        // Resolution outcomes are translated into parallel-emit ClaimTreeError
+        // entries per DC.09's transition window (legacy first per Q7, then
+        // new-code per the resolver's outcome).
+        //
+        // B.8: This route SUBSUMES the prior CROSS_PROJECT_TARGET_RE direct
+        // emission of `cross-project-derives` (formerly at L443-451 / L529-539).
+        // The legacy `cross-project-derives` code is now emitted as a parallel
+        // companion to the new `derivation-target-cross-project` code, preserving
+        // the verbose R011-rationale message at the legacy emission per Q1 caveat.
+        //
+        // @implements {DD021.§10.DC.08} every resolution flows through resolveReference()
+        // @implements {DD021.§10.DC.04} bare-note-id derives= detection (via resolver)
+        // @implements {R011.§2.AC.03} cross-project derives= rejected (via resolver)
+        // @implements {DD021.§10.DC.09} parallel-emit during transition window
 
-        if (resolvedId) {
+        // Normalize: strip § for resolver input (matches resolveReference's
+        // expectation of pre-normalized text; the resolver parses internally).
+        const normalized = target.replace(/§/g, '');
+        const outcome: ResolverOutcome = resolveReference(normalized, this.data, {
+          currentNoteId: entry.noteId,
+          derivesPosition: true,
+        });
+
+        if (outcome.kind === 'resolved') {
+          const resolvedId = outcome.canonicalId;
           resolved.push(resolvedId);
           // Build reverse index: source claim -> derived claims
           const existing = this.derivativesMap.get(resolvedId) ?? [];
           existing.push(entry.fullyQualified);
           this.derivativesMap.set(resolvedId, existing);
-        } else {
-          // Unresolvable derivation target → record error
+        } else if (outcome.kind === 'ambiguous') {
+          // Section-less derives= matched multiple candidates. Parallel-emit
+          // legacy `unresolvable-derivation-target` + new `derivation-target-ambiguous`.
           this.data.errors.push({
             type: 'unresolvable-derivation-target',
             claimId: entry.fullyQualified,
@@ -463,6 +541,75 @@ export class ClaimIndex {
             message: `Claim "${entry.fullyQualified}" declares derives=${target} but target does not resolve in the index.`,
             noteId: entry.noteId,
             noteFilePath: entry.noteFilePath,
+          });
+          this.data.errors.push({
+            type: 'derivation-target-ambiguous',
+            claimId: entry.fullyQualified,
+            line: entry.line,
+            message: `Claim "${entry.fullyQualified}" declares derives=${target}, which is ambiguous; candidates: ${outcome.candidates.join(', ')}. Use the fully qualified form to disambiguate.`,
+            noteId: entry.noteId,
+            noteFilePath: entry.noteFilePath,
+          });
+          // Populate entry's unresolvedDerivationTargets per DC.12 for trace
+          // sentinel rendering. Ambiguous outcomes don't have a single
+          // `outcome.code`; use 'derivation-target-ambiguous' per the §2 mapping.
+          // @implements {DD021.§10.DC.12} unresolved derives= surfaced for trace rendering
+          entry.unresolvedDerivationTargets.push({
+            rawTarget: target,
+            code: 'derivation-target-ambiguous',
+          });
+        } else {
+          // unresolved kind: emit legacy + new code per DC.09 parallel-emit.
+          // The cross-project case gets the verbatim R011-rationale message
+          // on the legacy emission (preserves today's text for grep-stability
+          // per Q1 caveat); the new code carries a short detail.
+          if (outcome.code === 'derivation-target-cross-project') {
+            // Legacy first per Q7 — verbatim R011 message from today's L448.
+            this.data.errors.push({
+              type: 'cross-project-derives',
+              claimId: entry.fullyQualified,
+              line: entry.line,
+              message: `Claim "${entry.fullyQualified}" declares derives=${target}, but cross-project derivation is rejected. The derivation graph is per-project (R006.§Non-Goals). R011.§2.AC.03 permits reconsideration via a future requirement that relaxes both R006 and R011.§2.AC.03 together; in this version, derives= MUST point at a local claim.`,
+              noteId: entry.noteId,
+              noteFilePath: entry.noteFilePath,
+            });
+            // New code second per DC.09 ordering.
+            this.data.errors.push({
+              type: 'derivation-target-cross-project',
+              claimId: entry.fullyQualified,
+              line: entry.line,
+              message: formatNewCodeMessage(outcome.code, target, undefined, entry.noteId),
+              noteId: entry.noteId,
+              noteFilePath: entry.noteFilePath,
+            });
+          } else {
+            // Other unresolved codes (bare-note-id, unknown-note,
+            // undefined-claim, malformed) parallel-emit with legacy
+            // `unresolvable-derivation-target` first per Q7.
+            this.data.errors.push({
+              type: 'unresolvable-derivation-target',
+              claimId: entry.fullyQualified,
+              line: entry.line,
+              message: `Claim "${entry.fullyQualified}" declares derives=${target} but target does not resolve in the index.`,
+              noteId: entry.noteId,
+              noteFilePath: entry.noteFilePath,
+            });
+            this.data.errors.push({
+              type: outcome.code,
+              claimId: entry.fullyQualified,
+              line: entry.line,
+              message: formatNewCodeMessage(outcome.code, target, undefined, entry.noteId),
+              noteId: entry.noteId,
+              noteFilePath: entry.noteFilePath,
+            });
+          }
+          // Populate entry's unresolvedDerivationTargets per DC.12 for trace
+          // sentinel rendering. Both cross-project and other-unresolved branches
+          // record the raw target + the new-taxonomy code (ResolverFailureCode).
+          // @implements {DD021.§10.DC.12} unresolved derives= surfaced for trace rendering
+          entry.unresolvedDerivationTargets.push({
+            rawTarget: target,
+            code: outcome.code,
           });
         }
       }
@@ -543,7 +690,9 @@ export class ClaimIndex {
           continue;
         }
 
-        // Build the raw reference string for resolution
+        // Build the raw reference string for resolution (used in error
+        // messages even when the resolver consumes the parsed ClaimAddress
+        // directly).
         const rawParts: string[] = [];
         if (addr.noteId) rawParts.push(addr.noteId);
         if (addr.sectionPath) rawParts.push(...addr.sectionPath.map(String));
@@ -557,11 +706,20 @@ export class ClaimIndex {
 
         const rawRef = rawParts.join('.');
 
-        // Skip self-referencing claims (claim referencing itself within the same note)
-        const resolved = resolveClaimAddress(rawRef, this.data.entries, note.id);
+        // Route through the shared resolver. The resolver branches on the
+        // pre-parsed ClaimAddress (raw: ClaimAddress path — malformed cannot
+        // fire). Outcomes are translated into ClaimCrossReference edges with
+        // both `resolverOutcome` (new shape) and `unresolved?: boolean`
+        // (legacy retained for transition per OQ.02), and into parallel
+        // ClaimTreeError entries (legacy + new) per DC.09's transition window.
+        // @implements {DD021.§10.DC.08} cross-ref scan calls resolveReference
+        const outcome: ResolverOutcome = resolveReference(addr, this.data, {
+          currentNoteId: note.id,
+          derivesPosition: false,
+        });
 
-        if (resolved) {
-          const targetEntry = this.data.entries.get(resolved)!;
+        if (outcome.kind === 'resolved') {
+          const targetEntry = outcome.entry;
 
           // Skip references from a note to claims within the same note
           // (these are structural, not cross-references)
@@ -574,16 +732,22 @@ export class ClaimIndex {
 
           this.data.crossRefs.push({
             fromClaim: fromClaim ?? `${note.id}:line-${ref.line}`,
-            toClaim: resolved,
+            toClaim: outcome.canonicalId,
             fromNoteId: note.id,
             toNoteId: targetEntry.noteId,
             line: ref.line,
             filePath: note.filePath,
+            resolverOutcome: outcome,
           });
         } else {
           // Only report as broken if the reference targets a different note
           // (or has an explicit note ID that isn't the current document)
           if (addr.noteId && addr.noteId !== note.id && addr.claimPrefix !== undefined) {
+            // Q7 legacy-first ordering: emit legacy `unresolved-reference`
+            // first (today's grep surface), then new code per DC.09's
+            // expanded body. Both rows appear in lint output during the
+            // transition window.
+            // @implements {DD021.§10.DC.09} parallel-emit during transition window
             this.data.errors.push({
               type: 'unresolved-reference',
               claimId: rawRef,
@@ -593,8 +757,37 @@ export class ClaimIndex {
               noteFilePath: note.filePath,
             });
 
+            // Emit the new code per the resolver outcome kind.
+            // - unresolved: use the discrete failure code (reference-to-unknown-note,
+            //   reference-to-undefined-claim, malformed-claim-reference, etc.)
+            // - ambiguous: surface as new `ambiguous` ClaimTreeError type? No —
+            //   today's `ambiguous` claim-tree-error is for SAME-NOTE ambiguity
+            //   from {R004.§1.AC.04}. The cross-note section-less ambiguity from
+            //   DC.03 surfaces via the new unresolved-reference family: we emit
+            //   reference-to-undefined-claim with candidates in the detail (or
+            //   leave the legacy `unresolved-reference` alone and emit no new
+            //   code on `ambiguous` outcomes for inline-ref position — they're
+            //   surfaced via the resolverOutcome attached below).
+            if (outcome.kind === 'unresolved') {
+              this.data.errors.push({
+                type: outcome.code,
+                claimId: rawRef,
+                line: ref.line,
+                message: formatNewCodeMessage(outcome.code, rawRef, addr.noteId, note.id),
+                noteId: note.id,
+                noteFilePath: note.filePath,
+              });
+            }
+            // For `ambiguous` outcomes in inline-ref position, we attach the
+            // outcome to the cross-ref edge below; rendering layers (trace,
+            // lint) discriminate via `ref.resolverOutcome.kind === 'ambiguous'`.
+            // No new ClaimTreeError emitted — the cross-ref's outcome is the
+            // primary signal, paralleled by the legacy `unresolved-reference`
+            // above for grep-stability.
+
             // Also create an unresolved cross-reference so the trace command
-            // can surface broken refs instead of silently dropping them
+            // can surface broken refs instead of silently dropping them.
+            // Attach the full resolver outcome per OQ.02 closure.
             const fromClaim = this.findContainingClaim(note.id, ref.line);
             this.data.crossRefs.push({
               fromClaim: fromClaim ?? `${note.id}:line-${ref.line}`,
@@ -604,6 +797,7 @@ export class ClaimIndex {
               line: ref.line,
               filePath: note.filePath,
               unresolved: true,
+              resolverOutcome: outcome,
             });
           }
         }

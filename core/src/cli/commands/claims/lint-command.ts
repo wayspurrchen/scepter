@@ -72,6 +72,15 @@ export const lintCommand = new Command('lint')
           const claimIndex = context.projectManager.claimIndex;
           const derivationErrors = validateDerivationLinks(noteId, indexData, claimIndex);
 
+          // (c) consumer-synthesis: walk inline-ref crossRefs from this note
+          // where the resolved target is archived. Synthesizes
+          // reference-to-archived WARNING + legacy unresolved-reference ERROR
+          // per Q14-(i) and DC.09 parallel-emit (legacy first per Q7).
+          // @implements {DD021.§10.DC.06} consumer-side synthesis of reference-to-archived
+          // @implements {R015.§1.AC.04b} lint downgrades archived-citation to warning
+          // @implements {DD021.§10.DC.09} parallel-emit
+          const inlineArchiveErrors = collectInlineRefArchiveSynthesis(noteId, indexData);
+
           // @implements {R011.§3.AC.06} Validate alias-prefixed references in this note
           const aliasReferenceErrors = await validateAliasReferences(
             noteId,
@@ -104,6 +113,15 @@ export const lintCommand = new Command('lint')
           }
           for (const err of derivationErrors) {
             const key = `${err.line}:${err.type}`;
+            if (!seen.has(key)) {
+              allErrors.push(err);
+              seen.add(key);
+            }
+          }
+          for (const err of inlineArchiveErrors) {
+            // Dedup key includes claimId because multiple archived inline-refs
+            // from the same line are possible (e.g., two refs on the same line).
+            const key = `${err.line}:${err.type}:${err.claimId}`;
             if (!seen.has(key)) {
               allErrors.push(err);
               seen.add(key);
@@ -167,6 +185,58 @@ export const lintCommand = new Command('lint')
  *
  * @implements {DD020.§5.DC.02} tombstoned-target audit category
  */
+/**
+ * Walks `data.crossRefs` for resolved-archived inline-ref edges originating
+ * from the given note, and synthesizes parallel-emit `ClaimTreeError` entries
+ * per the (c) consumer-synthesis pattern (per {DD021.§10.DC.06} via team-lead
+ * Q12 disposition). For each archived-target inline-ref:
+ *
+ * - Legacy `unresolved-reference` (ERROR severity) — preserves today's
+ *   grep surface per {DD021.§10.DC.09} parallel-emit; legacy-first per Q7.
+ * - New `reference-to-archived` (WARNING severity) — surfaces the discrete
+ *   code per {R015.§1.AC.04b} ("the discrete code is what allows lint to
+ *   downgrade severity"). The lint output renders archived-citation as a
+ *   soft signal distinguishing it from missing-note / undefined-claim.
+ *
+ * The resolver does NOT emit `reference-to-archived` for active consumers
+ * (per (c) disposition, all consumers pass `includeArchived: true`); this
+ * synthesis pattern is the rendering-layer realization of the AC's intent.
+ *
+ * @implements {DD021.§10.DC.06} consumer-side synthesis of reference-to-archived
+ * @implements {R015.§1.AC.04b} lint downgrades archived-citation to warning
+ * @implements {DD021.§10.DC.09} parallel-emit during transition window
+ * @internal Exported for testing
+ */
+export function collectInlineRefArchiveSynthesis(
+  noteId: string,
+  indexData: import('../../../claims/index.js').ClaimIndexData,
+): ClaimTreeError[] {
+  const out: ClaimTreeError[] = [];
+  for (const ref of indexData.crossRefs) {
+    if (ref.fromNoteId !== noteId) continue;
+    if (ref.resolverOutcome === undefined) continue;
+    if (ref.resolverOutcome.kind !== 'resolved') continue;
+    if (ref.resolverOutcome.entry.archived !== true) continue;
+
+    // Q14-(i) parallel-emit: legacy first per Q7.
+    out.push({
+      type: 'unresolved-reference',
+      claimId: ref.toClaim,
+      line: ref.line,
+      message: `Unresolved claim reference "${ref.toClaim}" in note ${noteId} at line ${ref.line}.`,
+      noteId,
+    });
+    out.push({
+      type: 'reference-to-archived',
+      claimId: ref.toClaim,
+      line: ref.line,
+      message: `Reference "${ref.toClaim}" resolves to archived note "${ref.toNoteId}". Consider rewriting the citation or un-archiving the target.`,
+      noteId,
+    });
+  }
+  return out;
+}
+
 function collectTombstonedTargetAudit(
   noteId: string,
   indexData: import('../../../claims/index.js').ClaimIndexData,
@@ -341,23 +411,68 @@ export function validateDerivationLinks(
           continue;
         }
 
-        // Check 7: derivation-from-removed
+        // Check 7: derivation-from-removed — legacy + new code per Q2 + Q7
+        // Three-way conjunction (per {DD021.§7.OQ.03}-adjacent + claims.md):
+        //   resolved (implicit — sourceEntry exists) AND lifecycle.type === 'removed'
+        //   AND derivesPosition (implicit — inside derives= loop).
+        // @implements {DD021.§10.DC.09} parallel-emit during transition window
         if (sourceEntry.lifecycle?.type === 'removed') {
+          // Legacy first per Q7 — text preserved verbatim.
           errors.push({
             type: 'derivation-from-removed',
             claimId: fullyQualified,
             line: entry.line,
             message: `Claim "${fullyQualified}" derives from "${sourceFqid}" which is tagged :removed.`,
           });
+          // New code second per Q7 ordering.
+          errors.push({
+            type: 'derivation-target-removed',
+            claimId: fullyQualified,
+            line: entry.line,
+            message: `Claim "${fullyQualified}" derives from "${sourceFqid}" which is tagged :removed.`,
+          });
         }
 
-        // Check 8: derivation-from-superseded
+        // Check 8: derivation-from-superseded — legacy + new code per Q2 + Q7
+        // @implements {DD021.§10.DC.09} parallel-emit during transition window
         if (sourceEntry.lifecycle?.type === 'superseded') {
           errors.push({
             type: 'derivation-from-superseded',
             claimId: fullyQualified,
             line: entry.line,
             message: `Claim "${fullyQualified}" derives from "${sourceFqid}" which is tagged :superseded. Consider re-deriving from the replacement.`,
+          });
+          errors.push({
+            type: 'derivation-target-superseded',
+            claimId: fullyQualified,
+            line: entry.line,
+            message: `Claim "${fullyQualified}" derives from "${sourceFqid}" which is tagged :superseded. Consider re-deriving from the replacement.`,
+          });
+        }
+
+        // Check 9: archive synthesis for derives= position (DC.06 via Q12-(c)).
+        // When the source-of-derivation entry is archived, synthesize a
+        // reference-to-archived WARNING + legacy unresolved-reference ERROR
+        // parallel-emit per Q14-(i) and DC.09 (legacy first per Q7).
+        // The lint UX surfaces archived-citation as a soft signal per
+        // {R015.§1.AC.04b}.
+        // @implements {DD021.§10.DC.06} consumer-side synthesis of reference-to-archived
+        // @implements {R015.§1.AC.04b} lint downgrades archived-citation to warning
+        // @implements {DD021.§10.DC.09} parallel-emit
+        if (sourceEntry.archived === true) {
+          // Legacy first per Q7.
+          errors.push({
+            type: 'unresolved-reference',
+            claimId: fullyQualified,
+            line: entry.line,
+            message: `Unresolved claim reference "${sourceFqid}" in note "${entry.noteId}" at line ${entry.line}.`,
+          });
+          // New code second.
+          errors.push({
+            type: 'reference-to-archived',
+            claimId: fullyQualified,
+            line: entry.line,
+            message: `Reference "${sourceFqid}" resolves to archived note. Consider rewriting the citation or un-archiving the target.`,
           });
         }
       }

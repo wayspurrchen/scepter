@@ -642,3 +642,4 @@ This works for the common case but is ambiguous if multiple notes have an `AC.01
 - {R005} — Claim Metadata, Verification, and Lifecycle (metadata syntax this builds on)
 - {DD001} — Detailed design for {R004} (structure and convention reference)
 - {DD002} — Detailed design for {R005} (metadata parser integration context)
+- {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (re-derives resolver behavior the §9 Observation 4 left as future enhancement; bare-note-id `derives=` is now rejected per {R006.§1.AC.05}, and lint/trace share a single resolver per {R006.§5.AC.04}; added 2026-05-20)

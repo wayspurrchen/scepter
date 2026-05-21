@@ -38,6 +38,8 @@ import { lintCommand } from './commands/claims/lint-command.js';
 import { verifyCommand } from './commands/claims/verify-command.js';
 import { staleCommand } from './commands/claims/stale-command.js';
 import { threadCommand } from './commands/claims/thread-command.js';
+// @implements {DD021.§10.DC.15} dependents subcommand registered at top level per DD006.§3.DC.03
+import { dependentsCommand } from './commands/claims/dependents-command.js';
 // @implements {DD014.§3.DC.24} `meta` subcommand group registered at top level
 import { metaCommand } from './commands/claims/meta/index.js';
 // @implements {DD018.§3.DC.76} `snapshot` subcommand group registered at top level
@@ -100,6 +102,8 @@ program.addCommand(lintCommand);
 program.addCommand(verifyCommand);
 program.addCommand(staleCommand);
 program.addCommand(threadCommand);
+// @implements {DD021.§10.DC.15} dependents command registered at top level
+program.addCommand(dependentsCommand);
 program.addCommand(metaCommand);
 // @implements {DD018.§3.DC.76} register snapshotCommand at top level
 program.addCommand(snapshotCommand);
@@ -141,7 +145,7 @@ createBackwardCompatAlias('notes');
 // Help output grouping {DD006.§3.DC.09}
 const COMMAND_GROUPS: Record<string, string[]> = {
   'Note CRUD': ['create', 'show', 'list', 'search', 'delete', 'archive', 'restore', 'purge', 'convert', 'ingest'],
-  'Connection Understanding': ['trace', 'thread', 'gather', 'gaps'],
+  'Connection Understanding': ['trace', 'thread', 'gather', 'gaps', 'dependents'],
   'Quality and Hygiene': ['lint', 'verify', 'stale', 'snapshot'],
   'Configuration': ['types', 'confidence', 'config', 'init'],
 };

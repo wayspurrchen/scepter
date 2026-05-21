@@ -1,19 +1,30 @@
 /**
- * Fuzzy claim ID resolution for the show command.
+ * Normalize-then-resolve wrapper for user-typed claim addresses.
  *
- * Normalizes user-provided shorthand claim addresses and resolves them
- * against the claim index. Handles:
- *   - $ -> section symbol replacement
- *   - Zero-padding for note ID shortcodes and claim numbers
- *   - Exact match first, then suffix matching for ambiguous inputs
+ * Post-{DD021.§10.DC.10} migration: this file is a thin wrapper around the
+ * shared resolver at `core/src/claims/reference-resolver.ts`. The ad-hoc
+ * suffix-matching logic that previously lived here is REMOVED — equivalent
+ * behavior is provided by the resolver's section-less rule ({DD021.§10.DC.03}).
+ * The section-only branch (e.g., `show DD007.1` -> all claims in §1 of DD007)
+ * is PRESERVED at this layer per the (β) interpretation of DC.10 disposed by
+ * team-lead 2026-05-21: DC.10's "equivalent behavior is provided by §10.DC.03"
+ * is factually wrong for section-only inputs because DC.03 is single-outcome
+ * by construction (cannot return many-entries). The section-only branch IS
+ * conceptually a browse feature, not a claim-resolution operation, and lives
+ * naturally at this wrapper layer.
  *
- * @implements {DD008.§1.DC.01} resolveClaimInput() normalization and resolution
- * @implements {DD008.§1.DC.02} Zero-padding rules for shortcodes and claim numbers
+ * Normalization (`$` → `§`, `§` stripping, zero-padding) is preserved verbatim
+ * per {DD008.§1.DC.01} / {DD008.§1.DC.02}.
+ *
+ * @implements {DD008.§1.DC.01} normalization preserved verbatim
+ * @implements {DD008.§1.DC.02} zero-padding preserved verbatim
+ * @implements {DD021.§10.DC.10} normalize-then-resolve with section-only preserved per (β)
  */
 
 import chalk from 'chalk';
 import type { ClaimIndexData, ClaimIndexEntry } from '../../../claims/index.js';
 import { parseNoteId } from '../../../parsers/note/shared-note-utils.js';
+import { resolveReference } from '../../../claims/reference-resolver.js';
 
 export interface ResolveResult {
   matches: ClaimIndexEntry[];
@@ -23,34 +34,34 @@ export interface ResolveResult {
 /**
  * Normalize and resolve a user-provided string to zero or more claim index entries.
  *
- * Normalization steps:
- * 1. Replace `$` with `§` (shell escape convenience)
- * 2. Strip `§` for index lookup (the index uses dotted form without `§`)
- * 3. Zero-pad shortcode digits and claim numbers
- * 4. Exact match in data.entries
- * 5. If no exact match and input has no section path: suffix match
+ * Steps (post-{DD021.§10.DC.10}):
  *
+ * 1. Normalize (`$` → `§`, `§` stripping, zero-padding) per {DD008.§1.DC.01-.02}.
+ * 2. Section-only short-circuit: if input is `NOTEID.SECTION` (e.g., `DD007.1`),
+ *    return all claims under that section. This is a BROWSE query, not a claim
+ *    resolution — preserved at the wrapper layer per the (β) interpretation of
+ *    {DD021.§10.DC.10}.
+ * 3. Delegate to `resolveReference()` for single-claim resolution. Map outcomes:
+ *    - `resolved` → `{ matches: [outcome.entry], normalized }`
+ *    - `ambiguous` → `{ matches: [...candidate entries], normalized }`
+ *    - `unresolved` → `{ matches: [], normalized }`
+ *
+ * @implements {DD021.§10.DC.10} normalize-then-resolve wrapper per (β) disposition
  * @implements {DD008.§1.DC.01}
+ * @implements {DD008.§1.DC.02}
  */
 export function resolveClaimInput(input: string, data: ClaimIndexData): ResolveResult {
-  // Step 1: Replace $ with §
+  // Normalization (preserved verbatim).
   let normalized = input.replace(/\$/g, '§');
-
-  // Step 2: Strip § for index lookup
   normalized = normalized.replace(/§/g, '');
-
-  // Step 3: Zero-pad shortcode digits and claim numbers, strip section zero-padding
   normalized = zeroPad(normalized, data);
   normalized = stripSectionZeroPadding(normalized);
 
-  // Step 4: Exact match
-  const exactEntry = data.entries.get(normalized);
-  if (exactEntry) {
-    return { matches: [exactEntry], normalized };
-  }
-
-  // Step 5: Section-only resolution.
-  // If input is NOTEID.SECTION (e.g., DD007.1), show all claims in that section.
+  // Section-only short-circuit. If input is NOTEID.SECTION (e.g., DD007.1 or
+  // DD007.3.1), return all claims under that section. This is a browse query,
+  // NOT a claim resolution, so it does not flow through resolveReference().
+  // Per the (β) interpretation of DC.10: DC.03 cannot model section-browse's
+  // many-entries return; this branch stays at the wrapper layer.
   const sectionMatch = isSectionReference(normalized);
   if (sectionMatch) {
     const { noteId, sectionPath } = sectionMatch;
@@ -65,32 +76,39 @@ export function resolveClaimInput(input: string, data: ClaimIndexData): ResolveR
       matches.sort((a, b) => a.fullyQualified.localeCompare(b.fullyQualified));
       return { matches, normalized };
     }
+    // Section-only with no matches falls through to resolver (degenerate case;
+    // resolver will return `unresolved` and we map to empty matches).
   }
 
-  // Step 6: Suffix matching when no section path is present.
-  // If input has no section path (i.e., no numeric segment between noteId and claim prefix),
-  // try all entries ending with the claim suffix.
-  // E.g., "DD007.DC.01" should match "DD007.1.DC.01" and "DD007.2.DC.01"
-  if (hasMissingSectionPath(normalized)) {
-    const suffix = extractClaimSuffix(normalized);
-    const notePrefix = extractNotePrefix(normalized);
+  // Delegate single-claim resolution to the shared resolver per DC.10 + DC.03.
+  // includeArchived: true per §4 per-consumer defaults — user-facing lookup
+  // MUST see archived (the user typed the ID; they get the entry).
+  // @implements {DD021.§10.DC.08} resolution flows through shared resolver
+  const outcome = resolveReference(normalized, data, {
+    currentNoteId: undefined,
+    derivesPosition: false,
+    includeArchived: true,
+  });
 
-    if (suffix && notePrefix) {
-      const matches: ClaimIndexEntry[] = [];
-      for (const [key, entry] of data.entries) {
-        if (key.startsWith(notePrefix + '.') && key.endsWith('.' + suffix)) {
-          matches.push(entry);
-        }
-      }
-      if (matches.length > 0) {
-        // Sort by fully qualified ID for deterministic output
-        matches.sort((a, b) => a.fullyQualified.localeCompare(b.fullyQualified));
-        return { matches, normalized };
-      }
+  if (outcome.kind === 'resolved') {
+    return { matches: [outcome.entry], normalized };
+  }
+  if (outcome.kind === 'ambiguous') {
+    // Map candidate FQIDs to ClaimIndexEntry[] for the consumer (show command,
+    // dependents command, etc.) to render. The candidates already include
+    // entries that pass the includeArchived filter (resolver applies it
+    // internally during the section-less enumeration).
+    const matches: ClaimIndexEntry[] = [];
+    for (const fqid of outcome.candidates) {
+      const entry = data.entries.get(fqid);
+      if (entry) matches.push(entry);
     }
+    matches.sort((a, b) => a.fullyQualified.localeCompare(b.fullyQualified));
+    return { matches, normalized };
   }
 
-  // No matches
+  // unresolved: empty matches. The consumer (resolveSingleClaim below) renders
+  // a "Claim not found" diagnostic with suggestions.
   return { matches: [], normalized };
 }
 
@@ -232,56 +250,6 @@ function findShortcodeWidth(shortcode: string, data: ClaimIndexData): number {
   }
 
   return minWidth;
-}
-
-/**
- * Detect whether the normalized input is missing its section path.
- * This is the case when a note ID is followed directly by a claim prefix
- * with no numeric segment in between.
- *
- * E.g., "DD007.DC.01" has no section path (missing the "1" between DD007 and DC).
- * "DD007.1.DC.01" does have a section path.
- */
-function hasMissingSectionPath(normalized: string): boolean {
-  const parts = normalized.split('.');
-  if (parts.length < 3) return false;
-
-  // Check if first part is a note ID
-  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return false;
-
-  // Check if second part is an uppercase claim prefix (not a number)
-  if (/^[A-Z]+$/.test(parts[1])) return true;
-
-  return false;
-}
-
-/**
- * Extract the claim suffix (e.g., "DC.01") from a normalized input
- * that has no section path.
- */
-function extractClaimSuffix(normalized: string): string | null {
-  const parts = normalized.split('.');
-  if (parts.length < 3) return null;
-
-  // First part is noteId, rest is claim suffix
-  // e.g., "DD007.DC.01" -> "DC.01"
-  if (!/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) return null;
-  if (!/^[A-Z]+$/.test(parts[1])) return null;
-
-  return parts.slice(1).join('.');
-}
-
-/**
- * Extract the note ID prefix from a normalized input.
- */
-function extractNotePrefix(normalized: string): string | null {
-  const parts = normalized.split('.');
-  if (parts.length < 1) return null;
-
-  if (/^[A-Z]{1,5}\d{3,5}$/.test(parts[0])) {
-    return parts[0];
-  }
-  return null;
 }
 
 /**

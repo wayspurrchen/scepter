@@ -6,6 +6,7 @@
  * @implements {R008.§2.AC.01} Claim index uses aggregated content for folder notes
  * @implements {DD019.§3.DC.09} Author-delta commit block removed; ensureIndex performs zero writes
  * @implements {DD019.§3.DC.10} Markdown-vs-CLI distinction is now structural (entry fields vs events)
+ * @see {DD021.§10.DC.16} Planned: pass `{ includeArchived: true }` to `noteManager.getNotes()` so archived notes stay in-index for resolver per {R015.§1.AC.04a}; not yet realized in this file.
  */
 
 import type { ProjectManager } from '../../../project/project-manager.js';
@@ -49,18 +50,32 @@ export async function ensureIndex(
     throw new Error('Note manager not initialized');
   }
 
-  // Get all notes (no limit)
-  const result = await noteManager.getNotes({});
+  // Get all notes including archived (no limit).
+  // @implements {DD021.§10.DC.16} ensureIndex passes includeArchived: true
+  // to noteManager.getNotes() so archived-note entries are present in the
+  // index per {R015.§1.AC.04a} ("archived notes MUST stay in-index for
+  // resolution"). Without this flag, the default note-manager filter at
+  // note-manager.ts:1315-1317 excludes archived notes, and the resolver
+  // (DD021.§10.DC.05/.06) degenerates archived citations to
+  // reference-to-unknown-note. Paired in this commit with the findGaps
+  // archived-skip in traceability.ts (B.5b) so the gap surface remains
+  // correct: archived entries are in the index for resolution, but inert
+  // for projection-coverage tally.
+  const result = await noteManager.getNotes({ includeArchived: true });
   const notes = result.notes;
 
   // Read content for each note — use aggregated contents so that folder
   // notes have claims from companion sub-files included.
+  // @implements {DD021.§10.DC.17} NoteWithContent.tags plumbing — pass
+  // note.tags so ClaimIndex.build() can populate entry.archived per
+  // tags.includes('archived').
   const notesWithContent: NoteWithContent[] = await Promise.all(
     notes.map(async (note) => ({
       id: note.id,
       type: note.type,
       filePath: note.filePath || '',
       content: (await noteManager.getAggregatedContents(note.id)) || '',
+      tags: note.tags,
     })),
   );
 

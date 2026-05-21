@@ -36,6 +36,19 @@ const SEVERITY_BY_TYPE: Record<ClaimTreeError['type'], vscode.DiagnosticSeverity
   'non-monotonic': vscode.DiagnosticSeverity.Warning,
   'ambiguous': vscode.DiagnosticSeverity.Warning,
   'unresolved-reference': vscode.DiagnosticSeverity.Warning,
+  // ---- New resolver-emitted codes per {DD021.§10.DC.02} ----
+  // @implements {DD021.§10.DC.09} severity mapping for new taxonomy codes (C.13b per Q25)
+  'reference-to-unknown-note': vscode.DiagnosticSeverity.Error,
+  'reference-to-undefined-claim': vscode.DiagnosticSeverity.Error,
+  // @implements {R015.§1.AC.04b} archived-citation is a soft signal (warning)
+  'reference-to-archived': vscode.DiagnosticSeverity.Warning,
+  'malformed-claim-reference': vscode.DiagnosticSeverity.Error,
+  'derivation-target-bare-note-id': vscode.DiagnosticSeverity.Error,
+  'derivation-target-cross-project': vscode.DiagnosticSeverity.Error,
+  // Lifecycle decoration codes are warnings (parallel today's derivation-from-* codes)
+  'derivation-target-removed': vscode.DiagnosticSeverity.Warning,
+  'derivation-target-superseded': vscode.DiagnosticSeverity.Warning,
+  'derivation-target-ambiguous': vscode.DiagnosticSeverity.Error,
 };
 
 export class DiagnosticsProvider {

@@ -5,7 +5,7 @@ tags: [cli, claims, ux]
 
 # DD008 - Show Command - Claim Display and Fuzzy ID Resolution
 
-**Related:** {A001} (CLI unification), {DD006} (unified CLI), {R004} (claim system)
+**Related:** {A001} (CLI unification), {DD006} (unified CLI), {R004} (claim system), {DD021} (Unified Reference Resolver — preserves §1.DC.01 normalization but moves the cross-note suffix-match logic into the shared resolver per {DD021.§10.DC.10}; added 2026-05-20)
 
 ## Problem
 
