@@ -1,7 +1,49 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ClaimIndexCache } from './claim-index';
+import { ClaimIndexCache, ClaimIndexEntry } from './claim-index';
 import { findAllMatches, findDeletionMarkers, noteIdFromPath } from './patterns';
+
+/**
+ * Recognize a claim definition at the start of `lineText`.
+ *
+ * Accepts heading-form (`### §1.AC.01 Title`, `### AC.01 Title`),
+ * paragraph-form (`§1.AC.01 prose…`, `AC.01 prose…`), and
+ * bold-wrapped paragraph form (`**§1.AC.01** prose…`,
+ * `**R049.LOCK.03** prose…`). Mirrors the patterns
+ * `tryParseClaimText` accepts in the core parser, restricted to the
+ * minimum needed to drive badge placement in the current document.
+ *
+ * Returns the bare claim id (e.g. `TM.01`), the inline section path
+ * if the definition carried one (e.g. `[13]` from `§13.TM.01`), and
+ * the column where the claim id starts in `lineText` so the caller
+ * can anchor a badge decoration there.
+ */
+function tryParseClaimDefinitionLine(lineText: string): { bareId: string; sectionPath?: number[]; idIdx: number } | null {
+  let work = lineText;
+  let stripped = 0;
+  const headingMatch = work.match(/^(#{1,6}\s+)/);
+  if (headingMatch) {
+    stripped = headingMatch[0].length;
+    work = work.slice(stripped);
+  }
+  const re = /^(?:\*\*|__)?(?:[A-Z]{1,5}\d{3,5}\.)?§?(?:(\d+(?:\.\d+)*)\.)?§?([A-Z]+)\.(\d{2,3})([a-z])?(?:\*\*|__)?[\s:]/;
+  const m = work.match(re);
+  if (!m) return null;
+  const [, secPath, claimPrefix, claimNum, subLetter] = m;
+  const padded = String(parseInt(claimNum, 10)).padStart(2, '0');
+  const bareId = `${claimPrefix}.${padded}${subLetter ?? ''}`;
+  const sectionPath = secPath ? secPath.split('.').map((s) => parseInt(s, 10)) : undefined;
+  const idIdxInWork = work.indexOf(`${claimPrefix}.${claimNum}`);
+  if (idIdxInWork < 0) return null;
+  return { bareId, sectionPath, idIdx: stripped + idIdxInWork };
+}
+
+function arrayEq(a: number[] | undefined, b: number[] | undefined): boolean {
+  if (!a || !b) return a === b;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
 
 // Resolved reference — dotted underline, subtle teal tint
 const resolvedDecoration = vscode.window.createTextEditorDecorationType({
@@ -260,39 +302,61 @@ export class DecorationProvider {
   // @implements {R012.§1.AC.02} badge displays total inbound count (sources + notes)
   // @implements {R012.§1.AC.03} badge color encodes source coverage (green for source, red for note-only)
   // @implements {R012.§1.AC.04} editor badge anchored on claim id range via `after`-decoration
-  // @implements {R012.§1.AC.06} badge appears only on claim definition (entry.line match), not citations
+  // @implements {R012.§1.AC.06} badge appears only on claim definition, not citations
   // @implements {R012.§1.AC.07} badge omitted when total === 0
+  // @implements {R008.§1.AC.05} badges appear on folder-form companion files too,
+  //   by scanning the open doc rather than trusting entry.line (which is the
+  //   aggregated-stream line for folder notes)
   private collectClaimBadges(
     doc: vscode.TextDocument,
     contextNoteId: string,
     out: vscode.DecorationOptions[],
   ): void {
-    const docPath = doc.uri.fsPath;
-    const projectDir = this.index.projectDir;
-
+    // Index entries from this note keyed by their bare claim id ("TM.01").
+    // For folder-form notes the entry.noteFilePath points at the parent
+    // root file and entry.line is the line in the aggregated content
+    // stream — neither maps cleanly back to a companion sub-file. We
+    // instead walk the open doc and look up each definition we find.
+    const candidatesByBareId = new Map<string, ClaimIndexEntry[]>();
     for (const entry of this.index.claimsForNote(contextNoteId)) {
-      const entryAbs = this.index.resolveFilePath(entry.noteFilePath);
-      if (entryAbs !== docPath) continue;
-      const lineIdx = entry.line - 1;
-      if (lineIdx < 0 || lineIdx >= doc.lineCount) continue;
+      const padded = String(entry.claimNumber).padStart(2, '0');
+      const bareId = `${entry.claimPrefix}.${padded}${entry.claimSubLetter ?? ''}`;
+      const arr = candidatesByBareId.get(bareId) ?? [];
+      arr.push(entry);
+      candidatesByBareId.set(bareId, arr);
+    }
+    if (candidatesByBareId.size === 0) return;
+
+    for (let lineIdx = 0; lineIdx < doc.lineCount; lineIdx++) {
+      const lineText = doc.lineAt(lineIdx).text;
+      const def = tryParseClaimDefinitionLine(lineText);
+      if (!def) continue;
+      const candidates = candidatesByBareId.get(def.bareId);
+      if (!candidates || candidates.length === 0) continue;
+
+      // Pick the entry whose sectionPath matches the line's inline
+      // section path (if any). Without a section qualifier, fall back
+      // to the unique candidate, or the first if multiple exist.
+      let entry: ClaimIndexEntry | undefined;
+      if (def.sectionPath) {
+        entry = candidates.find(
+          (c) => arrayEq(c.sectionPath, def.sectionPath!),
+        );
+      }
+      if (!entry) entry = candidates[0];
 
       const refs = this.index.incomingRefs(entry.fullyQualified);
       const total = refs.length;
       if (total === 0) continue;
 
-      // Locate the claim id in the actual line text so the badge sits next
-      // to it, not at end of line. Heading line looks like
-      // "### AC.01:tag Title…"; we anchor the decoration range on the id.
-      const lineText = doc.lineAt(lineIdx).text;
       const padded = String(entry.claimNumber).padStart(2, '0');
       const idStr = `${entry.claimPrefix}.${padded}${entry.claimSubLetter ?? ''}`;
-      const idIdx = lineText.indexOf(idStr);
+      const idIdx = lineText.indexOf(idStr, def.idIdx);
       if (idIdx < 0) continue;
       const idEnd = idIdx + idStr.length;
       const range = new vscode.Range(lineIdx, idIdx, lineIdx, idEnd);
 
       const sourceRefs = refs.filter((r) => r.fromNoteId.startsWith('source:'));
-      const noteRefs = refs.filter((r) => !r.fromNoteId.startsWith('source:'));
       const hasSource = sourceRefs.length > 0;
       const dotColor = hasSource ? '#6CC04A' : '#F48771';
 

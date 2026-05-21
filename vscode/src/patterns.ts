@@ -408,12 +408,29 @@ export function matchAtPosition(
 
 /**
  * Extract the note ID from a file path.
- * e.g. "DD001 ARCH017 Blob Migration.md" → "DD001"
+ *
+ * Recognizes two file shapes:
+ *   1. Top-level note file — basename starts with the NOTE-ID, e.g.
+ *      `R005 Foo.md` or `DD052.md`. Returns the leading NOTE-ID.
+ *   2. Folder-form companion file — basename does NOT start with a
+ *      NOTE-ID, but the parent directory does. e.g.
+ *      `DD052 Title/13-threat-model.md`. Returns the parent folder's
+ *      NOTE-ID per the folder-form note convention (R008): a parent
+ *      folder named after a NOTE-ID is the unit of identity, and
+ *      every companion .md inside aggregates into that note.
+ *
+ * Returns null when neither shape matches.
+ *
+ * @implements {R008.§1.AC.05} folder-form companion files inherit note id from parent folder
  */
 export function noteIdFromPath(filePath: string): string | null {
-  const basename = filePath.split('/').pop() ?? '';
-  const match = basename.match(/^([A-Z]{1,5}\d{3,5})\b/);
-  return match ? match[1] : null;
+  const segments = filePath.split('/');
+  const basename = segments[segments.length - 1] ?? '';
+  const baseMatch = basename.match(/^([A-Z]{1,5}\d{3,5})\b/);
+  if (baseMatch) return baseMatch[1];
+  const parent = segments[segments.length - 2] ?? '';
+  const parentMatch = parent.match(/^([A-Z]{1,5}\d{3,5})\b/);
+  return parentMatch ? parentMatch[1] : null;
 }
 
 /**
