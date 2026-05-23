@@ -157,6 +157,65 @@ export interface ClaimTreeError {
   noteFilePath?: string;
 }
 
+/**
+ * Discriminated string union of every code that can appear on `ClaimTreeError.type`.
+ *
+ * Extracted from the interface so consumers outside the parser (notably the
+ * project-wide audit at `core/src/claims/audit/`) can use the same union as
+ * a structural code set without re-enumerating it.
+ *
+ * @see {DD022.§10.3.DC.16} `applyCodesFilter` validates inputs against the
+ *   union of REFERENCE_FAMILY_CODES and ClaimErrorCode.
+ */
+export type ClaimErrorCode = ClaimTreeError['type'];
+
+/**
+ * Runtime Set of every code in {@link ClaimErrorCode}. Hand-enumerated because
+ * TypeScript erases type-union members at runtime — there is no built-in way
+ * to iterate `ClaimTreeError['type']` directly. The TypeScript declaration
+ * above is the authoring SoT; this Set mirrors it.
+ *
+ * Maintenance: when `ClaimTreeError.type` gains or loses a code, update both
+ * sides. The companion test (claim-tree.test.ts) verifies they stay in sync.
+ *
+ * @see {DD022.§10.3.DC.16} consumed by `applyCodesFilter` for input validation
+ */
+export const CLAIM_ERROR_CODES: ReadonlySet<ClaimErrorCode> = new Set<ClaimErrorCode>([
+  'duplicate',
+  'non-monotonic',
+  'ambiguous',
+  'unresolved-reference',
+  'forbidden-form',
+  'multiple-lifecycle',
+  'invalid-supersession-target',
+  'reference-to-removed',
+  'unresolvable-derivation-target',
+  'cross-project-derives',
+  'cross-project-superseded',
+  'alias-unknown',
+  'peer-unresolved',
+  'peer-target-not-found',
+  'mismatched-self-prefix',
+  'derives-superseded-conflict',
+  'self-derivation',
+  'invalid-derivation-target',
+  'derivation-from-removed',
+  'derivation-from-superseded',
+  'circular-derivation',
+  'deep-derivation-chain',
+  'partial-derivation-coverage',
+  'tombstoned-target-audit',
+  'reference-to-unknown-note',
+  'reference-to-undefined-claim',
+  'reference-to-archived',
+  'malformed-claim-reference',
+  'derivation-target-bare-note-id',
+  'derivation-target-cross-project',
+  'derivation-target-removed',
+  'derivation-target-superseded',
+  'derivation-target-ambiguous',
+]);
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------

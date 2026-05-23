@@ -50,7 +50,7 @@ export async function ensureIndex(
     throw new Error('Note manager not initialized');
   }
 
-  // Get all notes including archived (no limit).
+  // Get all notes including archived and soft-deleted (no limit).
   // @implements {DD021.§10.DC.16} ensureIndex passes includeArchived: true
   // to noteManager.getNotes() so archived-note entries are present in the
   // index per {R015.§1.AC.04a} ("archived notes MUST stay in-index for
@@ -61,7 +61,13 @@ export async function ensureIndex(
   // archived-skip in traceability.ts (B.5b) so the gap surface remains
   // correct: archived entries are in the index for resolution, but inert
   // for projection-coverage tally.
-  const result = await noteManager.getNotes({ includeArchived: true });
+  //
+  // @see {DD022.§8} `includeDeleted: true` keeps soft-deleted notes in the
+  // index so the audit's `reference-to-soft-deleted` synthesis
+  // ({DD022.§10.2.DC.07}) can fire. Without it, citations of soft-deleted
+  // notes would degenerate to `reference-to-unknown-note`. Same shape as
+  // the archive plumbing.
+  const result = await noteManager.getNotes({ includeArchived: true, includeDeleted: true });
   const notes = result.notes;
 
   // Read content for each note — use aggregated contents so that folder

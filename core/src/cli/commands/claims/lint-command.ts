@@ -20,32 +20,116 @@ import { isLifecycleTag } from '../../../claims/index.js';
 import type { ClaimIndex } from '../../../claims/index.js';
 import { formatLintResults, formatClaimTree as formatClaimTreeDisplay } from '../../formatters/claim-formatter.js';
 import type { ProjectManager } from '../../../project/project-manager.js';
+import { runProjectWideAudit, type AuditOptions } from '../../../claims/audit/run-audit.js';
+import { processSourceReference, REFERENCE_FAMILY_CODES, type IncidenceRecord, type IncidenceCode } from '../../../claims/audit/incidence-collector.js';
+import { CLAIM_ERROR_CODES } from '../../../parsers/claim/index.js';
 
 export const lintCommand = new Command('lint')
-  .description('Validate claim structure in a note')
-  .argument('<noteId>', 'Note ID to lint (e.g., R004)')
+  .description('Validate claim structure in a note (or project-wide with --all)')
+  // @implements {DD022.§10.5.DC.23} argument relaxed to optional; action handler validates noteId vs --all
+  .argument('[noteId]', 'Note ID to lint (e.g., R004). Omit when using --all.')
   .option('--reindex', 'Force rebuild of claim index')
   .option('--json', 'Output as JSON')
   // @implements {DD020.§5.DC.03} CLI surface exposes the opt-in tombstoned-target audit
   .option('--include-tombstoned-derives', 'Surface claims whose derives= or superseded= target is tombstoned (silent by default)')
-  .action(async (noteId: string, options: { reindex?: boolean; json?: boolean; includeTombstonedDerives?: boolean; projectDir?: string }) => {
+  // @implements {DD022.§10.5.DC.22} project-wide audit flags
+  .option('--all', 'Project-wide audit sweep (per R016)')
+  .option('--code', 'Include source-code annotations (with --all: full sweep; on per-note form: scoped to the named note)')
+  .option('--target <ids>', 'Filter to incidences citing these note IDs or claim FQIDs (comma-separated). Requires --all.')
+  .option('--codes <codes>', 'Filter to incidences whose error code is in this comma-separated list')
+  .option('--refs-only', 'Suppress non-reference-resolution findings')
+  .option('--include-archived-as-valid', 'Treat archived-note references as valid (suppress reference-to-archived findings)')
+  .option('--include-soft-deleted-as-valid', 'Treat soft-deleted-note references as valid (suppress reference-to-soft-deleted findings)')
+  .action(async (
+    noteId: string | undefined,
+    options: {
+      reindex?: boolean;
+      json?: boolean;
+      includeTombstonedDerives?: boolean;
+      all?: boolean;
+      code?: boolean;
+      target?: string;
+      codes?: string;
+      refsOnly?: boolean;
+      includeArchivedAsValid?: boolean;
+      includeSoftDeletedAsValid?: boolean;
+      projectDir?: string;
+    },
+  ) => {
     try {
+      // DC.24 pre-validation: --target on per-note form is rejected.
+      // Per Section 6 Finding #3: verbatim condition `options.target && !options.all`
+      // catches BOTH (noteId + --target) and (bare --target with no noteId).
+      // This check MUST fire before DC.23's noteId-vs-all validation so the
+      // user sees the specific incompatibility, not a generic flag error.
+      // @implements {DD022.§10.5.DC.24} per-note + --target rejected
+      if (options.target && !options.all) {
+        throw new Error('--target requires --all (project-wide reverse lookup is incoherent on a per-note scope)');
+      }
+
+      // DC.23: exactly one of noteId or --all.
+      // @implements {DD022.§10.5.DC.23} argument relaxation + exactly-one validation
+      if (noteId && options.all) {
+        throw new Error('Provide a note ID or --all, not both.');
+      }
+      if (!noteId && !options.all) {
+        throw new Error('Provide a note ID or --all.');
+      }
+
       await BaseCommand.execute(
         {
           projectDir: options.projectDir,
           requireNoteManager: true,
         },
         async (context) => {
+          // -------------------------------------------------------------
+          // Project-wide audit branch — runs runProjectWideAudit and exits.
+          // @implements {DD022.§10.5.DC.22} --all dispatch to orchestrator
+          // -------------------------------------------------------------
+          if (options.all) {
+            const auditOptions: AuditOptions = {
+              code: options.code ?? false,
+              ...(options.target
+                ? {
+                    target: options.target
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter((s) => s.length > 0),
+                  }
+                : {}),
+              ...(options.codes
+                ? {
+                    codes: options.codes
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter((s) => s.length > 0),
+                  }
+                : {}),
+              refsOnly: options.refsOnly ?? false,
+              includeArchivedAsValid: options.includeArchivedAsValid ?? false,
+              includeSoftDeletedAsValid: options.includeSoftDeletedAsValid ?? false,
+              json: options.json ?? false,
+            };
+            await runProjectWideAudit(context.projectManager, auditOptions);
+            return;
+          }
+
+          // -------------------------------------------------------------
+          // Per-note path — unchanged behavior + new optional --code,
+          // --refs-only, --codes handling at the end.
+          // -------------------------------------------------------------
           const noteManager = context.projectManager.noteManager;
           if (!noteManager) {
             throw new Error('Note manager not initialized');
           }
+          // TypeScript: noteId is narrowed to string by the DC.23 check above.
+          const targetNoteId = noteId as string;
 
           // Read note content — use aggregated contents so that folder notes
           // have claims from companion sub-files included.
-          const content = await noteManager.getAggregatedContents(noteId);
+          const content = await noteManager.getAggregatedContents(targetNoteId);
           if (content === null) {
-            throw new Error(`Note not found: ${noteId}`);
+            throw new Error(`Note not found: ${targetNoteId}`);
           }
 
           // Build and validate claim tree for this note
@@ -58,19 +142,19 @@ export const lintCommand = new Command('lint')
           // Collect index-level errors that pertain to this note
           const indexErrors = indexData.errors.filter((e) => {
             // Errors whose claimId starts with the noteId
-            return e.claimId.startsWith(noteId + '.') || e.message.includes(`note ${noteId}`);
+            return e.claimId.startsWith(targetNoteId + '.') || e.message.includes(`note ${targetNoteId}`);
           });
 
           // @implements {R005.§2.AC.07} Validate multiple lifecycle tags on same claim
           // @implements {R005.§2.AC.06} Validate supersession target resolves in index
           // @implements {R005.§2.AC.05} Warn when removed claims have incoming cross-references
-          const lifecycleErrors = validateLifecycleTags(noteId, indexData);
+          const lifecycleErrors = validateLifecycleTags(targetNoteId, indexData);
 
           // @implements {R006.§5.AC.01} Validate derivation links
           // @implements {R006.§5.AC.02} Detect deep derivation chains
           // @implements {R006.§5.AC.03} Detect partial derivation coverage
           const claimIndex = context.projectManager.claimIndex;
-          const derivationErrors = validateDerivationLinks(noteId, indexData, claimIndex);
+          const derivationErrors = validateDerivationLinks(targetNoteId, indexData, claimIndex);
 
           // (c) consumer-synthesis: walk inline-ref crossRefs from this note
           // where the resolved target is archived. Synthesizes
@@ -79,11 +163,11 @@ export const lintCommand = new Command('lint')
           // @implements {DD021.§10.DC.06} consumer-side synthesis of reference-to-archived
           // @implements {R015.§1.AC.04b} lint downgrades archived-citation to warning
           // @implements {DD021.§10.DC.09} parallel-emit
-          const inlineArchiveErrors = collectInlineRefArchiveSynthesis(noteId, indexData);
+          const inlineArchiveErrors = collectInlineRefArchiveSynthesis(targetNoteId, indexData);
 
           // @implements {R011.§3.AC.06} Validate alias-prefixed references in this note
           const aliasReferenceErrors = await validateAliasReferences(
-            noteId,
+            targetNoteId,
             indexData,
             context.projectManager,
           );
@@ -91,11 +175,13 @@ export const lintCommand = new Command('lint')
           // @implements {DD020.§5.DC.02} opt-in tombstoned-target audit
           // Silent by default; only collected when the flag is passed.
           const tombstonedAuditErrors = options.includeTombstonedDerives
-            ? collectTombstonedTargetAudit(noteId, indexData)
+            ? collectTombstonedTargetAudit(targetNoteId, indexData)
             : [];
 
           // Merge errors, deduplicating by line + type
-          const allErrors = [...treeErrors];
+          // Section 6 Finding #5: `let allErrors` (was `const`) so the
+          // post-merge filter steps below can reassign.
+          let allErrors: ClaimTreeError[] = [...treeErrors];
           const seen = new Set(treeErrors.map((e) => `${e.line}:${e.type}`));
           for (const err of indexErrors) {
             const key = `${err.line}:${err.type}`;
@@ -142,12 +228,64 @@ export const lintCommand = new Command('lint')
             }
           }
 
+          // -------------------------------------------------------------
+          // DC.25 per-note --code: scan source-code annotations targeting
+          // the named note and merge them into allErrors via the shim.
+          // -------------------------------------------------------------
+          // @implements {DD022.§10.5.DC.25} per-note --code source-scan
+          // @implements {DD022.§10.5.DC.26} --code requires source-code integration
+          if (options.code) {
+            const scanner = context.projectManager.sourceScanner;
+            if (!scanner || !scanner.isReady()) {
+              throw new Error(
+                '--code requires source-code integration to be enabled in scepter.config.json (sourceCodeIntegration.enabled = true)',
+              );
+            }
+            const projectRoot = scanner.getProjectPath();
+            const noteSourceRefs = scanner.getReferencesToNote(targetNoteId);
+            for (const ref of noteSourceRefs) {
+              const inc = processSourceReference(ref, indexData, projectRoot);
+              if (inc !== null) {
+                allErrors.push(incidenceRecordToClaimTreeError(inc));
+              }
+            }
+          }
+
+          // -------------------------------------------------------------
+          // DC.16 per-note --refs-only / --codes: post-merge filtering.
+          // -------------------------------------------------------------
+          // @implements {DD022.§10.5.DC.22} per-note accepts --refs-only / --codes
+          if (options.refsOnly) {
+            allErrors = allErrors.filter((e) =>
+              REFERENCE_FAMILY_CODES.has(e.type as IncidenceCode),
+            );
+          }
+          if (options.codes) {
+            const codeList = options.codes
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
+            const recognized = new Set<string>([
+              ...REFERENCE_FAMILY_CODES,
+              ...CLAIM_ERROR_CODES,
+            ]);
+            const unknown = codeList.filter((c) => !recognized.has(c));
+            if (unknown.length > 0) {
+              throw new Error(
+                `Unknown error code(s): ${unknown.join(', ')}. ` +
+                  `Recognized codes: ${Array.from(recognized).sort().join(', ')}`,
+              );
+            }
+            const codesSet = new Set(codeList);
+            allErrors = allErrors.filter((e) => codesSet.has(e.type));
+          }
+
           if (options.json) {
-            console.log(JSON.stringify({ noteId, errors: allErrors, tree: treeResult.roots }, null, 2));
+            console.log(JSON.stringify({ noteId: targetNoteId, errors: allErrors, tree: treeResult.roots }, null, 2));
             return;
           }
 
-          console.log(chalk.bold(`Lint results for ${chalk.cyan(noteId)}`));
+          console.log(chalk.bold(`Lint results for ${chalk.cyan(targetNoteId)}`));
           console.log('');
 
           // Show claim tree
@@ -635,4 +773,26 @@ export async function validateAliasReferences(
   }
 
   return errors;
+}
+
+/**
+ * Convert a source-site IncidenceRecord into a ClaimTreeError shape so the
+ * existing per-note `formatLintResults` renderer can display it alongside
+ * structural errors. Used by the per-note `--code` branch to merge source
+ * citations into the `allErrors` array without touching the formatter.
+ *
+ * @implements {DD022.§10.5.DC.25} shim for IncidenceRecord → ClaimTreeError
+ */
+function incidenceRecordToClaimTreeError(inc: IncidenceRecord): ClaimTreeError {
+  if (inc.site.kind !== 'source-site') {
+    throw new Error('incidenceRecordToClaimTreeError: expected source-site incidence');
+  }
+  return {
+    type: inc.code as ClaimTreeError['type'],
+    claimId: inc.targetRaw,
+    line: inc.site.line,
+    message: `Source-code annotation @${inc.site.annotationType} {${inc.targetRaw}} in ${inc.site.relativePath}:${inc.site.line}`,
+    ...(inc.targetNoteId !== undefined ? { noteId: inc.targetNoteId } : {}),
+    noteFilePath: inc.site.filePath,
+  };
 }

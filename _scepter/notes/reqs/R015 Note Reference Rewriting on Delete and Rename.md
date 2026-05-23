@@ -385,6 +385,7 @@ The VS Code extension's reference-resolution surface MUST recognize tombstoned r
 - {DD020} — Reference Rewriting on Delete and Rename - Implementation Blueprint (primary detailed design realizing the §1–§9 rewriter behavior)
 - {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (consumes the §1.AC.04a–c archive-lifecycle behavior — archived notes stay in-index for resolution, distinct `reference-to-archived` error code; AC.04a is realized by {DD021.§10.DC.05} (resolver `includeArchived` option), {DD021.§10.DC.16} (`ensureIndex` loads archived notes), and {DD021.§10.DC.17} (`ClaimIndexEntry.archived` field); AC.04b is realized by {DD021.§10.DC.06} (`reference-to-archived` failure code); added 2026-05-20)
 - {T004} — Remove stubbed deleted reference-update subsystem (followup cleanup surfaced during the R015/DD020 implementation cycle; scheduled removal of the existing `#deleted` reference-update path that builds in-memory maps without persisting; runs independently after this requirement lands)
+- {R016} — Project-Wide Reference Audit via `scepter lint` (the AUDIT complement to this requirement's IDEAL rewriter path; catches references that slipped past the rewriter — manual deletes, off-CLI renames, archived-note citations the author wants to follow up on. §1.AC.04a–c, §2.AC.01, §5.AC.01, §9.AC.07 are the rewriter rules whose survival the audit sweep checks; added 2026-05-22)
 
 ## Status
 

@@ -93,11 +93,14 @@ export interface NoteWithContent {
   content: string;
   /**
    * Note's tag set, surfaced from `Note.tags`. Used by `ClaimIndex.build()`
-   * to populate `ClaimIndexEntry.archived` per {DD021.§10.DC.17} from
-   * `tags.includes('archived')`. Optional for backward compatibility with
-   * older callers; when absent, entries have `archived: false`.
+   * to populate `ClaimIndexEntry.archived` (from `tags.includes('archived')`)
+   * per {DD021.§10.DC.17} and `ClaimIndexEntry.softDeleted` (from
+   * `tags.includes('deleted')`) per {DD022.§8}. Optional for backward
+   * compatibility with older callers; when absent, entries have
+   * `archived: false` and `softDeleted: false`.
    *
    * @implements {DD021.§10.DC.17} NoteWithContent.tags plumbing
+   * @see {DD022.§8} softDeleted prerequisite — populated from `tags.includes('deleted')`
    */
   tags?: string[];
 }
@@ -179,6 +182,19 @@ export interface ClaimIndexEntry {
    * @implements {DD021.§10.DC.17} archived field on ClaimIndexEntry
    */
   archived: boolean;
+  /**
+   * Whether the source note is soft-deleted (carries the `deleted` tag).
+   * Populated at entry construction from `NoteWithContent.tags`.
+   *
+   * Soft-deleted note entries remain in the index when `ensureIndex` passes
+   * `includeDeleted: true`. The audit consumer ({DD022.§10.2.DC.07}) branches
+   * on this field to synthesize `reference-to-soft-deleted` for resolved
+   * citations whose target note is soft-deleted — mirroring the (c)
+   * consumer-synthesis pattern used for `archived` per {DD021.§10.DC.06}.
+   *
+   * @see {DD022.§8} Soft-deleted lifecycle field on ClaimIndexEntry — prerequisite for DC.07 synthesis path.
+   */
+  softDeleted: boolean;
   noteType: string;          // e.g., "Requirement"
   noteFilePath: string;
 }
@@ -456,6 +472,8 @@ export class ClaimIndex {
           unresolvedDerivationTargets: [],
           // @implements {DD021.§10.DC.17} archived field populated from note tags
           archived: note.tags?.includes('archived') ?? false,
+          // @see {DD022.§8} softDeleted field populated from note tags ('deleted')
+          softDeleted: note.tags?.includes('deleted') ?? false,
           noteType: note.type,
           noteFilePath: note.filePath,
         };

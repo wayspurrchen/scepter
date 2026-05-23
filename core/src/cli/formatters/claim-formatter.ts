@@ -860,7 +860,9 @@ export function formatLintResults(errors: ClaimTreeError[]): string {
 }
 
 /**
- * Color-code error types for display.
+ * Color-code error types for display. The canonical mapping from code to
+ * colored tag — consumed by the per-note lint formatter (`formatLintResults`)
+ * and the project-wide audit human formatter ({DD022.§10.4.DC.19}).
  *
  * @implements {R005.§2.AC.05} reference-to-removed displayed as warning
  * @implements {R005.§2.AC.06} invalid-supersession-target displayed as error
@@ -869,7 +871,7 @@ export function formatLintResults(errors: ClaimTreeError[]): string {
  * @implements {R006.§5.AC.02} deep-derivation-chain and circular-derivation displayed
  * @implements {R006.§5.AC.03} partial-derivation-coverage displayed as warning
  */
-function formatErrorType(type: string): string {
+export function formatErrorType(type: string): string {
   switch (type) {
     case 'duplicate':
       return chalk.red('[DUPLICATE]');
@@ -930,6 +932,9 @@ function formatErrorType(type: string): string {
       return chalk.yellow('[DERIVES-FROM-SUPERSEDED]');
     case 'derivation-target-ambiguous':
       return chalk.red('[DERIVES-AMBIGUOUS]');
+    // @implements {DD022.§7.OQ.03} reference-to-soft-deleted color tag
+    case 'reference-to-soft-deleted':
+      return chalk.yellow('[SOFT-DELETED-REF]');
     // ---- Legacy cross-project codes: gray -> red for transition-window consistency ----
     // Per §5 ISSUE 11: today's `cross-project-derives`/`-superseded` fall
     // through to default `chalk.gray`; bring them in line with the new

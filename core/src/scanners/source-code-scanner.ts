@@ -76,6 +76,15 @@ export class SourceCodeScanner extends EventEmitter {
   }
 
   /**
+   * Project root path the scanner was constructed with. Used by downstream
+   * consumers (e.g., `core/src/claims/audit/incidence-collector.ts:collectSourceIncidences`)
+   * to derive `relativePath` for source-site incidence records.
+   */
+  getProjectPath(): string {
+    return this.projectPath;
+  }
+
+  /**
    * Scan all configured source directories
    *
    * Side effects:

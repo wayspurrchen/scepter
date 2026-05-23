@@ -152,3 +152,4 @@ The linter MUST validate derivation metadata.
 - {DD001} — Detailed design for {R004} (integration context)
 - {DD002} — Detailed design for {R005} (metadata parser integration context)
 - {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (realizes §1.AC.05 bare-note-id rejection, §4.AC.04 trace surfaces unresolved derives, §5.AC.04 shared resolver between lint/trace, §5.AC.05 `claims dependents` command; added 2026-05-20)
+- {R016} — Project-Wide Reference Audit via `scepter lint` (adjacent surface to §5.AC.05's `claims dependents` — both are reverse-lookup surfaces over the citation graph but distinct in direction and binding per {R016.§6.AC.02}: `dependents` lists derivation-graph edges against a LIVE target claim; R016's `--target` filter surfaces resolution incidences against potentially-absent targets across the audit sweep. Neither subsumes the other; added 2026-05-22)

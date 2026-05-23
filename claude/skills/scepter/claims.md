@@ -660,6 +660,85 @@ scepter claims stale --importance 4          # Filter by importance
 3. **After coding**: Run `trace` again. Verify the Source column shows your files. Run `gaps` to check for holes.
 4. **When investigating claims**: Use `thread` to trace derivation chains and `search` to find related claims. Do not grep the notes directory — the CLI resolves cross-references that raw text search cannot.
 
+### Project-Wide Reference Audit (R016 / DD022)
+
+For project-wide cleanup workflows — "which deleted/archived notes are still cited across notes and source code?" — `scepter lint` accepts an `--all` flag that ranges the per-note error-code taxonomy over every note in the project, with an opt-in source-code scan.
+
+```bash
+# Project-wide sweep over note citations
+scepter lint --all                                    # Notes only
+scepter lint --all --code                             # Notes + source-code annotations
+
+# Reverse-lookup filter — target MAY be a note that no longer exists
+scepter lint --all --target R042                      # Every citation of R042 (any claim)
+scepter lint --all --target R042,R057                 # Multiple targets, comma-separated
+scepter lint --all --target R042.§1.AC.03             # Claim-level target (exact match only)
+
+# Suppress non-reference structural findings
+scepter lint --all --refs-only
+
+# Filter to specific error codes
+scepter lint --all --codes reference-to-unknown-note,reference-to-archived
+
+# Machine-readable cleanup pipeline
+scepter lint --all --target R042 --refs-only --json | jq '.incidences[].site.filePath'
+
+# Lifecycle opt-outs (treat archived / soft-deleted as valid resolution targets)
+scepter lint --all --include-archived-as-valid
+scepter lint --all --include-soft-deleted-as-valid
+```
+
+**Per-note source-code citation lookup.** The per-note form `scepter lint <id>` accepts `--code` for the narrow "show source-code citations of this one note" case:
+
+```bash
+scepter lint R042 --code                              # Source citations of R042's claims
+scepter lint R042 --code --refs-only                  # Filter to reference-resolution findings
+```
+
+`--target` is REJECTED on the per-note form (a per-note scope cannot reverse-look-up an external target).
+
+**JSON contract.** `scepter lint --all --json` emits a stable, scriptable document:
+
+```json
+{
+  "scanned": { "notes": 49, "sourceFiles": 1342, "references": 5434 },
+  "incidences": [
+    {
+      "code": "reference-to-unknown-note",
+      "targetRaw": "R042.§1.AC.03",
+      "targetNoteId": "R042",
+      "site": {
+        "kind": "note-site",
+        "noteId": "DD007",
+        "claimId": "DD007.§3.DC.05",
+        "line": 142,
+        "sourceSnippet": "",
+        "filePath": "/abs/path/to/note.md"
+      }
+    }
+  ]
+}
+```
+
+The `IncidenceRecord` TypeScript type at `core/src/claims/audit/incidence-collector.ts` is the canonical specification of the JSON shape. Field renames, removals, or insertions are breaking changes. Field order is deterministic across invocations.
+
+**Error codes.** The audit emits the `{R004.§4.AC.07}` reference-resolution taxonomy plus `reference-to-soft-deleted` (per DD022 OQ.03 disposition):
+
+- `reference-to-unknown-note` — cited note ID is absent from the project
+- `reference-to-undefined-claim` — note exists but the claim is undefined
+- `reference-to-archived` — citation resolves to an archived note
+- `reference-to-soft-deleted` — citation resolves to a soft-deleted note
+- `malformed-claim-reference` — citation didn't parse as a ClaimAddress
+- `derivation-target-bare-note-id` — `derives=` value is a bare note ID
+- `derivation-target-cross-project` — `derives=` value is alias-prefixed
+- `derivation-target-removed` — `derives=` resolved to a `:removed` claim
+- `derivation-target-superseded` — `derives=` resolved to a `:superseded` claim
+- `derivation-target-ambiguous` — `derives=` resolved ambiguously
+
+Non-reference structural codes (`duplicate`, `non-monotonic`, `multiple-lifecycle`, etc.) are also emitted by default; `--refs-only` suppresses them. The full set lives in `ClaimErrorCode` at `core/src/parsers/claim/claim-tree.ts`.
+
+**Tombstones and cross-project citations.** Tombstoned references (`_deleted_<ID>_at_<TS>` markers from R015) MUST NOT be flagged by the audit under any combination of flags — they're a recognized lifecycle state, not a resolution failure. Cross-project (alias-prefixed) citations are excluded from the audit per R011 — they're read-only display pointers, not local resolution failures.
+
 ### How Traceability Works Mechanically
 
 The trace matrix is built from two data sources, both **scoped to the local project**. Cross-project (alias-prefixed) references are tracked separately and never enter the local matrix — the peer's data flows OUT only at display time, the local data does not flow in. Understanding what the matrix measures is essential: if you don't know how coverage is detected, you'll add annotations that appear correct but are invisible to the system.

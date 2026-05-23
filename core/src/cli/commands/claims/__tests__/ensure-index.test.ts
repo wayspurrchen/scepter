@@ -67,9 +67,12 @@ const NOTE_MANAGER_SRC = readFileSync(
 describe('DD021.§10.DC.16: ensureIndex passes includeArchived: true to noteManager.getNotes()', () => {
   it('ensure-index.ts source contains the includeArchived: true call', () => {
     // The exact call signature documented at DD021.§10.DC.16 — the
-    // loader MUST invoke getNotes with this option bag.
+    // loader MUST invoke getNotes with includeArchived: true. Other
+    // options on the same call (e.g., includeDeleted: true from
+    // {DD022.§8}) are permitted; the assertion only fixes the
+    // includeArchived flag.
     expect(ENSURE_INDEX_SRC).toMatch(
-      /noteManager\.getNotes\(\s*\{\s*includeArchived:\s*true\s*\}\s*\)/,
+      /noteManager\.getNotes\(\s*\{[^}]*\bincludeArchived:\s*true\b[^}]*\}\s*\)/,
     );
   });
 
@@ -188,7 +191,7 @@ describe('ensureIndex end-to-end: includeArchived flag propagates and archived n
 
     await ensureIndex(pm);
     expect(getNotesCalls.length).toBeGreaterThanOrEqual(1);
-    expect(getNotesCalls[0]).toEqual({ includeArchived: true });
+    expect(getNotesCalls[0]).toEqual({ includeArchived: true, includeDeleted: true });
   });
 
   it('archived notes appear in the resulting index after ensureIndex', async () => {
@@ -297,6 +300,6 @@ describe('ensureIndex end-to-end: includeArchived flag propagates and archived n
     // Forcing reindex bypasses cache; flag MUST still be passed.
     await ensureIndex(pm, { reindex: true });
     expect(getNotesCalls.length).toBe(2);
-    expect(getNotesCalls[1]).toEqual({ includeArchived: true });
+    expect(getNotesCalls[1]).toEqual({ includeArchived: true, includeDeleted: true });
   });
 });

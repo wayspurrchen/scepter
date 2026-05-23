@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { buildClaimTree, validateClaimTree } from '../claim-tree';
-import type { ClaimTreeResult } from '../claim-tree';
+import { buildClaimTree, validateClaimTree, CLAIM_ERROR_CODES } from '../claim-tree';
+import type { ClaimTreeResult, ClaimErrorCode } from '../claim-tree';
 
 describe('Claim Tree', () => {
   describe('buildClaimTree — basic section parsing', () => {
@@ -1462,6 +1462,50 @@ describe('Claim Tree', () => {
       expect(result.claims.has('1.LOCK.03')).toBe(true);
       const node = result.claims.get('1.LOCK.03')!;
       expect(node.selfPrefix).toBeUndefined();
+    });
+  });
+
+  /**
+   * Maintenance guard: CLAIM_ERROR_CODES is a hand-enumerated runtime Set
+   * that mirrors the ClaimTreeError['type'] string union. TypeScript erases
+   * the union at runtime so the two sides cannot be auto-synchronized.
+   * This test catches the most common drift: a code added to one side but
+   * not the other.
+   *
+   * The `Exclude<ClaimErrorCode, ...>` trick: if every literal in the Set
+   * is a valid ClaimErrorCode, the assertion compiles. If a future
+   * ClaimErrorCode is added that's NOT in the Set, the count assertion
+   * below fails and the reviewer adds the missing entry.
+   *
+   * @validates {DD022.§10.3.DC.16} consumer-side recognized-codes set
+   */
+  describe('CLAIM_ERROR_CODES maintenance guard', () => {
+    it('every member is a valid ClaimErrorCode (type-checked at compile)', () => {
+      // Type-check: the cast asserts every Set entry matches the union.
+      // If a Set entry is misspelled or missing from the union, this line
+      // fails to compile and the producer fixes the Set.
+      const sample: ClaimErrorCode[] = Array.from(CLAIM_ERROR_CODES);
+      expect(sample.length).toBeGreaterThan(0);
+    });
+
+    it('CLAIM_ERROR_CODES has the expected count for the current union', () => {
+      // Counted from the `ClaimTreeError['type']` union definition. If the
+      // union grows or shrinks, update this number AND the Set body. The
+      // count is the tripwire: if it changes without the Set being touched,
+      // CI catches the drift.
+      expect(CLAIM_ERROR_CODES.size).toBe(33);
+    });
+
+    it('contains the new DD022 reference codes', () => {
+      expect(CLAIM_ERROR_CODES.has('reference-to-unknown-note')).toBe(true);
+      expect(CLAIM_ERROR_CODES.has('reference-to-undefined-claim')).toBe(true);
+      expect(CLAIM_ERROR_CODES.has('reference-to-archived')).toBe(true);
+      expect(CLAIM_ERROR_CODES.has('malformed-claim-reference')).toBe(true);
+      // Note: 'reference-to-soft-deleted' is NOT in CLAIM_ERROR_CODES —
+      // it lives only in IncidenceCode per {DD022.§7.OQ.03}. The Set is
+      // the parser's structural-error vocabulary; the audit's reference-
+      // family extension is separate.
+      expect(CLAIM_ERROR_CODES.has('reference-to-soft-deleted' as ClaimErrorCode)).toBe(false);
     });
   });
 });

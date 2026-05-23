@@ -434,6 +434,8 @@ The DCs in this section are the implementation-binding assertions for the module
 - {R004} — Claim-Level Addressability and Traceability System (resolver behavior ACs)
 - {R006} — Claim Derivation Tracing (bare-note-id stance, `claims dependents` ergonomic)
 - {R015} — Note Reference Rewriting on Delete and Rename (archive lifecycle)
+- {R016} — Project-Wide Reference Audit via `scepter lint` (forward-direction consumer of this DD's resolver outcomes; the audit sweep ranges the resolver over the project per {R016.§6.AC.01}, emitting the §3 {R004.§4.AC.07} error-code taxonomy as project-wide findings rather than per-reference outcomes; added 2026-05-22)
+- {DD022} — Project-Wide Reference Audit Lint Surface (forward-direction consumer DD; consumes `resolveReference()` per {DD022.§10.2.DC.09}; consumes the `ClaimCrossReference.resolverOutcome` field per {DD022.§10.2.DC.05}; follows the §10.DC.06 archive-synthesis pattern via {DD022.§10.2.DC.06} to synthesize a new `reference-to-soft-deleted` code without widening the `ResolverFailureCode` union; reuses `includeArchived` semantics; added 2026-05-23)
 - {S002} — Claim Reference Grammar (cross-tab specification consumed by the resolver)
 - `core/src/claims/claim-index.ts` — The current `resolveClaimAddress()` site replaced by this DD
 - `core/src/cli/commands/shared/resolve-claim-id.ts` — The current `resolveClaimInput()` site that this DD unifies with the above

@@ -95,6 +95,23 @@ export type {
   ClaimThreadOptions,
 } from './claim-thread.js';
 
+// Audit (project-wide reference audit) — DD022
+// @implements {DD022.§10.6.DC.27} Barrel re-exports for the audit public surface
+export { runProjectWideAudit } from './audit/run-audit.js';
+
+export type {
+  AuditOptions,
+  AuditScanned,
+} from './audit/run-audit.js';
+
+export { REFERENCE_FAMILY_CODES } from './audit/incidence-collector.js';
+
+export type {
+  IncidenceRecord,
+  IncidenceCode,
+  IncidenceSite,
+} from './audit/incidence-collector.js';
+
 // Confidence markers
 // @see {DD016.§1.DC.06} barrel re-export contract — these names are
 //   preserved as legacy-compat wrappers around the new adapter registry

@@ -18,10 +18,12 @@ export type {
 export {
   buildClaimTree,
   validateClaimTree,
+  CLAIM_ERROR_CODES,
 } from './claim-tree';
 
 export type {
   ClaimNode,
   ClaimTreeResult,
   ClaimTreeError,
+  ClaimErrorCode,
 } from './claim-tree';

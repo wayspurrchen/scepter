@@ -397,3 +397,4 @@ Specified in {S002.§3.1.AC.02}.
 - {R005.§3} — Claim-level verification events (complements file-level confidence)
 - {DD001} — Claim-Level Addressability and Traceability (primary detailed design for this requirement)
 - {DD021} — Unified Reference Resolver and Failure-Mode Taxonomy (realizes §4.AC.07 error-code taxonomy split, §4.AC.08 shared lint/trace resolver, §4.AC.09 section-less reference resolution, §5.AC.05 trace surfaces unresolved citations; added 2026-05-20)
+- {R016} — Project-Wide Reference Audit via `scepter lint` (downstream consumer of §4.AC.07's error-code taxonomy and §4.AC.08's shared resolver; ranges the per-reference taxonomy over the project as a project-wide audit sweep; added 2026-05-22)
