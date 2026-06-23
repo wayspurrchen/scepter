@@ -236,6 +236,9 @@ export type {
 
 §DC.05:derives=A003.§3.AC.05 The barrel MUST NOT import from `core/src/cli/`, `core/src/llm/`, or `core/src/chat/` — these are CLI-specific or have external service dependencies.
 
+<!-- stale-for: claim text references `core/src/chat/` (deleted by {T010}, 2026-06-23) and characterizes `core/src/llm/` as having "external service dependencies" — after T010, llm/ holds only the dependency-free `types.ts` seam. The MUST-NOT is still satisfied (the barrel imports from neither); only the path enumeration and rationale are stale. See {T010} for current source state. Flagged for human review — do not rewrite without confirming intent. -->
+
+
 The barrel re-exports from existing subsystem barrels where they exist, and directly from source files otherwise.
 
 ### Export Inventory by Subsystem
@@ -440,6 +443,8 @@ All symbols from `types/index.ts` are re-exported. See the `core/src/types/index
 ### Explicitly Excluded from the Barrel
 
 §DC.06:derives=A003.§3.AC.06 The following modules are internal and MUST NOT appear in the top-level barrel.
+
+<!-- stale-for: the `chat/*` row names a directory deleted by {T010} (2026-06-23); the `llm/*` reason "External service dependencies (Claude SDK, OpenAI)" no longer holds — after T010, llm/ contains only the dependency-free `types.ts` seam, and `tasks/task-dispatcher.ts` still consumes that seam (not a live LLM backend). The exclusion intent (keep these out of the public barrel) is unaffected; the reasons and the `chat/*` row are stale. See {T010}. Flagged for human review — do not rewrite without confirming intent. -->
 
 | Module | Reason |
 |--------|--------|
@@ -861,7 +866,9 @@ tsup generates declaration files from all entry points when `dts: true`. No addi
 
 **Will the barrel cause bundlers to pull in everything?**
 
-The barrel `core/src/index.ts` imports from domain modules only. It does not import from `cli/`, `llm/`, or `chat/`. So at the module graph level, CLI dependencies (Commander.js, chalk) are not reachable from the library entry point.
+The barrel `core/src/index.ts` imports from domain modules only. It does not import from `cli/`, `llm/`, or `chat/`. So at the module graph level, CLI dependencies (Commander.js, chalk) are not reachable from the library entry point. <!-- note: `chat/` was deleted by {T010} (2026-06-23); this prose predates that and names it as a still-present exclusion target. Statement remains true (a deleted dir cannot be imported); path reference is historical. -->
+
+The DC.11 *claim* (avoid pulling CLI deps into consumer bundles) is unaffected by {T010}.
 
 However, some domain classes extend `EventEmitter` and import `fs`, `fs-extra`, `chokidar`, `gray-matter`, etc. These are Node.js runtime dependencies that any consumer of the domain logic will need. This is expected -- the library is a Node.js library, not a browser library.
 

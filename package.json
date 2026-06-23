@@ -1,7 +1,30 @@
 {
-  "name": "scepter",
+  "name": "@wayspurrchen/scepter",
   "version": "0.1.0",
-  "private": true,
+  "description": "SCEpter — a CLI-first knowledge management system for AI-assisted development. Captures atomic project knowledge as a graph of cross-referenced notes with claim-level traceability.",
+  "keywords": [
+    "scepter",
+    "knowledge-management",
+    "zettelkasten",
+    "ai",
+    "cli",
+    "traceability",
+    "requirements",
+    "documentation"
+  ],
+  "license": "MIT",
+  "author": "Way Spurr-Chen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wayspurrchen/scepter.git"
+  },
+  "homepage": "https://github.com/wayspurrchen/scepter#readme",
+  "bugs": {
+    "url": "https://github.com/wayspurrchen/scepter/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./core/dist/index.js",
   "module": "./core/dist/index.mjs",
   "types": "./core/dist/index.d.ts",
@@ -29,7 +52,18 @@
     }
   },
   "bin": {
-    "scepter": "./scepter"
+    "scepter": "./core/dist/cli.js"
+  },
+  "files": [
+    "core/dist/**/*.js",
+    "core/dist/**/*.mjs",
+    "core/dist/**/*.d.ts",
+    "core/dist/**/*.d.mts",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "cd core && tsup",
@@ -41,11 +75,10 @@
     "test": "cd core && vitest",
     "test:watch": "cd core && vitest --watch",
     "test:integration": "cd core && vitest run --config vitest.integration.config.ts --reporter=verbose",
-    "test:integration:watch": "cd core && vitest --config vitest.integration.config.ts --reporter=verbose"
+    "test:integration:watch": "cd core && vitest --config vitest.integration.config.ts --reporter=verbose",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1.0.35",
-    "@anthropic-ai/sdk": "^0.56.0",
     "@paralleldrive/cuid2": "^2.2.2",
     "chalk": "^5.3.0",
     "chokidar": "^4.0.3",
@@ -54,14 +87,10 @@
     "commander": "^11.1.0",
     "fs-extra": "^11.3.0",
     "gray-matter": "^4.0.3",
-    "handlebars": "^4.7.8",
     "js-yaml": "^4.1.1",
     "minimatch": "^10.0.3",
-    "openai": "^5.8.2",
-    "prettier": "^3.6.1",
     "proper-lockfile": "^4.1.2",
     "uuid": "^11.1.0",
-    "vitest": "^3.2.4",
     "zod": "^3.25.70"
   },
   "devDependencies": {
@@ -72,10 +101,12 @@
     "@types/uuid": "^10.0.0",
     "eslint": "^9.29.0",
     "glob": "^11.0.3",
+    "prettier": "^3.6.1",
     "rimraf": "^6.0.1",
     "tsup": "^8.5.0",
     "tsx": "^4.6.2",
     "typescript": "^5.8.3",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   }
 }

@@ -1,6 +1,10 @@
-import { type SDKMessage } from '@anthropic-ai/claude-code';
 import type { ContextHints } from './context';
 import type { Note } from './note';
+
+// Conversation message record. Previously typed via @anthropic-ai/claude-code's SDKMessage;
+// that dependency was removed along with the interactive LLM/chat subsystem, so the history
+// is kept as an opaque record array for any consumer that injects an llmFunction seam.
+export type SDKMessage = Record<string, unknown>;
 
 // Task definition
 export interface Task {
