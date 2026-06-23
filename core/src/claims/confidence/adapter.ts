@@ -9,6 +9,7 @@ import type {
   ConfidencePayload,
   ConfidenceLevel,
   ReviewerIcon,
+  ConfidenceParseOptions,
 } from './types.js';
 
 /**
@@ -35,9 +36,21 @@ export interface ConfidenceAdapter {
   /**
    * Parse a confidence annotation out of file content. Returns null
    * when the content carries no recognized annotation. Never throws.
+   *
+   * The OPTIONAL `options.defaultReviewer` carries the resolved
+   * implied-human default ({R017}). When it is a reviewer value, a bare
+   * level digit with no leading emoji is attributed to that reviewer;
+   * when omitted/null, a bare digit does NOT parse (today's behavior).
+   *
    * @implements {S003.§1.AC.04}
+   * @implements {S003.§1.AC.08}
+   * @implements {DD016.§10.DC.50}
    */
-  parse(content: string, filePath: string): ConfidenceAnnotation | null;
+  parse(
+    content: string,
+    filePath: string,
+    options?: ConfidenceParseOptions,
+  ): ConfidenceAnnotation | null;
 
   /**
    * Render a payload as the adapter's annotation string. When date is

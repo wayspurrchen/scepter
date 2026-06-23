@@ -6,14 +6,16 @@ tags: [confidence, adapters, audit, mark, apply, auto-insert, test-plan]
 
 # TS001 - Confidence subsystem test plan
 
-**Spec:** {S003}, {S004} | **Requirements:** {R013} | **Designs:** {DD016}, {DD017}
-**Date:** 2026-05-05
+**Spec:** {S003}, {S004} | **Requirements:** {R013}, {R017} | **Designs:** {DD016}, {DD017}
+**Date:** 2026-05-05 (§12 added for {R017}: 2026-05-31)
 
 ## Context
 
 This test plan establishes the verification surface for the {R013} confidence-extension stack. {S003}/{DD016} introduce a pluggable adapter registry under `core/src/claims/confidence/` (replacing the monolithic `core/src/claims/confidence.ts`), with a typed `ConfidenceAdapter` interface, ordered first-match lookup, a re-expressed C-family adapter (with the {S003.§3.AC.05} three-branch insert behavior change), and a new markdown-frontmatter adapter built on `gray-matter`. {S004}/{DD017} build four command surfaces atop the registry: a multi-scope `audit` with `--paths`, a registry-routed `mark`, a new bulk `apply`, and a `NoteManager.createNote` auto-insert hook. The plan covers verification for the entire stack as a single coherent body of tests because the two specs share fixtures and adapter dispatch is the integration seam where most behavior emerges.
 
 The existing test file `core/src/claims/__tests__/confidence.test.ts` (312 lines, 5 describe blocks) is re-homed per {DD016.§9}: parse and validation cases survive byte-for-byte under new import paths; insert cases are revised to match the corrected three-branch behavior; a backward-compat parse case for legacy after-`*/` placement is added. This plan specifies the full target test surface — replacements, additions, and net-new files — not the migration mechanics.
+
+§12 (added for {R017}) covers the implied-human read-time defaulting policy: the emoji-optional parse grammar in both adapters ({S003.§6}/{DD016.§10}), the frontmatter YAML-number coercion, the `claims.confidence.impliedHuman` config flag and its default-active resolution, and the read-path consumers that thread the resolved `defaultReviewer` ({S004.§7}/{DD017.§8}). These tests extend the existing confidence test files rather than adding new ones. Origin task {T006}.
 
 ## Scope
 
@@ -29,6 +31,7 @@ The existing test file `core/src/claims/__tests__/confidence.test.ts` (312 lines
 - Auto-insert hook: idempotence, template precedence, `autoInsert: false` no-op, null-adapter no-op, throw isolation, scope to creation path, `includeDate` honor ({S004.§5}, {DD017.DC.30-33}).
 - Formatter behavior: per-scope sections, `--paths` TTY detection, apply summary, apply plan table ({DD017.DC.34-38}).
 - `includeDate` config flag end-to-end across mark, apply, and auto-insert ({R013.§1.AC.06}, {S004.§3.AC.03}).
+- Implied-human read-time policy ({R017}): the emoji-optional parse grammar in both adapters, the frontmatter YAML-number coercion, the `impliedHuman` config flag and its default-active resolution, and the read-path consumers (audit `byReviewer` tally, `apply --skip-annotated`, auto-insert precedence) that thread the resolved `defaultReviewer` ({S003.§6}, {S004.§7}, {DD016.§10}, {DD017.§8}).
 
 **Out of scope:**
 - Live integration tests against external services (none exist for this subsystem).
@@ -84,6 +87,7 @@ The map below shows which test plan section validates which upstream AC ranges. 
 | §9 Auto-insert hook | S004.§5.AC.01-07, DD017.DC.30-33 |
 | §10 Cross-cutting invariants | S003.§5.AC.01-05, R013.§1.AC.06 |
 | §11 Test execution | (process — invocation contract) |
+| §12 Implied-human read-time policy ({R017}) | S003.§6.AC.01-08, S004.§7.AC.01-08, DD016.§10.DC.50-55, DD017.§8.DC.40-45 |
 
 ## §1 Test infrastructure
 
@@ -313,6 +317,40 @@ AC.01 The full test suite MUST be invocable via `npm test` from the project root
 
 AC.02 The exit-status contract: a passing test run exits 0; any failed test exits non-zero. Pre-commit hooks invoking `npm test` (or the project's `verify` gate) MUST fail the commit on non-zero exit. This plan does NOT introduce a custom verification gate; it relies on the project's existing test-script invocation.
 
+## §12 Implied-human read-time policy tests ({R017})
+
+The {R017} implied-human policy widens both adapters' parse grammars on the read path and threads a resolved `defaultReviewer` through the read-path consumers. {S003.§6}/{DD016.§10} own the adapter-layer mechanism (emoji-optional grammar, the OPTIONAL `parse` `defaultReviewer` parameter, frontmatter YAML-number coercion); {S004.§7}/{DD017.§8} own the command-layer half (the `claims.confidence.impliedHuman` config flag, its default-active resolution, the per-consumer threading, and the audit `byReviewer` tally). These tests extend the EXISTING confidence test files rather than adding new ones — the policy is an additive read-time behavior layered on the adapters and consumers TS001 §2-§11 already cover. {R017}, {S003}, {S004}, {DD016}, {DD017}, {T006} are the upstream authority.
+
+### Adapter parse grammar (C-family and frontmatter)
+
+AC.01:5:derives=S003.§6.AC.01 The C-family adapter test file (`core/src/claims/confidence/__tests__/c-family.test.ts`) MUST contain a describe block exercising the emoji-optional grammar with `{defaultReviewer: '👤'}`: a bare `// @confidence 4` MUST parse to reviewer `👤` at level 4; the JSDoc carrier form ` * @confidence 3` MUST parse to `👤`/3; and a bare digit at every level 1-5 MUST parse to `👤` at that level. Each case names {S003.§6.AC.01} / {S003.§6.AC.03}.
+
+AC.02:derives=S003.§6.AC.05 The C-family test file MUST assert the inactive-policy outcome: a bare `// @confidence 4` parsed with NO options (and with `{defaultReviewer: null}`) MUST return `null` — today's behavior. This is the backward-compat opt-out at the adapter layer ({S003.§6.AC.05} / {DD016.§10.DC.51}).
+
+AC.03:derives=S003.§6.AC.04 The C-family test file MUST assert that a bare digit followed by an ISO date (`// @confidence 4 2026-05-31`) parses to `👤`/4 dated under the active policy, and that explicit `🤖2`/`👤4` annotations parse UNCHANGED with and without options (the explicit-emoji regression, {S003.§6.AC.02} / {S003.§6.AC.06}).
+
+AC.04:5:derives=S003.§6.AC.08 The markdown-frontmatter test file (`core/src/claims/confidence/__tests__/markdown-frontmatter.test.ts`) MUST contain a describe block covering: a YAML **string** `confidence: "4"` with policy active → `👤`/4; an unquoted YAML **number** `confidence: 4` with policy active → `👤`/4 via the YAML-integer coercion ({S003.§6.AC.08} / {DD016.§10.DC.53}); both the string and number forms with NO options → `null`; and the bare-digit-plus-date string `confidence: 4 2026-05-31` → `👤`/4 dated ({S003.§6.AC.04}).
+
+AC.05:derives=S003.§6.AC.08 The markdown-frontmatter test file MUST assert that out-of-range integers (`confidence: 6`, `confidence: 0`), a non-integer (`confidence: 4.5`), and YAML object / array / boolean confidence values all return `null` under BOTH policy states, and that explicit `🤖2`/`👤4` parse unchanged with and without options ({S003.§6.AC.02} / {S003.§6.AC.06} / {DD016.§10.DC.52}).
+
+AC.06:derives=S003.§6.AC.07 Both adapter test files MUST assert no validation coupling: a bare `1` and a bare `2` — levels below the writer-side human range 3-5 — MUST still parse to `👤` under the active policy. Parse MUST NOT consult the reviewer/level range table ({S003.§6.AC.07} / {DD016.§10.DC.54}).
+
+### Command-layer consumers (audit, apply, auto-insert)
+
+AC.07:4:derives=S004.§7.AC.04 The audit test file (`core/src/claims/confidence/__tests__/audit.test.ts`) MUST assert that with `impliedHuman` active, a source file carrying a bare-digit confidence annotation counts as `annotated` (not `unannotated`) and its level lands in `byLevel`; and that with `impliedHuman` inactive the same bare-digit file counts `unannotated` ({S004.§7.AC.04} / {DD017.§8.DC.41}).
+
+AC.08:4:derives=S004.§7.AC.05 The audit test file MUST assert that a bare-digit annotated file increments `byReviewer['👤']`, that `byReviewer` is summed across scopes in the top-level union, and that `byReviewer` is zero-initialized (`{ '🤖': 0, '👤': 0 }`) on every scope substructure of a run with no annotations ({S004.§7.AC.05} / {DD017.§8.DC.40}).
+
+AC.09:derives=S004.§7.AC.06 The confidence-formatter test file (`core/src/cli/formatters/__tests__/confidence-formatter.test.ts`) MUST assert that `renderScopeSection` emits the per-reviewer breakdown (a "By reviewer:" block with human/AI counts) per scope, and that the `--format json` path carries the additive `byReviewer` field at every scope ({S004.§7.AC.06} / {DD017.§8.DC.42}). The hand-rolled `ScopedAuditResult` fixtures in this file MUST include the `byReviewer` field so `renderScopeSection` does not throw.
+
+AC.10:derives=S004.§7.AC.07 The apply command test file (`core/src/cli/commands/confidence/__tests__/apply-command.test.ts`) MUST assert that with `impliedHuman` active, `apply --skip-annotated` classifies a file carrying a bare digit as `skip-annotated` and leaves it byte-identical on disk; and that with `impliedHuman` inactive the same file classifies `mark` (bare digit unrecognized) ({S004.§7.AC.07} / {DD017.§8.DC.44}).
+
+AC.11:derives=S004.§7.AC.08 The auto-insert hook test file (`core/src/notes/__tests__/auto-insert-hook.test.ts`) MUST assert that with `impliedHuman` active, a new note pre-seeded with a bare-digit `confidence` value is NOT overwritten by the auto-insert default — the precedence parse returns non-null, so the hand-typed bare digit survives and the `🤖2` default is not written ({S004.§7.AC.08} / {DD017.§8.DC.45}).
+
+### Configuration default
+
+AC.12:4:derives=S004.§7.AC.02 The config-validator test file (`core/src/config/config-validator.test.ts`) MUST assert that `claims.confidence.impliedHuman` is accepted as a boolean and rejected as a non-boolean, and — mirroring the `includeDate` default coverage — that the parsed `impliedHuman` value defaults to `true` when the confidence block omits it (asserted against the Zod schema directly) while an explicit `false` survives the default ({S004.§7.AC.01} / {S004.§7.AC.02} / {DD016.§10.DC.55}).
+
 ## Decisions
 
 ### Decision 1 — Fixture organization: per-section fixtures, not one shared tree
@@ -360,7 +398,8 @@ AC.02 The exit-status contract: a passing test run exits 0; any failed test exit
 | §9 Auto-insert hook | 8 |
 | §10 Cross-cutting invariants | 4 |
 | §11 Test execution | 2 |
-| **Total** | **79** |
+| §12 Implied-human read-time policy ({R017}) | 12 |
+| **Total** | **91** |
 
 ## Non-Goals
 
@@ -384,15 +423,21 @@ AC.02 The exit-status contract: a passing test run exits 0; any failed test exit
 - {S003.§3} — C-family adapter (including the §3.AC.05 three-branch insert correction and §3.AC.06 legacy-parse backward-compat).
 - {S003.§4} — Markdown frontmatter adapter.
 - {S003.§5} — Cross-cutting invariants.
+- {S003.§6} — Implied-human read-time parse grammar ({R017}): the emoji-optional grammar in both adapters, the `parse` `defaultReviewer` parameter, and the frontmatter YAML-number coercion. §12 verifies this surface.
 - {S004} — Command surface and creation hook specification.
 - {S004.§1} — Filter semantics (cross-cutting).
 - {S004.§2} — `confidence audit` multi-scope.
 - {S004.§3} — `confidence mark` adapter routing.
 - {S004.§4} — `confidence apply` bulk command.
 - {S004.§5} — Auto-insert on note creation.
+- {S004.§7} — Implied-human policy ({R017}): the `impliedHuman` config flag, its default-active resolution, the read-path consumer threading, and the audit `byReviewer` tally. §12 verifies this surface.
+- {R017} — Implied-human read-time confidence defaulting; the requirement §12 verifies. Origin task {T006}.
 - {DD016} — Adapter registry implementation; §9 mandates the test re-homing and the new C-family/frontmatter/registry test cases.
 - {DD016.§9.DC.46-49} — Explicit test-case enumeration for C-family insert, legacy parse compat, frontmatter coverage, and registry lookup.
+- {DD016.§10.DC.50-55} — Adapter-layer implementation of {R017}: the emoji-optional regexes, the `parse` `defaultReviewer` parameter, the frontmatter YAML-number coercion, the reaffirmed validation boundary, and the `impliedHuman` config slot. §12 verifies these DCs.
 - {DD017} — Command surface implementation; §2-§7 enumerate the DCs whose tests this plan covers.
+- {DD017.§8.DC.40-45} — Command-layer implementation of {R017}: the `byReviewer` audit tally, the flag resolution, and the `defaultReviewer` threading into the audit, apply, and auto-insert read-path consumers. §12 verifies these DCs.
+- {T006} — Origin task for {R017}: the scoping note carrying the design, decisions, and code touch-points.
 - `core/src/claims/__tests__/confidence.test.ts` — Existing 312-line test file; deleted and re-homed per Decision 3 and {DD016.§9}.
 - `core/src/cli/commands/__tests__/cross-project-commands.test.ts` — Command-level integration test pattern this plan follows for fixture-based testing under `.test-tmp/`.
 - `core/package.json` (root: `/Users/way/Projects/scepter/package.json`) — Test runner script (`npm test` → `cd core && vitest`); `vitest@^3.2.4` dependency.

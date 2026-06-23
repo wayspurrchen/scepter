@@ -318,12 +318,14 @@ const SCEpterConfigBaseSchema = z.object({
   // @implements {R004.§7.AC.03} Confidence config validation
   // @implements {R013.§1.AC.06} Date-inclusion config flag (Zod validation)
   // @implements {DD016.§8.DC.44} includeDate Zod field with .default(true)
+  // @implements {DD016.§10.DC.55} impliedHuman Zod field with .default(true)
   claims: z.object({
     bracelessMatching: z.boolean().optional().default(true),
     projectionTypes: z.array(z.string()).optional(),
     confidence: z.object({
       autoInsert: z.boolean().optional().default(true),
       includeDate: z.boolean().optional().default(true),
+      impliedHuman: z.boolean().optional().default(true),
     }).optional(),
   }).optional(),
   // Cross-project alias configuration. Key-shape validation runs as a

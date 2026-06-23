@@ -16,6 +16,7 @@ import { StatusValidator } from '../statuses/status-validator';
 import { parseNoteMentions } from '../parsers/note/note-parser';
 import { UnifiedDiscovery } from '../discovery/unified-discovery';
 import { getAdapter } from '../claims/confidence/registry';
+import type { ReviewerIcon } from '../claims/confidence/types';
 
 // Type definitions for the API
 export interface CreateNoteParams {
@@ -581,11 +582,19 @@ export class NoteManager extends EventEmitter {
    * emitted, and the method returns. Template-supplied confidence
    * values take precedence (parse-non-null → return).
    *
-   * @implements {S004.§5.AC.01-06}
+   * @implements {S004.§5.AC.01}
+   * @implements {S004.§5.AC.02}
+   * @implements {S004.§5.AC.03}
+   * @implements {S004.§5.AC.04}
+   * @implements {S004.§5.AC.05}
+   * @implements {S004.§5.AC.06}
    * @implements {DD017.DC.30}
    * @implements {DD017.DC.31}
    * @implements {DD017.DC.32}
    * @implements {DD017.DC.33}
+   * @implements {DD017.§8.DC.39} resolve impliedHuman ?? true
+   * @implements {DD017.§8.DC.39a} map to defaultReviewer ('👤' | null)
+   * @implements {DD017.§8.DC.45} thread defaultReviewer into the precedence parse
    */
   private async maybeAutoInsertConfidence(notePath: string): Promise<void> {
     // Step 1: read autoInsert flag; undefined → true (default).
@@ -605,10 +614,14 @@ export class NoteManager extends EventEmitter {
     }
 
     // Step 3: template precedence — if confidence already present, do
-    // not overwrite (parse non-null → return).
+    // not overwrite (parse non-null → return). {R017}: resolve impliedHuman
+    // (default active) and thread defaultReviewer so a pre-seeded bare
+    // digit parses non-null and is respected, not clobbered (DC.45).
+    const impliedHuman = config.claims?.confidence?.impliedHuman ?? true;
+    const defaultReviewer: ReviewerIcon | null = impliedHuman ? '👤' : null;
     let parsed: ReturnType<typeof adapter.parse>;
     try {
-      parsed = adapter.parse(content, notePath);
+      parsed = adapter.parse(content, notePath, { defaultReviewer });
     } catch {
       return;
     }

@@ -21,6 +21,8 @@
  * @validates {DD017.DC.26}
  * @validates {DD017.DC.27}
  * @validates {DD017.DC.28}
+ * @validates {S004.§7.AC.07} apply --skip-annotated skips a bare-digit file under active policy ({R017})
+ * @validates {DD017.§8.DC.44} defaultReviewer threaded into the skip-annotated parse
  * @validates {TS001.§8.AC.01}
  * @validates {TS001.§8.AC.02}
  * @validates {TS001.§8.AC.03}
@@ -30,6 +32,7 @@
  * @validates {TS001.§8.AC.07}
  * @validates {TS001.§8.AC.09}
  * @validates {TS001.§8.AC.10}
+ * @validates {TS001.§12.AC.10}
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -575,6 +578,82 @@ describe('S004.§4.AC.07: apply — per-file failure isolation', () => {
       }
     } finally {
       insertSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Implied-human policy in apply --skip-annotated ({R017}). S004.§7.AC.07 /
+// DD017.§8.DC.44 / TS001 §12.
+// ---------------------------------------------------------------------------
+
+describe('S004.§7.AC.07: apply --skip-annotated under the implied-human policy', () => {
+  let ctx: TestContext;
+
+  afterEach(async () => {
+    if (ctx) await fs.remove(ctx.projectPath);
+  });
+
+  it('with policy active, --skip-annotated skips a file carrying a bare digit (not overwritten)', async () => {
+    // autoInsert off so the fixture state is exactly as seeded; impliedHuman
+    // explicitly active so a bare digit parses non-null and classifies skip.
+    ctx = await setupFullTestProject('apply-implied-skip', {
+      ...APPLY_TEST_CONFIG,
+      claims: { confidence: { autoInsert: false, impliedHuman: true } },
+    });
+    const abs = await seedSource(
+      ctx,
+      'core/src/bare-digit.ts',
+      '// @confidence 4\nconst x = 1;\nexport {};\n',
+    );
+    const before = await fs.readFile(abs, 'utf-8');
+
+    const result = await executeApply(ctx.projectManager!, {
+      reviewerArg: 'ai',
+      levelArg: '2',
+      filters: { glob: 'core/src/**/*.ts' },
+      skipAnnotated: true,
+      overwrite: false,
+      dryRun: false,
+      verbose: false,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const row = result.rows.find((r) => r.path.endsWith('bare-digit.ts'));
+      expect(row?.action).toBe('skip-annotated');
+      expect(result.outcome.skippedAnnotated).toBe(1);
+      expect(result.outcome.marked).toBe(0);
+    }
+    // The hand-typed bare digit MUST be untouched on disk.
+    const after = await fs.readFile(abs, 'utf-8');
+    expect(after).toBe(before);
+  });
+
+  it('with policy INACTIVE, the same bare-digit file is marked (bare digit unrecognized)', async () => {
+    ctx = await setupFullTestProject('apply-implied-skip-off', {
+      ...APPLY_TEST_CONFIG,
+      claims: { confidence: { autoInsert: false, impliedHuman: false } },
+    });
+    await seedSource(
+      ctx,
+      'core/src/bare-digit.ts',
+      '// @confidence 4\nconst x = 1;\nexport {};\n',
+    );
+
+    const result = await executeApply(ctx.projectManager!, {
+      reviewerArg: 'ai',
+      levelArg: '2',
+      filters: { glob: 'core/src/**/*.ts' },
+      skipAnnotated: true,
+      overwrite: false,
+      dryRun: true,
+      verbose: false,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const row = result.rows.find((r) => r.path.endsWith('bare-digit.ts'));
+      // Bare digit is unrecognized under the inactive policy → action mark.
+      expect(row?.action).toBe('mark');
     }
   });
 });

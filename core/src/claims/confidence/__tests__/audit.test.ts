@@ -7,17 +7,23 @@
  * @validates {S004.§2.AC.04}
  * @validates {S004.§2.AC.05}
  * @validates {S004.§2.AC.09}
+ * @validates {S004.§7.AC.04} bare digit counts as annotated under active policy ({R017})
+ * @validates {S004.§7.AC.05} additive byReviewer tally, summed across scopes
  * @validates {DD017.DC.05}
  * @validates {DD017.DC.06}
  * @validates {DD017.DC.07}
  * @validates {DD017.DC.08}
  * @validates {DD017.DC.09}
  * @validates {DD017.DC.10}
+ * @validates {DD017.§8.DC.40} byReviewer tally
+ * @validates {DD017.§8.DC.41} defaultReviewer threaded into walkScope
  * @validates {TS001.§6.AC.01}
  * @validates {TS001.§6.AC.02}
  * @validates {TS001.§6.AC.03}
  * @validates {TS001.§6.AC.07}
  * @validates {TS001.§6.AC.08}
+ * @validates {TS001.§12.AC.07}
+ * @validates {TS001.§12.AC.08}
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -222,5 +228,90 @@ describe('S004.§2: auditConfidence — getAdapter null-skip and legacy compat',
     expect(summary.annotated).toBeTypeOf('number');
     expect(summary.byLevel1).toBeTypeOf('number');
     expect(summary.filesCount).toBeTypeOf('number');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Implied-human policy in the audit ({R017}). S004.§7.AC.04,.AC.05 /
+// DD017.§8.DC.40,.DC.41 / TS001 §12.
+// ---------------------------------------------------------------------------
+
+const AUDIT_POLICY_ON: SCEpterConfig = {
+  ...AUDIT_TEST_CONFIG,
+  claims: { confidence: { autoInsert: false, impliedHuman: true } },
+};
+
+const AUDIT_POLICY_OFF: SCEpterConfig = {
+  ...AUDIT_TEST_CONFIG,
+  claims: { confidence: { autoInsert: false, impliedHuman: false } },
+};
+
+describe('S004.§7: audit under the implied-human policy', () => {
+  let ctx: TestContext;
+
+  afterEach(async () => {
+    if (ctx) await fs.remove(ctx.projectPath);
+  });
+
+  it('S004.§7.AC.04: with policy active, a bare-digit source file counts as annotated', async () => {
+    ctx = await setupFullTestProject('audit-implied-on', AUDIT_POLICY_ON);
+    // A source file carrying ONLY a bare digit (no leading emoji).
+    await seedSourceFile(ctx, 'core/src/bare-digit.ts', '// @confidence 4\nconst x = 1;\nexport {};\n');
+
+    const result = await auditConfidence(ctx.projectManager!, { scope: 'source' });
+    expect(result.bySource.annotated).toBe(1);
+    expect(result.bySource.unannotated).toBe(0);
+    // Level lands in byLevel under the active policy.
+    expect(result.bySource.byLevel[4]).toBe(1);
+  });
+
+  it('S004.§7.AC.05: a bare-digit file increments byReviewer[👤]', async () => {
+    ctx = await setupFullTestProject('audit-implied-byreviewer', AUDIT_POLICY_ON);
+    await seedSourceFile(ctx, 'core/src/bare-digit.ts', '// @confidence 4\nconst x = 1;\nexport {};\n');
+
+    const result = await auditConfidence(ctx.projectManager!, { scope: 'source' });
+    expect(result.bySource.byReviewer['👤']).toBe(1);
+    expect(result.bySource.byReviewer['🤖']).toBe(0);
+  });
+
+  it('S004.§7.AC.05: byReviewer sums across scopes in the top-level union', async () => {
+    ctx = await setupFullTestProject('audit-implied-union', AUDIT_POLICY_ON);
+    // A bare-digit source file → 👤 (implied human); an explicit-emoji note → 👤.
+    // autoInsert is off, so the note carries exactly the content frontmatter.
+    // createNote indexes the note so the audit's note-discovery finds it.
+    await seedSourceFile(ctx, 'core/src/bare-digit.ts', '// @confidence 4\nconst x = 1;\nexport {};\n');
+    await ctx.noteManager.createNote({
+      type: 'Requirement',
+      title: 'Explicit Human Note',
+      content: '---\nconfidence: "👤4 2026-05-05"\n---\nbody\n',
+      tags: [],
+    });
+
+    const result = await auditConfidence(ctx.projectManager!);
+    // Source contributed one 👤; notes contributed one 👤 → top-level 2.
+    expect(result.byReviewer['👤']).toBe(
+      result.bySource.byReviewer['👤'] + result.byNotes.byReviewer['👤'],
+    );
+    expect(result.byReviewer['👤']).toBe(2);
+    expect(result.byReviewer['🤖']).toBe(0);
+  });
+
+  it('S004.§7.AC.04: with policy INACTIVE, the same bare-digit file counts unannotated', async () => {
+    ctx = await setupFullTestProject('audit-implied-off', AUDIT_POLICY_OFF);
+    await seedSourceFile(ctx, 'core/src/bare-digit.ts', '// @confidence 4\nconst x = 1;\nexport {};\n');
+
+    const result = await auditConfidence(ctx.projectManager!, { scope: 'source' });
+    expect(result.bySource.annotated).toBe(0);
+    expect(result.bySource.unannotated).toBe(1);
+    expect(result.bySource.byReviewer['👤']).toBe(0);
+  });
+
+  it('S004.§7.AC.05: byReviewer is zero-initialized on every scope substructure', async () => {
+    ctx = await setupFullTestProject('audit-implied-zeroinit', AUDIT_POLICY_ON);
+    // No annotated files at all — assert the zero-init shape of byReviewer.
+    const result = await auditConfidence(ctx.projectManager!, { scope: 'notes' });
+    expect(result.bySource.byReviewer).toEqual({ '🤖': 0, '👤': 0 });
+    expect(result.byNotes.byReviewer).toEqual({ '🤖': 0, '👤': 0 });
+    expect(result.byReviewer).toEqual({ '🤖': 0, '👤': 0 });
   });
 });

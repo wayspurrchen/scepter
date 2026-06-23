@@ -28,7 +28,7 @@ import { glob } from 'glob';
 import type { SourceCodeIntegrationConfig } from '../../types/config.js';
 import type { ProjectManager } from '../../project/project-manager.js';
 import { getAdapter } from './registry.js';
-import type { ConfidenceLevel, ConfidenceAnnotation } from './types.js';
+import type { ConfidenceLevel, ConfidenceAnnotation, ReviewerIcon } from './types.js';
 
 /**
  * Per-scope audit substructure. Same six fields as the legacy top-level
@@ -38,12 +38,15 @@ import type { ConfidenceLevel, ConfidenceAnnotation } from './types.js';
  *
  * @implements {DD017.DC.05}
  * @implements {DD017.DC.09}
+ * @implements {DD017.§8.DC.40} additive byReviewer per-reviewer tally
  */
 export interface ScopedAuditResult {
   total: number;
   annotated: number;
   unannotated: number;
   byLevel: Record<ConfidenceLevel, number>;
+  /** Per-reviewer count of annotated files (at minimum '🤖' and '👤'). */
+  byReviewer: Record<ReviewerIcon, number>;
   files: ConfidenceAnnotation[];
   unannotatedFiles: string[];
 }
@@ -77,6 +80,7 @@ function emptyScopedResult(): ScopedAuditResult {
     annotated: 0,
     unannotated: 0,
     byLevel: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    byReviewer: { '🤖': 0, '👤': 0 },
     files: [],
     unannotatedFiles: [],
   };
@@ -136,13 +140,20 @@ async function discoverNoteFiles(pm: ProjectManager): Promise<string[]> {
  * ScopedAuditResult. Each file is routed through `getAdapter(filePath)`;
  * adapter-null files are silently omitted from BOTH counts.
  *
+ * The resolved `defaultReviewer` ({R017}) is threaded into each
+ * `adapter.parse` call so a bare-digit annotation parses to a human
+ * (`👤`) annotation under the active policy, counting as annotated.
+ *
  * @implements {DD017.DC.04}
  * @implements {DD017.DC.08}
+ * @implements {DD017.§8.DC.40} byReviewer increment per annotated file
+ * @implements {DD017.§8.DC.41} defaultReviewer threaded into parse
  */
 async function walkScope(
   files: string[],
   projectPath: string,
   pathDisplay: 'absolute' | 'relative',
+  defaultReviewer: ReviewerIcon | null,
 ): Promise<ScopedAuditResult> {
   const result = emptyScopedResult();
 
@@ -155,12 +166,13 @@ async function walkScope(
 
     try {
       const content = await fs.readFile(absolute, 'utf-8');
-      const annotation = adapter.parse(content, display);
+      const annotation = adapter.parse(content, display, { defaultReviewer });
 
       result.total++;
       if (annotation) {
         result.annotated++;
         result.byLevel[annotation.level]++;
+        result.byReviewer[annotation.reviewer]++;
         result.files.push(annotation);
       } else {
         result.unannotated++;
@@ -181,7 +193,9 @@ async function walkScope(
 
 /**
  * Combine two scoped results into a top-level union. Counters sum,
- * arrays concatenate, byLevel sums per level.
+ * arrays concatenate, byLevel and byReviewer sum per key.
+ *
+ * @implements {DD017.§8.DC.40} byReviewer summed per reviewer across scopes
  */
 function unionScopes(
   source: ScopedAuditResult,
@@ -197,6 +211,10 @@ function unionScopes(
       3: source.byLevel[3] + notes.byLevel[3],
       4: source.byLevel[4] + notes.byLevel[4],
       5: source.byLevel[5] + notes.byLevel[5],
+    },
+    byReviewer: {
+      '🤖': source.byReviewer['🤖'] + notes.byReviewer['🤖'],
+      '👤': source.byReviewer['👤'] + notes.byReviewer['👤'],
     },
     files: [...source.files, ...notes.files],
     unannotatedFiles: [...source.unannotatedFiles, ...notes.unannotatedFiles],
@@ -214,6 +232,9 @@ function unionScopes(
  * @implements {S004.§2.AC.05}
  * @implements {S004.§2.AC.09}
  * @implements {DD017.DC.10}
+ * @implements {DD017.§8.DC.39} resolve impliedHuman ?? true
+ * @implements {DD017.§8.DC.39a} map to defaultReviewer ('👤' | null)
+ * @implements {DD017.§8.DC.41} thread defaultReviewer through walkScope
  */
 export async function auditConfidence(
   pm: ProjectManager,
@@ -222,19 +243,24 @@ export async function auditConfidence(
   const scope = options.scope ?? 'both';
   const config = pm.configManager.getConfig();
 
+  // {R017} read-time policy: resolve impliedHuman (default active) and map
+  // to the parse-policy defaultReviewer ('👤' active, null inactive).
+  const impliedHuman = config.claims?.confidence?.impliedHuman ?? true;
+  const defaultReviewer: ReviewerIcon | null = impliedHuman ? '👤' : null;
+
   let bySource: ScopedAuditResult = emptyScopedResult();
   let byNotes: ScopedAuditResult = emptyScopedResult();
 
   if (scope === 'source' || scope === 'both') {
     if (config.sourceCodeIntegration?.enabled) {
       const sourceFiles = await discoverSourceFiles(pm.projectPath, config.sourceCodeIntegration);
-      bySource = await walkScope(sourceFiles, pm.projectPath, 'relative');
+      bySource = await walkScope(sourceFiles, pm.projectPath, 'relative', defaultReviewer);
     }
   }
 
   if (scope === 'notes' || scope === 'both') {
     const noteFiles = await discoverNoteFiles(pm);
-    byNotes = await walkScope(noteFiles, pm.projectPath, 'absolute');
+    byNotes = await walkScope(noteFiles, pm.projectPath, 'absolute', defaultReviewer);
   }
 
   const top = unionScopes(bySource, byNotes);

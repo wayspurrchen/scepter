@@ -9,10 +9,12 @@
  * @validates {S004.§5.AC.05}
  * @validates {S004.§5.AC.06}
  * @validates {S004.§5.AC.07}
+ * @validates {S004.§7.AC.08} bare-digit pre-seed respected by auto-insert under active policy ({R017})
  * @validates {DD017.DC.30}
  * @validates {DD017.DC.31}
  * @validates {DD017.DC.32}
  * @validates {DD017.DC.33}
+ * @validates {DD017.§8.DC.45} defaultReviewer threaded into the precedence parse
  * @validates {TS001.§9.AC.01}
  * @validates {TS001.§9.AC.02}
  * @validates {TS001.§9.AC.03}
@@ -21,6 +23,7 @@
  * @validates {TS001.§9.AC.06}
  * @validates {TS001.§9.AC.07}
  * @validates {TS001.§9.AC.08}
+ * @validates {TS001.§12.AC.11}
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -303,6 +306,39 @@ describe('R013.§1.AC.06: includeDate: false on auto-insert omits the date', () 
     const onDisk = await fs.readFile(note.filePath!, 'utf-8');
     const parsed = matter(onDisk);
     expect(parsed.data.confidence).toBe('🤖2');
+  });
+});
+
+describe('S004.§7.AC.08: auto-insert respects a pre-seeded bare digit under the implied-human policy ({R017})', () => {
+  let ctx: TestContext;
+
+  beforeEach(async () => {
+    ctx = await setupFullTestProject(
+      'auto-insert-implied-human',
+      configWith({ autoInsert: true, impliedHuman: true }),
+    );
+  });
+
+  afterEach(async () => {
+    await fs.remove(ctx.projectPath);
+  });
+
+  it('a new note pre-seeded with a bare-digit confidence is NOT overwritten with the 🤖2 default', async () => {
+    // With the policy active, the precedence parse sees the bare digit as a
+    // human annotation (non-null), so the hook short-circuits and leaves the
+    // hand-typed value in place rather than clobbering it.
+    const templateContent = '---\nconfidence: 4\n---\nbody\n';
+    const note = await ctx.noteManager.createNote({
+      type: 'Requirement',
+      title: 'Pre-seeded Bare Digit',
+      content: templateContent,
+      tags: [],
+    });
+    const onDisk = await fs.readFile(note.filePath!, 'utf-8');
+    const parsed = matter(onDisk);
+    // The bare digit survives; the 🤖2 default was NOT written.
+    expect(parsed.data.confidence).toBe(4);
+    expect(String(parsed.data.confidence)).not.toContain('🤖');
   });
 });
 

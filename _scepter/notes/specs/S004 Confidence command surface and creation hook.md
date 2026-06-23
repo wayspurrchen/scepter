@@ -8,7 +8,7 @@ status: draft
 
 ## Context
 
-This specification consolidates the command-surface contracts for {R013.§2}, {R013.§3}, {R013.§4}, plus the registry-routing refactor that {S003} implies for the existing `confidence mark` command. {S003} fixes the adapter registry — `getAdapter(filePath)`, the `ConfidencePayload` type, and first-match-wins lookup — and is a normative dependency: every command surface here is a consumer of that registry. {R004.§7} established the original confidence subsystem (audit and mark scoped to source files; the `claims.confidence.autoInsert` flag declared but unwired) and is the upstream contract this spec extends.
+This specification consolidates the command-surface contracts for {R013.§2}, {R013.§3}, {R013.§4}, plus the registry-routing refactor that {S003} implies for the existing `confidence mark` command, plus the read-path command-layer half of the {R017} implied-human policy (§7). {S003} fixes the adapter registry — `getAdapter(filePath)`, the `ConfidencePayload` type, and first-match-wins lookup — and is a normative dependency: every command surface here is a consumer of that registry. {S003.§6} (the implied-human parse grammar and the `defaultReviewer` parse parameter) is the normative dependency for §7. {R004.§7} established the original confidence subsystem (audit and mark scoped to source files; the `claims.confidence.autoInsert` flag declared but unwired) and is the upstream contract this spec extends.
 
 Scope here is contractual command behavior. The adapter registry's internals are owned by {S003} and are out of scope. The on-disk payload format and structured-vs-string frontmatter shape are settled by {R013} and {S003}; this spec does not relitigate them.
 
@@ -20,6 +20,8 @@ Four command surfaces are specified:
 2. **`confidence mark`** — refactored to route through the adapter registry so it works on `.md` notes as well as source files.
 3. **`confidence apply`** — new bulk command. Resolves a filter set into a target file list, routes each file through the registry, applies the annotation per behavior modifiers, and reports per-file outcomes.
 4. **Auto-insert hook** — wires `claims.confidence.autoInsert` into the `scepter create` flow so newly created notes acquire a `🤖2 <today>` annotation by default.
+
+A fifth, cross-cutting section (§7) factors the {R017} implied-human read-path policy: the `claims.confidence.impliedHuman` config flag, its resolution, the threading of the resolved `defaultReviewer` into each read-path consumer's `parse` call, and the audit per-reviewer breakdown that bucketing consumes.
 
 A cross-cutting filter-semantics section (§1) factors the rules shared by `audit` (scope flags) and `apply` (target selection) so the per-command sections can reference rather than restate.
 
@@ -44,6 +46,8 @@ The filter resolver returns a list of `{filePath, scope}` tuples where `scope �
 ## §2 `confidence audit` — multi-scope
 
 The existing `auditConfidence` walks only source files via `discoverSourceFiles`. This section extends the command to walk both source files and notes, route each through `getAdapter`, and emit per-scope coverage breakdowns. Default invocation (no flags) shifts from "source only" to "both scopes" — an intentional behavior change documented in §6.
+
+The audit result substructure carries the per-scope coverage fields enumerated in §2.AC.05 (`total`, `annotated`, `unannotated`, `byLevel`, `files`, `unannotatedFiles`). {R017} adds one further additive field, `byReviewer` (a per-reviewer annotated-file tally), specified in §7.AC.05 — it parallels `byLevel` and is consumed by the human/AI bucketing. The §2.AC.05 enumeration is unchanged; `byReviewer` is additive on top of it.
 
 §2.AC.01:derives=R013.§2.AC.01 `scepter confidence audit` MUST discover source files via the existing `sourceCodeIntegration.folders × extensions × exclude` rules, MUST discover notes via `discoveryPaths` glob-walking for `.md` files (subject to `discoveryExclude`), and MUST aggregate annotation coverage independently for each scope.
 
@@ -133,6 +137,52 @@ The `auditConfidence(...)` library API gains the additive `bySource` and `byNote
 
 §6.AC.01 Release notes for the version that lands {R013.§2} MUST document the audit default-scope change as a behavior break, naming `--source-only` as the explicit-opt-in form for the prior behavior.
 
+## §7 Implied-human policy: config and read-path consumers
+
+{R017} adds a read-time defaulting policy: when active, a confidence annotation whose level digit carries no leading emoji reads as a human (`👤`) annotation. {S003.§6} specifies the parse-grammar mechanism (the emoji-optional grammar and the OPTIONAL `defaultReviewer` parameter on `parse`, per {S003.§1.AC.08}). This section specifies the command-layer half: the `claims.confidence.impliedHuman` config flag, its resolution, and the threading of the resolved `defaultReviewer` into each read-path consumer's `parse` call so that a bare-digit annotation is observed as a human annotation wherever annotation state is consumed.
+
+Three read-path consumers parse on-disk content and must honor the policy: the audit walk (§2), the `apply --skip-annotated` check (§4), and the auto-insert precedence check (§5). All three already hold the project config at their call site, so each resolves the flag locally and passes the mapped `defaultReviewer` into `adapter.parse`. The write paths (`mark`, `apply`'s write step, auto-insert's `insert` step) are unaffected — the policy widens only what is read, never what is written.
+
+### Configuration flag
+
+The flag lives in the existing `claims.confidence` config block alongside `autoInsert` and `includeDate`, defaults active, and resolves with the same `?? true` pattern those flags use.
+
+§7.AC.01:4:derives=R017.AC.08 A `claims.confidence.impliedHuman` boolean configuration field MUST control the implied-human policy. It MUST reside in the same `claims.confidence` block as `autoInsert` and `includeDate`. `true` activates bare-digit-reads-as-human; `false` deactivates it.
+
+§7.AC.02:derives=R017.AC.09 The `impliedHuman` flag MUST default to active when unset: each read-path consumer MUST resolve it as `config.claims?.confidence?.impliedHuman ?? true`, so that a project with no `impliedHuman` key gets bare-digit-reads-as-human behavior. (This mirrors the `includeDate ?? true` resolution already used in §3.AC.03 and §5.AC.02.)
+
+### Resolution and threading
+
+Each read-path consumer maps the resolved boolean to the `defaultReviewer` value {S003.§1.AC.08} expects and passes it as the `parse` options parameter.
+
+§7.AC.03:4:derives=R017.AC.08 Each read-path consumer (audit, `apply --skip-annotated`, auto-insert precedence) MUST map the resolved `impliedHuman` boolean to the `defaultReviewer` parse-policy value — `true → '👤'`, `false → null` — and MUST pass it as the `options.defaultReviewer` argument to every `adapter.parse(content, filePath, options)` call it makes on the read path. A consumer that does not resolve the flag (passing no options) MUST, per {S003.§1.AC.08}, get today's behavior (bare digit unrecognized).
+
+### Audit: count bare digit as human, with a per-reviewer breakdown
+
+With the policy threaded into the audit walk, a file carrying a bare-digit annotation parses to a non-null `ConfidenceAnnotation` with `reviewer: '👤'`, so it is counted as annotated and its level lands in `byLevel`. The audit result additionally gains a per-reviewer tally so consumers can bucket human vs AI coverage directly rather than re-deriving it from the per-file `files` array.
+
+§7.AC.04:4:derives=R017.AC.10 With `impliedHuman` resolved active, `scepter confidence audit` MUST count a file carrying a bare-digit confidence annotation as annotated (not unannotated), and its level MUST be included in the scope's `byLevel` tally, in both the `bySource`/`byNotes` substructures and the top-level union (§2.AC.05).
+
+§7.AC.05:4:derives=R017.AC.10 The audit result substructure (`ScopedAuditResult`, and by extension the top-level union and the `bySource`/`byNotes` substructures per §2.AC.05) MUST gain an additive `byReviewer` breakdown: a per-reviewer count of annotated files keyed by reviewer (at minimum `'🤖'` and `'👤'` counts). A bare-digit-annotated file MUST contribute to the `'👤'` count. The `byReviewer` breakdown MUST union across scopes the same way `byLevel` does (per-reviewer sums). This is additive to the §2.AC.05 substructure and MUST NOT remove or alter the existing `total`, `annotated`, `unannotated`, `byLevel`, `files`, or `unannotatedFiles` fields.
+
+§7.AC.06:derives=R017.AC.10 The audit table formatter (§2.AC.07) MUST surface the per-reviewer breakdown (human vs AI annotated-file counts) alongside the existing per-level breakdown, per scope. The downstream human/AI bucketing that consumes the audit result (including the VS Code confidence tree, which buckets by `reviewer === '👤'`) MUST place a bare-digit-annotated file in the human bucket, consequent to its `reviewer: '👤'` parse outcome under §7.AC.04.
+
+### Apply: bare digit is "already annotated"
+
+§7.AC.07:derives=R017.AC.11 With `impliedHuman` resolved active, `scepter confidence apply` with `--skip-annotated` (the default per §4.AC.03) MUST treat a file carrying a bare-digit confidence annotation as already annotated: the threaded `adapter.parse(content, filePath, {defaultReviewer: '👤'})` returns non-null, so the file MUST be left untouched on disk and recorded under the `skipped-annotated` outcome (§4.AC.03), rather than overwriting the hand-typed value. When `--overwrite` is set, the bare digit MUST be replaced per §4.AC.03's overwrite branch, unchanged by the policy.
+
+### Auto-insert: respect a pre-existing bare digit
+
+§7.AC.08:derives=R017.AC.12 With `impliedHuman` resolved active, the auto-insert-on-create hook (§5) MUST thread `{defaultReviewer: '👤'}` into its precedence `adapter.parse(content, notePath, options)` call (§5.AC.02). A note that already carries a bare-digit `confidence` value MUST therefore parse non-null, so the hook MUST NOT overwrite it (§5.AC.03) — the pre-existing bare digit MUST be respected as an existing annotation and left unchanged, rather than being clobbered with the `🤖2` default.
+
+### Write side unaffected
+
+The policy changes only the read path. Every write path continues to emit an explicit emoji, and the reviewer written continues to originate from the explicit `ai`/`human` argument (or the auto-insert default), as already specified.
+
+§7.AC.09:4:derives=R017.AC.13 The `impliedHuman` policy MUST NOT cause any writing path to emit a bare digit. `mark` (§3), `apply`'s write step (§4), and auto-insert's `insert` step (§5.AC.02) MUST continue to write an explicit-emoji annotation via `adapter.format` / `adapter.insert`, regardless of the flag's state.
+
+§7.AC.10:derives=R017.AC.14 The reviewer written by `mark`, `apply`, and auto-insert MUST continue to originate from the explicit `ai`/`human` argument (mapped at the command layer per §3.AC.02) or the auto-insert `🤖` default (§5.AC.02), unaffected by `impliedHuman`. The policy MUST NOT alter what is written under any flag state.
+
 ## Acceptance Criteria Summary
 
 | Section | Count |
@@ -143,7 +193,8 @@ The `auditConfidence(...)` library API gains the additive `bySource` and `byNote
 | §4 `confidence apply` — bulk | 9 |
 | §5 Auto-insert on note creation | 7 |
 | §6 Migration and backward compatibility | 1 |
-| **Total** | **39** |
+| §7 Implied-human policy: config and read-path consumers | 10 |
+| **Total** | **49** |
 
 ## Non-Goals / Out of Scope
 
@@ -169,9 +220,13 @@ The `auditConfidence(...)` library API gains the additive `bySource` and `byNote
 - {S003.§3} — C-family adapter behavioral equivalence — preserves `mark` and `audit` source-file behavior byte-identically.
 - {S003.§4} — Markdown frontmatter adapter — the new shape `mark`, `apply`, and the auto-insert hook write through on `.md` files.
 - {S003.§5} — Cross-cutting invariants; §5.AC.03 (validation at command layer) is upstream of §3.AC.02 here.
-- {R004.§7} — Original confidence requirement; {R004.§7.AC.02} (mark contract) is the upstream contract `mark` continues to satisfy.
+- {S003.§6} — Implied-human read-time parse grammar and the `defaultReviewer` parse parameter ({S003.§1.AC.08}) — the normative dependency for §7; §7 resolves the `impliedHuman` flag and threads the mapped value into the consumers' `parse` calls.
+- {R017} — Implied-human read-time confidence defaulting. §7 concretizes the command-layer half: config flag ({R017.AC.08}, {R017.AC.09}), threading ({R017.AC.08}), audit count + per-reviewer breakdown ({R017.AC.10}), apply skip ({R017.AC.11}), auto-insert precedence ({R017.AC.12}), and write-side-unaffected ({R017.AC.13}, {R017.AC.14}). Origin task {T006}.
 - `core/src/claims/confidence.ts` — Existing `auditConfidence`, `parseConfidenceAnnotation`, `insertConfidenceAnnotation`, `formatConfidenceAnnotation`, `validateReviewerLevel`, `mapReviewerArg`. Audit walking and command-layer validation are extended/preserved here.
 - `core/src/cli/commands/confidence/audit-command.ts` — Existing audit command shape extended in §2.
 - `core/src/cli/commands/confidence/mark-command.ts` — Existing mark command refactored in §3 to consume `getAdapter`.
 - `core/src/notes/note-manager.ts` — `NoteManager.createNote` (line 436); the auto-insert hook in §5 attaches between `noteFileManager.createNoteFile(note)` (line 520) and the `return note` exit.
-- `core/src/types/config.ts` — `ClaimConfig.confidence.autoInsert` declaration (lines 222-241); the schema realized by §5.
+- `core/src/types/config.ts` — `ClaimConfig.confidence` block (`autoInsert`, `includeDate`); §5 realizes `autoInsert`, and §7 adds the `impliedHuman` field to the same block.
+- `core/src/claims/confidence/audit.ts` — `walkScope` calls `adapter.parse` (the read path §7 threads `defaultReviewer` into); `ScopedAuditResult`/`ConfidenceAuditResult` gain the additive `byReviewer` field per §7.AC.05.
+- `core/src/cli/commands/confidence/apply-command.ts` — `apply --skip-annotated`'s `adapter.parse` call (the read path §7 threads `defaultReviewer` into per §7.AC.07).
+- `core/src/claims/confidence/adapters/c-family.ts`, `core/src/claims/confidence/adapters/markdown-frontmatter.ts` — the two adapters whose `parse` accepts the §7-threaded `defaultReviewer` per {S003.§6}.

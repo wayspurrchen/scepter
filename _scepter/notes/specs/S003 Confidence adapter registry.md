@@ -10,7 +10,7 @@ status: draft
 
 This specification formalizes the adapter registry that {R013.§1} introduces: a small, ordered collection of adapter objects that mediate between the confidence subsystem's payload model and the byte-level file shapes that carry confidence annotations. It defines the adapter interface every implementation must satisfy, the registry's lookup contract, and the two built-in adapters — the C-family comment adapter (a re-expression of the existing behavior in `core/src/claims/confidence.ts`) and the markdown frontmatter adapter (a new shape that uses `gray-matter` to read and write a `confidence:` scalar).
 
-The spec scopes to {R013.§1} only. {R013.§2} (audit-scope expansion), {R013.§3} (bulk apply), and {R013.§4} (auto-insert on note creation) are downstream consumers of the registry and will be specified separately. This document defines the contract those consumers depend on; it does not specify their command surface, filter semantics, or wiring.
+The spec scopes to {R013.§1} plus the read-time parse-widening of {R017}. {R013.§2} (audit-scope expansion), {R013.§3} (bulk apply), and {R013.§4} (auto-insert on note creation) are downstream consumers of the registry and will be specified separately. This document defines the contract those consumers depend on; it does not specify their command surface, filter semantics, or wiring. §6 (added for {R017}) specifies the implied-human read-time policy that widens both adapters' parse grammars; the `claims.confidence.impliedHuman` config flag and the read-path consumers that resolve and thread it are specified in {S004.§7}.
 
 The C-family adapter MUST preserve the externally observable contracts of {R004.§7.AC.01} and {R004.§7.AC.02} byte-for-byte — the same annotation strings produced by the existing `formatConfidenceAnnotation` and the same parse outcomes produced by the existing `parseConfidenceAnnotation` MUST hold under the adapter's `format` and `parse` operations.
 
@@ -22,6 +22,7 @@ In scope:
 - The C-family adapter's `matches`, `parse`, `format`, and `insert` behavior — specifying the existing implementation as a contract.
 - The frontmatter adapter's `matches`, `parse`, `format`, and `insert` behavior — including the create-frontmatter-when-absent case.
 - Cross-cutting invariants: payload canonicalization, date round-tripping, validation delegation, and side-effect freedom.
+- The implied-human read-time policy (§6, {R017}): the emoji-optional parse grammar in both adapters, the OPTIONAL `defaultReviewer` parameter on `parse`, and the bare-digit-reads-as-human contract gated by that parameter.
 
 Out of scope:
 - The command-surface specifications for `confidence audit`, `confidence apply`, `confidence mark`, and auto-insert on `scepter create` — separate specs.
@@ -29,6 +30,7 @@ Out of scope:
 - A third-party adapter registration API. The registry's extensibility is mentioned as a future hook; the contract here covers built-in adapters only.
 - Source-file auto-insert at creation. There is no `scepter create` equivalent for source files; the adapter contract is silent on creation-time wiring.
 - The reviewer/level validation rule (AI 1-3, Human 3-5). That rule is enforced at the command layer (`mark`/`apply`) by `validateReviewerLevel`; adapters do not validate.
+- The `claims.confidence.impliedHuman` config flag, its default-active resolution, and the wiring that threads the resolved `defaultReviewer` into each read-path consumer's `parse` call. §6 specifies the parse-grammar mechanism the flag activates; {S004.§7} specifies the flag and its consumer threading.
 
 Non-goals:
 - This spec does not redefine the payload string format. {R013.§1.AC.04} establishes `<emoji><level> <YYYY-MM-DD>` as canonical and shape-agnostic; this spec restates it as the payload contract that adapters preserve.
@@ -254,8 +256,18 @@ interface ConfidenceAdapter {
   /**
    * Parse a confidence annotation out of file content. Returns null
    * when the content carries no recognized annotation. Never throws.
+   *
+   * The OPTIONAL `options.defaultReviewer` carries the resolved
+   * implied-human read-time policy (§6, {R017}). When set to '👤', a
+   * bare level digit with no leading emoji reads as a human annotation.
+   * When omitted or null, a bare digit MUST NOT parse — identical to
+   * today's behavior. Explicit-emoji parsing is unaffected (§1.AC.09).
    */
-  parse(content: string, filePath: string): ConfidenceAnnotation | null;
+  parse(
+    content: string,
+    filePath: string,
+    options?: { defaultReviewer?: ReviewerIcon | null },
+  ): ConfidenceAnnotation | null;
 
   /**
    * Render a payload as the adapter's annotation string. The string
@@ -305,6 +317,14 @@ The interface is content-pure. No operation reads or writes the filesystem. Call
 §1.AC.06:4 `insert()` MUST preserve all non-annotation content in `c`. The output content MUST contain every line of `c` that did not carry the prior annotation, in the same order, with identical text. Replacement of an existing annotation MUST be in-place at the original line; insertion of a new annotation MUST add lines at the adapter's defined insertion point without reordering surrounding content.
 
 §1.AC.07:4 `insert()` MUST be idempotent at a given payload: `insert(insert(c, p), p)` MUST equal `insert(c, p)`, modulo the trailing-newline handling defined in §4.AC.05 for the frontmatter adapter.
+
+### Read-time policy parameter on `parse`
+
+The implied-human read-time policy ({R017}) widens what `parse` accepts on the read path: when active, an annotation that carries a bare level digit with no leading emoji reads as a human (`👤`) annotation (see §6). The policy is a per-call read-time input, not adapter-global state — different callers may resolve the policy differently (a write-path caller never activates it; a read-path caller activates it from config). The contract therefore threads the resolved policy into `parse` as an OPTIONAL trailing parameter so callers that do not opt in compile and behave unchanged. The parameter carries a single resolved value — the reviewer to attribute to a bare digit — rather than a config object; resolving the `claims.confidence.impliedHuman` flag to that value is the caller's responsibility (see {S004.§7}).
+
+§1.AC.08:4:derives=R017.AC.05 The `parse` operation MUST accept an OPTIONAL third parameter carrying the resolved default-reviewer policy — `parse(content: string, filePath: string, options?: { defaultReviewer?: ReviewerIcon | null })` (or a structurally equivalent options shape). The parameter MUST be optional so that every existing caller invoking `parse(content, filePath)` compiles and behaves identically to today. When the parameter is omitted, `parse` MUST behave as if `defaultReviewer` were absent — a bare digit MUST NOT parse, exactly as today.
+
+§1.AC.09:derives=R017.AC.06 The read-time policy parameter MUST NOT alter the parse outcome of any annotation carrying an explicit `🤖` or `👤` emoji. The parameter governs ONLY the bare-digit case (§6.AC.01); for explicit-emoji annotations, `parse` MUST return the same reviewer, level, and date regardless of the parameter's presence or value.
 
 ### Public surface (illustrative)
 
@@ -390,6 +410,42 @@ The adapter contract relies on four invariants that hold across every adapter, p
 
 §5.AC.05 `format` is the canonical serializer for the payload-as-string. Adapters MAY compose `format` internally inside `insert`, or MAY embed equivalent string construction directly; the choice is an implementation detail. What the contract guarantees is that `format(reviewer, level, date)` produces the exact string a caller would see if it parsed the inserted annotation back out and re-rendered just the payload portion.
 
+## §6 Implied-human read-time policy
+
+{R017} introduces a read-time defaulting policy layered on top of the {R013.§1.AC.04} payload format: when active, a confidence annotation whose level digit carries no leading emoji parses as a human (`👤`) annotation at that level. The motivation is ergonomic — a human editing a file by hand can type `confidence: 4` in note frontmatter or `// @confidence 4` in source, rather than pasting a `👤` emoji the YAML scalar or comment carrier does not otherwise need. The automated actor already writes `🤖` programmatically; only the human hand-editing a file benefits from the leniency. The governing principle is that the robot emoji `🤖` is the only marker that reads as AI; a bare digit and an explicit `👤` both read as human, and the two human readings converge.
+
+This section amends the parse grammar of both built-in adapters by making the leading emoji capture OPTIONAL. It does not touch `format` or `insert` — every write path continues to emit an explicit emoji (the read-leniently/write-explicitly asymmetry is intentional). The policy is threaded into `parse` via the OPTIONAL parameter specified in §1.AC.08; the bare-digit case is the only new parse outcome, and it is gated entirely by the resolved `defaultReviewer` value. When `defaultReviewer` is absent or null, the grammar widening is inert and parse behaves exactly as §3.AC.02 and §4.AC.02 specify today.
+
+The policy is a parse-time defaulting rule, not a validation rule: it records what is on disk and MUST NOT consult the writer-side reviewer/level ranges (the AI 1-3 / Human 3-5 table enforced by `validateReviewerLevel` at the command layer per §5.AC.03). A bare digit reads as human at every level 1-5, including levels a human could not write via `mark`. This preserves the §5.AC.03 / {DD016.§1.DC.04} boundary that adapters MUST NOT import validation.
+
+### Emoji-optional grammar
+
+The amendment widens the emoji capture group in each adapter's parse regex from required to optional. §3.AC.02 specifies the C-family grammar `(?:\/\/|\*)\s*@confidence\s+(🤖|👤)(\d)(?:\s+(.+))?` and §4.AC.02 the frontmatter grammar `^(🤖|👤)(\d)(?:\s+(\S+))?$`. Under the policy, the `(🤖|👤)` group becomes `(🤖|👤)?` in both. The level capture, the optional trailing-date capture, and the line/anchoring behavior are otherwise unchanged. These claims amend §3.AC.02 and §4.AC.02 — they do not delete those claims; they add the read-time-active behavior on top of the unchanged explicit-emoji behavior.
+
+§6.AC.01:5:derives=R017.AC.01 When `parse` is invoked with `defaultReviewer: '👤'`, an annotation consisting of a bare level digit with no leading emoji MUST parse to reviewer `👤` and the captured level, in BOTH the C-family adapter (`// @confidence 4` and ` * @confidence 4` carrier forms, per the §3.AC.02 grammar with the emoji group optional) and the markdown-frontmatter adapter (`confidence: 4`, per the §4.AC.02 anchored grammar with the emoji group optional). Amends §3.AC.02 and §4.AC.02.
+
+§6.AC.02:derives=R017.AC.02 When the leading emoji IS present, parse outcome MUST be unchanged from §3.AC.02 / §4.AC.02 regardless of `defaultReviewer`: an explicit `🤖` parses to reviewer `🤖`, an explicit `👤` parses to reviewer `👤`. The grammar widening attaches the `defaultReviewer` value ONLY when the (now-optional) emoji capture is absent.
+
+§6.AC.03:derives=R017.AC.03 Bare-digit defaulting MUST apply at every level 1-5: with `defaultReviewer: '👤'`, a bare `1`, `2`, `3`, `4`, or `5` MUST each parse to reviewer `👤` at the corresponding level, in both adapters.
+
+§6.AC.04:derives=R017.AC.04 The trailing-date capture MUST behave identically whether or not the leading emoji is present. With `defaultReviewer: '👤'`, a bare digit followed by a single space and an ISO `YYYY-MM-DD` date (`confidence: 4 2026-05-31`; `// @confidence 4 2026-05-31`) MUST parse to reviewer `👤`, the captured level, and the captured date — the same date capture group the explicit-emoji form uses (§3.AC.02's third group, §4.AC.02's third group).
+
+### Inactive policy is identical to today
+
+§6.AC.05:4:derives=R017.AC.05 When `parse` is invoked with `defaultReviewer` omitted or null, a bare level digit with no leading emoji MUST NOT parse: `parse` MUST return the same no-match outcome (`null`) it returns today, in both adapters. The widened (emoji-optional) grammar MUST attach a reviewer to a bare digit ONLY when `defaultReviewer` is a reviewer value; with no resolved default, a bare digit is not a recognized annotation.
+
+§6.AC.06:derives=R017.AC.06 Toggling `defaultReviewer` between `'👤'` and absent/null MUST change the parse outcome of ONLY the bare-digit case. Any annotation carrying an explicit `🤖` or `👤` MUST parse identically under both states (this is the adapter-level expression of §1.AC.09).
+
+### Parse independence from write-side ranges
+
+§6.AC.07:4:derives=R017.AC.07 With `defaultReviewer: '👤'`, a bare digit at a level outside the writer-side human range — `confidence: 1`, `confidence: 2` — MUST parse to reviewer `👤` at that level. Parse MUST NOT consult the reviewer/level range table, MUST NOT downgrade, reject, or reclassify the annotation on the basis of that table, and MUST NOT import validation (preserving the §5.AC.03 and {DD016.§1.DC.04} adapter/validation boundary).
+
+### YAML-number coercion in the frontmatter adapter
+
+A hand-typed bare `confidence: 4` is the motivating case for {R017.AC.01}, but `gray-matter` parses an unquoted single digit as a YAML number. The current §4.AC.02 string-scalar guard (`typeof value !== 'string'` → `null`) would reject a YAML number before the emoji-optional grammar runs, so the motivating case would never reach §6.AC.01. The frontmatter adapter therefore MUST coerce an in-range YAML integer to its digit-string form under the active policy. The dated form (`confidence: 4 2026-05-31`) is already a YAML string and needs no coercion; only the bare single-digit case becomes a number.
+
+§6.AC.08:4:derives=R017.AC.01 When the markdown-frontmatter adapter is invoked with `defaultReviewer: '👤'` and the `confidence` frontmatter value is a YAML integer in the range 1-5, `parse` MUST coerce it to the corresponding single-digit string and apply the §6.AC.01 bare-digit grammar, yielding reviewer `👤` at that level. When `defaultReviewer` is omitted or null, a YAML-integer `confidence` value MUST continue to return `null` per §4.AC.02 (Edge case 3, policy-inactive). YAML object, array, boolean, and out-of-range numeric values MUST return `null` under both policy states. This claim amends Edge case 3; it does not relax the §4.AC.02 string-scalar contract for explicit-emoji annotations.
+
 ## Edge Cases
 
 ### Edge case 1: empty content
@@ -407,7 +463,8 @@ The adapter contract relies on four invariants that hold across every adapter, p
 ### Edge case 3: confidence value present but not a string
 
 **Trigger:** A `.md` file's frontmatter has `confidence: 4` (a YAML number) or `confidence: {reviewer: ai, level: 2}` (an object — the explicit non-goal shape).
-**Behavior:** The frontmatter adapter's `parse` MUST return `null`. Per §4.AC.02, only string-scalar values that match the payload regex are recognized. Numbers, objects, arrays, and booleans are all unrecognized. The user receives no special diagnostic from the adapter; the command layer MAY surface a "found unrecognized confidence value" message if it inspects the raw frontmatter directly.
+**Behavior (policy inactive — `defaultReviewer` omitted/null):** The frontmatter adapter's `parse` MUST return `null`. Per §4.AC.02, only string-scalar values that match the payload regex are recognized. Numbers, objects, arrays, and booleans are all unrecognized. The user receives no special diagnostic from the adapter; the command layer MAY surface a "found unrecognized confidence value" message if it inspects the raw frontmatter directly.
+**Behavior (policy active — `defaultReviewer: '👤'`):** A hand-typed bare `confidence: 4` is the motivating case for {R017} — but `gray-matter` parses an unquoted single digit as a YAML *number*, not a string, so the §4.AC.02 string-scalar guard would reject it before the emoji-optional grammar runs. Per §6.AC.08, when the policy is active the frontmatter adapter MUST coerce a YAML *integer* `confidence` value in the range 1-5 to its single-digit string form and run it through the emoji-optional grammar, yielding reviewer `👤` at that level. Object, array, boolean, and out-of-range numeric values remain unrecognized (`null`) under both policy states. (The dated form `confidence: 4 2026-05-31` is already a YAML string — it carries a space — so it is recognized by the string path without coercion.)
 
 ### Edge case 4: C-family file with annotation past line 20
 
@@ -445,6 +502,8 @@ The adapter contract does not define error types or codes for the parse path; th
 | §1.AC.05 | Round-trip invariant | §1, all adapters |
 | §1.AC.06 | insert() preserves non-annotation content | §1, all adapters |
 | §1.AC.07 | insert() idempotence | §1, §4.AC.08 |
+| §1.AC.08 | parse() OPTIONAL defaultReviewer param; omitted = today | §1, §6 |
+| §1.AC.09 | read-time param governs bare-digit only; explicit-emoji unaffected | §1, §6 |
 | §2.AC.01 | Registry is ordered, first-match-wins | §2 |
 | §2.AC.02 | Built-in registration order | §2 |
 | §2.AC.03 | getAdapter returns adapter or null, never throws | §2 |
@@ -469,6 +528,14 @@ The adapter contract does not define error types or codes for the parse path; th
 | §5.AC.03 | Validation delegated to command layer | §5 |
 | §5.AC.04 | No side effects on adapter ops | §5 |
 | §5.AC.05 | format() is canonical payload serializer | §5 |
+| §6.AC.01 | bare digit reads as 👤 in both adapters (policy active) | §6 |
+| §6.AC.02 | explicit emoji unchanged regardless of policy | §6 |
+| §6.AC.03 | bare-digit defaulting applies at every level 1-5 | §6 |
+| §6.AC.04 | date capture identical with/without leading emoji | §6 |
+| §6.AC.05 | policy inactive → bare digit returns null (today) | §6 |
+| §6.AC.06 | toggling policy changes only the bare-digit case | §6 |
+| §6.AC.07 | parse does not consult write-side reviewer/level ranges | §6 |
+| §6.AC.08 | frontmatter coerces in-range YAML int under active policy | §6, Edge case 3 |
 
 ## Design Decisions
 
@@ -537,6 +604,7 @@ This spec deliberately excludes:
 ## References
 
 - {R013.§1} — Source requirement: pluggable annotation adapters. §1.AC.01-05 are the upstream contracts this spec concretizes.
+- {R017} — Implied-human read-time confidence defaulting. §6's emoji-optional parse grammar and the `parse` `defaultReviewer` parameter concretize {R017.AC.01-07}; the YAML-number coercion (§6.AC.08) realizes the {R017.AC.01} `confidence: 4` frontmatter case. Origin task {T006}.
 - {R013.§2} — Audit scope expansion (downstream consumer; separate spec).
 - {R013.§3} — Bulk apply (downstream consumer; separate spec).
 - {R013.§4} — Auto-insert on note creation (downstream consumer; separate spec).

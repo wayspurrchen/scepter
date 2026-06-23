@@ -2,10 +2,14 @@
  * Tests for the SCEpterConfig Zod validator.
  *
  * @validates {DD016.§8.DC.44} includeDate Zod field with .default(true)
+ * @validates {DD016.§10.DC.55} impliedHuman Zod field with .default(true)
+ * @validates {S004.§7.AC.01} impliedHuman config flag in the confidence block ({R017})
+ * @validates {S004.§7.AC.02} impliedHuman defaults active (true) when unset
  * @validates {R013.§1.AC.06} date-inclusion config flag (validation behavior)
+ * @validates {TS001.§12.AC.12} impliedHuman config default
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ConfigValidator, ConfigValidationError } from './config-validator';
+import { ConfigValidator, ConfigValidationError, SCEpterConfigSchema } from './config-validator';
 import type { SCEpterConfig } from '../types/config';
 
 describe('ConfigValidator', () => {
@@ -215,6 +219,53 @@ describe('ConfigValidator', () => {
       };
       const errors = validator.validate(config);
       expect(errors.length).toBeGreaterThan(0);
+    });
+
+    // S004.§7.AC.01 / DD016.§10.DC.55 — impliedHuman config flag ({R017}).
+    it('S004.§7.AC.01: should accept claims.confidence with impliedHuman true', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: { impliedHuman: true } },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('S004.§7.AC.01: should accept claims.confidence with impliedHuman false', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: { impliedHuman: false } },
+      };
+      const errors = validator.validate(config);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('S004.§7.AC.01: should reject claims.confidence.impliedHuman with non-boolean', () => {
+      const config = {
+        ...baseConfig,
+        claims: { confidence: { impliedHuman: 'yes' } },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    // S004.§7.AC.02 / DD016.§10.DC.55 — the parsed default is `true` when the
+    // key is unset, mirroring includeDate's .default(true). Asserting the
+    // resolved value (not just acceptance) via the Zod schema directly.
+    it('S004.§7.AC.02: impliedHuman defaults to true when the confidence block omits it', () => {
+      const parsed = SCEpterConfigSchema.parse({
+        ...baseConfig,
+        claims: { confidence: {} },
+      });
+      expect(parsed.claims?.confidence?.impliedHuman).toBe(true);
+    });
+
+    it('S004.§7.AC.02: an explicit impliedHuman:false survives the Zod default', () => {
+      const parsed = SCEpterConfigSchema.parse({
+        ...baseConfig,
+        claims: { confidence: { impliedHuman: false } },
+      });
+      expect(parsed.claims?.confidence?.impliedHuman).toBe(false);
     });
   });
 

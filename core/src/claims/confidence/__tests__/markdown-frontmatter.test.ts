@@ -1,11 +1,40 @@
 /**
  * Tests for the markdown-frontmatter confidence adapter.
  *
- * @validates {S003.§4.AC.01,.AC.02,.AC.03,.AC.04,.AC.05,.AC.06,.AC.07,.AC.08}
- * @validates {S003.§5.AC.02,.AC.04} cross-cutting invariants
- * @validates {DD016.§6.DC.30,.DC.31,.DC.32,.DC.33,.DC.34,.DC.35,.DC.36,.DC.37,.DC.38,.DC.39,.DC.40}
+ * @validates {S003.§4.AC.01}
+ * @validates {S003.§4.AC.02}
+ * @validates {S003.§4.AC.03}
+ * @validates {S003.§4.AC.04}
+ * @validates {S003.§4.AC.05}
+ * @validates {S003.§4.AC.06}
+ * @validates {S003.§4.AC.07}
+ * @validates {S003.§4.AC.08}
+ * @validates {S003.§5.AC.02} cross-cutting invariants
+ * @validates {S003.§5.AC.04} cross-cutting invariants
+ * @validates {S003.§6.AC.01} implied-human parse grammar + YAML coercion ({R017})
+ * @validates {S003.§6.AC.04} implied-human parse grammar + YAML coercion ({R017})
+ * @validates {S003.§6.AC.05} implied-human parse grammar + YAML coercion ({R017})
+ * @validates {S003.§6.AC.07} implied-human parse grammar + YAML coercion ({R017})
+ * @validates {S003.§6.AC.08} implied-human parse grammar + YAML coercion ({R017})
+ * @validates {DD016.§6.DC.30}
+ * @validates {DD016.§6.DC.31}
+ * @validates {DD016.§6.DC.32}
+ * @validates {DD016.§6.DC.33}
+ * @validates {DD016.§6.DC.34}
+ * @validates {DD016.§6.DC.35}
+ * @validates {DD016.§6.DC.36}
+ * @validates {DD016.§6.DC.37}
+ * @validates {DD016.§6.DC.38}
+ * @validates {DD016.§6.DC.39}
+ * @validates {DD016.§6.DC.40}
  * @validates {DD016.§9.DC.48}
+ * @validates {DD016.§10.DC.52} emoji-optional grammar
+ * @validates {DD016.§10.DC.53} YAML-number coercion
+ * @validates {DD016.§10.DC.54} no validation coupling
  * @validates {R013.§1.AC.06} no-date format branch in markdown projection
+ * @validates {TS001.§12.AC.04}
+ * @validates {TS001.§12.AC.05}
+ * @validates {TS001.§12.AC.06} no-validation-coupling (bare 1/2) in frontmatter
  */
 
 import { describe, it, expect } from 'vitest';
@@ -267,5 +296,115 @@ describe('S003.§5: markdown-frontmatter cross-cutting invariants', () => {
     for (const c of inputs) {
       expect(() => markdownFrontmatterAdapter.parse(c, 'x.md')).not.toThrow();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Implied-human read-time policy ({R017}) — emoji-optional grammar plus the
+// YAML-number coercion for hand-typed bare `confidence: 4`.
+// S003.§6.AC.01,.AC.04,.AC.05,.AC.07,.AC.08 / DD016.§10.DC.52,.DC.53,.DC.54.
+// ---------------------------------------------------------------------------
+
+const HUMAN_DEFAULT = { defaultReviewer: '👤' as const };
+
+describe('S003.§6: markdown-frontmatter implied-human bare-digit parse', () => {
+  // S003.§6.AC.01 — quoted bare digit (already a YAML *string*) under policy
+  it('S003.§6.AC.01: YAML string `confidence: "4"` with policy active parses to human/4', () => {
+    const content = '---\nconfidence: "4"\n---\n\nbody';
+    const result = markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT);
+    expect(result).not.toBeNull();
+    expect(result!.reviewer).toBe('👤');
+    expect(result!.level).toBe(4);
+    expect(result!.date).toBeUndefined();
+  });
+
+  // S003.§6.AC.08 / DC.53 — unquoted bare digit is a YAML *number*; the active
+  // policy coerces an in-range integer to its digit string before the guard.
+  it('S003.§6.AC.08: YAML number `confidence: 4` (unquoted) with policy active coerces to human/4', () => {
+    const content = '---\nconfidence: 4\n---\n\nbody';
+    const result = markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT);
+    expect(result).not.toBeNull();
+    expect(result!.reviewer).toBe('👤');
+    expect(result!.level).toBe(4);
+  });
+
+  // S003.§6.AC.05 — policy inactive: unquoted YAML number returns null (today)
+  it('S003.§6.AC.05: YAML number `confidence: 4` with NO options returns null', () => {
+    const content = '---\nconfidence: 4\n---\n\nbody';
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md')).toBeNull();
+  });
+
+  it('S003.§6.AC.05: YAML string `confidence: "4"` with NO options returns null', () => {
+    const content = '---\nconfidence: "4"\n---\n\nbody';
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md')).toBeNull();
+  });
+
+  // S003.§6.AC.08 — out-of-range numbers return null under BOTH policy states
+  it('S003.§6.AC.08: out-of-range `confidence: 6` returns null under active policy', () => {
+    const content = '---\nconfidence: 6\n---\n\nbody';
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT)).toBeNull();
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md')).toBeNull();
+  });
+
+  it('S003.§6.AC.08: out-of-range `confidence: 0` returns null under active policy', () => {
+    const content = '---\nconfidence: 0\n---\n\nbody';
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT)).toBeNull();
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md')).toBeNull();
+  });
+
+  // S003.§6.AC.08 — non-integer returns null under both states
+  it('S003.§6.AC.08: non-integer `confidence: 4.5` returns null under active policy', () => {
+    const content = '---\nconfidence: 4.5\n---\n\nbody';
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT)).toBeNull();
+    expect(markdownFrontmatterAdapter.parse(content, 'a.md')).toBeNull();
+  });
+
+  // S003.§6.AC.08 — object/array/boolean return null under both states
+  it('S003.§6.AC.08: object / array / boolean confidence return null under active policy', () => {
+    const obj = '---\nconfidence:\n  reviewer: ai\n  level: 2\n---\n\nbody';
+    const arr = '---\nconfidence:\n  - foo\n  - bar\n---\n\nbody';
+    const bool = '---\nconfidence: true\n---\n\nbody';
+    for (const content of [obj, arr, bool]) {
+      expect(markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT)).toBeNull();
+      expect(markdownFrontmatterAdapter.parse(content, 'a.md')).toBeNull();
+    }
+  });
+
+  // S003.§6.AC.04 — bare digit + date is already a YAML string (carries a
+  // space); reaches the grammar without coercion and parses dated.
+  it('S003.§6.AC.04: bare `confidence: 4 2026-05-31` (string) parses to human/4 dated', () => {
+    const content = '---\nconfidence: 4 2026-05-31\n---\n\nbody';
+    const result = markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT);
+    expect(result).not.toBeNull();
+    expect(result!.reviewer).toBe('👤');
+    expect(result!.level).toBe(4);
+    expect(result!.date).toBe('2026-05-31');
+  });
+
+  // S003.§6.AC.07 / DC.54 — no validation coupling: bare 1 and 2 (below the
+  // write-side human range 3-5) still parse to human under the active policy.
+  it('S003.§6.AC.07: bare 1 and 2 (below the write-side human range) parse to human', () => {
+    for (const level of [1, 2] as const) {
+      const content = `---\nconfidence: ${level}\n---\n\nbody`;
+      const result = markdownFrontmatterAdapter.parse(content, 'a.md', HUMAN_DEFAULT);
+      expect(result).not.toBeNull();
+      expect(result!.reviewer).toBe('👤');
+      expect(result!.level).toBe(level);
+    }
+  });
+
+  // S003.§6.AC.02 / .AC.06 — explicit emoji UNCHANGED with and without options
+  it('S003.§6.AC.06: explicit 🤖2 and 👤4 parse identically with options active', () => {
+    const ai = '---\nconfidence: "🤖2 2026-05-05"\n---\n\nbody';
+    const human = '---\nconfidence: "👤4 2026-05-05"\n---\n\nbody';
+    const aiResult = markdownFrontmatterAdapter.parse(ai, 'a.md', HUMAN_DEFAULT);
+    const humanResult = markdownFrontmatterAdapter.parse(human, 'b.md', HUMAN_DEFAULT);
+    expect(aiResult!.reviewer).toBe('🤖');
+    expect(aiResult!.level).toBe(2);
+    expect(humanResult!.reviewer).toBe('👤');
+    expect(humanResult!.level).toBe(4);
+    // Identical to the no-options outcome (regression).
+    expect(aiResult).toEqual(markdownFrontmatterAdapter.parse(ai, 'a.md'));
+    expect(humanResult).toEqual(markdownFrontmatterAdapter.parse(human, 'b.md'));
   });
 });

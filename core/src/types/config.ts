@@ -235,6 +235,7 @@ export interface ClaimConfig {
    * @implements {R004.§7.AC.03} Confidence auto-insert config
    * @implements {R013.§1.AC.06} Date inclusion control
    * @implements {DD016.§8.DC.43} includeDate optional boolean field
+   * @implements {DD016.§10.DC.55} impliedHuman optional boolean field
    */
   confidence?: {
     /** Whether to auto-insert confidence annotations on file creation. Default: true */
@@ -247,6 +248,15 @@ export interface ClaimConfig {
      * Default: true
      */
     includeDate?: boolean;
+    /**
+     * Whether a hand-typed bare confidence digit reads as a human (👤)
+     * annotation on the read path. When true (default), `confidence: 4`
+     * / `// @confidence 4` parses as human/4; when false, a bare digit
+     * does not parse (today's behavior). Write paths are unaffected
+     * regardless of this flag. Per {R017}.
+     * Default: true
+     */
+    impliedHuman?: boolean;
   };
 }
 

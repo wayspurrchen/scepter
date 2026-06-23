@@ -12,8 +12,10 @@ This DD concretizes {S003} — the adapter-registry contract that {R013.§1} int
 
 Scope is the adapter layer only. The audit/mark/apply command surface and the auto-insert hook on `scepter create` are downstream consumers tracked separately under {S004}; this DD does not touch them. The C-family adapter changes one externally-observable behavior — the JSDoc-internal insert position per {S003.§3.AC.05} — and that single divergence is the only legacy-behavior break.
 
-**Source spec:** {S003}.
-**Source requirement:** {R013.§1}, in particular {R013.§1.AC.06}.
+The {R017} amendment (§10, added 2026-05-31) widens both adapters' parse grammars on the read path: when the resolved implied-human policy is active, a confidence annotation whose level digit carries no leading emoji reads as a human (`👤`) annotation. This DD owns the adapter-layer half of {R017} — the emoji-optional regexes, the OPTIONAL `defaultReviewer` parse parameter, the frontmatter YAML-number coercion, the reaffirmed validation boundary, and the new `claims.confidence.impliedHuman` config field. The command-layer half (flag resolution and threading into each read-path consumer's `parse` call) is {DD017}'s §8, concretizing {S004.§7}. Write paths are untouched.
+
+**Source spec:** {S003} (§6 added for {R017}).
+**Source requirement:** {R013.§1}, in particular {R013.§1.AC.06}; plus {R017} (read-time defaulting).
 **Migration source:** `core/src/claims/confidence.ts` (entire file is removed; functions split per Module Inventory).
 
 ## Specification Scope
@@ -26,6 +28,8 @@ This DD covers:
 - {S003.§4.AC.01-08} — The markdown-frontmatter adapter (new file shape).
 - {S003.§5.AC.01-05} — Cross-cutting invariants (canonical IR, date round-trip, validation delegation, side-effect freedom).
 - {R013.§1.AC.06} — The `claims.confidence.includeDate` config flag (type and validator additions only).
+- {S003.§6.AC.01-08} ({R017}) — The implied-human read-time policy: the emoji-optional parse grammar in both adapters, the OPTIONAL `defaultReviewer` parse parameter ({S003.§1.AC.08}), the explicit-emoji-unchanged guarantee ({S003.§1.AC.09}), and the frontmatter YAML-number coercion (§10).
+- {S004.§7.AC.01} ({R017}) — The `claims.confidence.impliedHuman` config field (type and validator additions only). The flag's resolution and threading into read-path consumers is {DD017}'s §8; this DD adds only the schema slot, parallel to how it added `includeDate` for {S004} to consume.
 
 Explicitly out of scope (deferred to {S004}):
 
@@ -56,6 +60,13 @@ Explicitly out of scope (deferred to {S004}):
 | `core/src/claims/__tests__/confidence.test.ts` | `core/src/claims/__tests__/confidence.test.ts` | PRESENT — tests re-homed; one set updated for §3.AC.05 behavior change |
 | `mark-command.ts` import surface | `core/src/cli/commands/confidence/mark-command.ts:15-21` | PRESENT — barrel re-exports preserve `mapReviewerArg`, `validateReviewerLevel`, `formatConfidenceAnnotation`, `insertConfidenceAnnotation`. Routing through the registry is {S004}'s concern; this DD's barrel keeps mark-command compiling unchanged. |
 | `audit-command.ts` import surface | `core/src/cli/commands/confidence/audit-command.ts:13` | PRESENT — `auditConfidence` import preserved by barrel re-export until {S004}'s DD relocates it. |
+| `CONFIDENCE_REGEX` (post-{DD016} home) | `core/src/claims/confidence/adapters/c-family.ts:35` | PRESENT — emoji group `(🤖\|👤)` widened to `(🤖\|👤)?` per §10 (DC.51) |
+| `FRONTMATTER_PAYLOAD_REGEX` | `core/src/claims/confidence/adapters/markdown-frontmatter.ts:35` | PRESENT — emoji group widened to optional; coercion added ahead of the string-scalar guard per §10 (DC.52, DC.53) |
+| Frontmatter string-scalar guard (`typeof value !== 'string'` → `null`) | `core/src/claims/confidence/adapters/markdown-frontmatter.ts:69` | PRESENT — preceded by the active-policy YAML-integer coercion per §10 (DC.53); the guard is otherwise unchanged |
+| `ConfidenceAdapter.parse` signature | `core/src/claims/confidence/adapter.ts:40` | PRESENT — gains an OPTIONAL third parameter `options?: { defaultReviewer?: ReviewerIcon \| null }` per §10 (DC.50) |
+| `REVIEWER_LEVEL_RANGES` (must-NOT-import boundary) | `core/src/claims/confidence/validation.ts:13` | PRESENT — adapters MUST NOT import it; the bare-digit default is applied with no range check per §10 (DC.54), preserving DC.04 |
+| `ClaimConfig.confidence` block (`impliedHuman` lands beside `autoInsert`/`includeDate`) | `core/src/types/config.ts:239` | PRESENT — extended with `impliedHuman?: boolean` per §10 (DC.55) |
+| `claims.confidence` Zod object | `core/src/config/config-validator.ts:324-327` | PRESENT — extended with `impliedHuman: z.boolean().optional().default(true)` per §10 (DC.55) |
 
 No ABSENT primitives. The DD is self-contained within the existing project structure.
 
@@ -821,6 +832,137 @@ DC.48:derives=S003.§4.AC.05 The new `markdown-frontmatter.test.ts` file MUST co
 
 DC.49:derives=S003.§2.AC.03 The new `registry.test.ts` MUST cover at minimum: (a) `getAdapter('foo.ts')` returns the C-family adapter; (b) `getAdapter('foo.md')` returns the frontmatter adapter; (c) `getAdapter('foo.unknown')` returns `null`; (d) `getAdapter('')` returns `null` (empty path); (e) registration order is `[markdown-frontmatter, c-family]` — verified by checking that an `.md` file routes to the frontmatter adapter, NOT to a hypothetical narrower adapter (informational only since no narrower adapter exists in this DD).
 
+## §10 Implied-human read-time policy ({R017})
+
+This section amends the adapter layer to realize the {R017} read-time defaulting policy specified in {S003.§6}. The amendment is read-only and additive: the leading-emoji capture in each adapter's parse regex becomes OPTIONAL, `parse` gains an OPTIONAL third parameter carrying the resolved default-reviewer, and the frontmatter adapter coerces an in-range YAML integer to its digit-string form under the active policy. Every existing call site compiles unchanged; `format` and `insert` are untouched. The DCs below ADD to §1-§9; they do not delete or reword any existing DC.
+
+The single mechanism is: when the (now-optional) emoji capture is **absent** AND `options.defaultReviewer` is a reviewer value, attribute that reviewer to the parsed annotation; otherwise behave exactly as before (emoji present → that reviewer; emoji absent and no `defaultReviewer` → `null`). The {DD017}.§8 consumers resolve `claims.confidence.impliedHuman` to `'👤'` (active) or `null` (inactive/unthreaded) and pass it as `options.defaultReviewer`.
+
+### Adapter interface — OPTIONAL `defaultReviewer` parameter (`adapter.ts`)
+
+`parse` gains an OPTIONAL trailing options parameter. The current signature at `core/src/claims/confidence/adapter.ts:40` becomes:
+
+```typescript
+parse(
+  content: string,
+  filePath: string,
+  options?: { defaultReviewer?: ReviewerIcon | null },
+): ConfidenceAnnotation | null;
+```
+
+The parameter is OPTIONAL so every existing caller invoking `parse(content, filePath)` compiles and behaves identically. `ReviewerIcon` is already imported in `adapter.ts`; no new import is required.
+
+DC.50:4:derives=S003.§1.AC.08 The `ConfidenceAdapter.parse` signature in `adapter.ts` MUST add an OPTIONAL third parameter `options?: { defaultReviewer?: ReviewerIcon | null }`. The parameter MUST be optional so that every existing two-argument `parse(content, filePath)` call site in the project compiles and behaves identically. When `options` is omitted, or `options.defaultReviewer` is `undefined`/`null`, each adapter's `parse` MUST behave exactly as it does today (a bare digit MUST NOT parse). Both built-in adapter `parse` functions (`c-family.ts`, `markdown-frontmatter.ts`) MUST adopt the same three-argument signature. This is the type-level half of {S003.§1.AC.08}; the per-adapter behavior is DC.51 (c-family) and DC.52-DC.53 (frontmatter).
+
+### C-family adapter — emoji-optional grammar (`adapters/c-family.ts`)
+
+The widening makes the emoji group optional in `CONFIDENCE_REGEX` (`core/src/claims/confidence/adapters/c-family.ts:35`):
+
+```
+Before: /(?:\/\/|\*)\s*@confidence\s+(🤖|👤)(\d)(?:\s+(.+))?/
+After:  /(?:\/\/|\*)\s*@confidence\s+(🤖|👤)?(\d)(?:\s+(.+))?/
+```
+
+The capture-group indices are unchanged: group 1 = emoji (now possibly `undefined`), group 2 = level digit, group 3 = optional trailing date. The 20-line scan (`SCAN_LIMIT`), the `VALID_LEVELS` 1-5 guard, the `date: match[3]?.trim()` handling, and the carrier/insert paths are all unchanged. `parse` resolves the reviewer per the policy:
+
+```typescript
+const emoji = match[1] as ReviewerIcon | undefined;
+const reviewer = emoji ?? options?.defaultReviewer ?? null;
+if (reviewer === null) continue;  // emoji absent AND no defaultReviewer → not an annotation
+```
+
+Because the regex still requires the `@confidence` tag and a digit, the explicit-emoji forms (`🤖2`, `👤4`, and their dated variants `🤖2 2026-05-31`) match exactly as before — the optional group captures the emoji when present, so `match[1]` is the emoji and `reviewer = emoji`. The new case is `// @confidence 4` / ` * @confidence 4`: `match[1]` is `undefined`, so `reviewer` falls through to `options.defaultReviewer`.
+
+DC.51:5:derives=S003.§6.AC.01 The C-family adapter's `CONFIDENCE_REGEX` MUST widen the leading emoji group from `(🤖|👤)` to `(🤖|👤)?`. `parse` MUST resolve the reviewer as `match[1] ?? options?.defaultReviewer ?? null`; when the resolved reviewer is `null` (emoji absent AND no `defaultReviewer`), the line MUST be treated as a non-match (`continue` the scan, exactly today's outcome). When the emoji IS present, `match[1]` is the reviewer regardless of `defaultReviewer` (preserving {S003.§6.AC.02}). The capture-group order (1=emoji, 2=digit, 3=date), the `SCAN_LIMIT` 20-line bound, the `VALID_LEVELS` 1-5 guard, the `match[3]?.trim()` date handling, and the carrier/insert paths MUST remain unchanged. This amends DC.20; it does not replace it. Verify the optional-emoji regex does not misparse `🤖2`, `👤4`, or the dated forms (`🤖2 2026-05-31`).
+
+### Markdown-frontmatter adapter — emoji-optional grammar (`adapters/markdown-frontmatter.ts`)
+
+The widening makes the emoji group optional in `FRONTMATTER_PAYLOAD_REGEX` (`core/src/claims/confidence/adapters/markdown-frontmatter.ts:35`):
+
+```
+Before: /^(🤖|👤)(\d)(?:\s+(\S+))?$/
+After:  /^(🤖|👤)?(\d)(?:\s+(\S+))?$/
+```
+
+Group indices are unchanged: 1=emoji (now possibly `undefined`), 2=level digit, 3=optional trailing date (no internal whitespace). The anchoring (`^…$`), the `VALID_LEVELS` 1-5 guard, and the `locateConfidenceKeyLine` call are all unchanged. The reviewer resolution mirrors c-family:
+
+```typescript
+const emoji = m[1] as ReviewerIcon | undefined;
+const reviewer = emoji ?? options?.defaultReviewer ?? null;
+if (reviewer === null) return null;  // emoji absent AND no defaultReviewer → not an annotation
+```
+
+DC.52:4:derives=S003.§6.AC.01 The markdown-frontmatter adapter's `FRONTMATTER_PAYLOAD_REGEX` MUST widen the leading emoji group from `(🤖|👤)` to `(🤖|👤)?`. `parse` MUST resolve the reviewer as `m[1] ?? options?.defaultReviewer ?? null`; when the resolved reviewer is `null` (emoji absent AND no `defaultReviewer`), `parse` MUST return `null` (today's outcome for an unrecognized scalar). When the emoji IS present, `m[1]` is the reviewer regardless of `defaultReviewer` ({S003.§6.AC.02}). The anchoring, the capture-group order, the `VALID_LEVELS` 1-5 guard, and the `locateConfidenceKeyLine` call MUST remain unchanged. This widened grammar applies to a `confidence` value that is already a YAML **string** — the bare-digit-with-date case `confidence: 4 2026-05-31` (a string, because it carries a space) reaches this grammar directly and parses to `👤`/4/dated under the active policy. This amends DC.31; it does not replace it.
+
+### Markdown-frontmatter adapter — YAML-number coercion (`adapters/markdown-frontmatter.ts`)
+
+A hand-typed bare `confidence: 4` (no date, no quotes) is the motivating case for {R017.AC.01}, but `gray-matter` parses an unquoted single digit as a YAML **number**. The current string-scalar guard at `markdown-frontmatter.ts:69` (`if (typeof value !== 'string') return null;`) rejects a YAML number before the emoji-optional grammar runs, so without coercion the motivating case never reaches DC.52. Under the active policy ONLY, `parse` MUST coerce an in-range YAML integer to its digit-string form before the string-scalar guard.
+
+The coercion algorithm, inserted between reading `parsed.data?.confidence` and the existing `typeof value !== 'string'` guard:
+
+```
+let value = parsed.data?.confidence;
+
+// §10 coercion (active policy only): a hand-typed bare `confidence: 4`
+// is a YAML number, not a string. Coerce an in-range integer to its
+// digit string so the emoji-optional grammar (DC.52) can attribute it
+// to options.defaultReviewer. Inactive policy leaves numbers untouched
+// → today's `typeof value !== 'string'` → null.
+if (
+  options?.defaultReviewer != null &&
+  typeof value === 'number' &&
+  Number.isInteger(value) &&
+  value >= 1 && value <= 5
+) {
+  value = String(value);   // 4 → '4'
+}
+
+if (typeof value !== 'string') return null;   // existing guard, unchanged
+// … FRONTMATTER_PAYLOAD_REGEX match per DC.52 …
+```
+
+Coercion is gated on three independent conditions, all of which MUST hold: the policy is active (`options.defaultReviewer != null`), the value is a YAML integer (`typeof === 'number' && Number.isInteger`), and it is in range 1-5. Out-of-range numbers (`0`, `6`, `42`), non-integers (`4.5`), and YAML objects/arrays/booleans fall through to the unchanged `typeof value !== 'string'` guard and return `null` under BOTH policy states. The coerced digit string `'4'` is then matched by `FRONTMATTER_PAYLOAD_REGEX` (DC.52) with `m[1] === undefined`, yielding `reviewer = options.defaultReviewer` = `👤`. (The user has confirmed this coercion is the mechanical realization of {R017.AC.01}'s `confidence: 4` example.)
+
+DC.53:5:derives=S003.§6.AC.08 When `options.defaultReviewer` is a reviewer value (active policy) AND the `confidence` frontmatter value is a YAML integer in the range 1-5, the markdown-frontmatter `parse` MUST coerce it to its single-digit string form (`4 → '4'`) BEFORE the `typeof value !== 'string'` guard at `markdown-frontmatter.ts:69`, then apply the DC.52 emoji-optional grammar — yielding reviewer `👤` (= `options.defaultReviewer`) at that level. When `options.defaultReviewer` is omitted or null (inactive policy), a YAML-integer `confidence` value MUST fall through to the unchanged string-scalar guard and return `null` (today's behavior, {S003.§4.AC.02} Edge case 3). YAML object, array, boolean, non-integer (`4.5`), and out-of-range integer (`0`, `6`, …) values MUST return `null` under BOTH policy states. The coercion MUST NOT touch the string-scalar path used by explicit-emoji annotations (`🤖2`, `👤4`) or the dated bare-digit string (`confidence: 4 2026-05-31`, already a string) — those reach the grammar without coercion. This amends DC.31 and {S003.§4.AC.02} Edge case 3; it does not relax the string-scalar contract for explicit-emoji annotations.
+
+### Validation boundary reaffirmed
+
+The bare-digit default is a parse-time defaulting rule, not a validation rule. Per DC.04 / {S003.§5.AC.03}, adapters MUST NOT import `validation.ts` or consult `REVIEWER_LEVEL_RANGES` (the write-side AI 1-3 / Human 3-5 table at `validation.ts:13`). A bare digit reads as human at every level 1-5, including levels a human cannot write via `mark` (e.g. `confidence: 2` → `👤`/2). No range check is applied to the bare-digit reviewer attribution.
+
+DC.54:4:derives=S003.§6.AC.07 The §10 emoji-optional grammar and the YAML-number coercion (DC.51, DC.52, DC.53) MUST NOT import `validation.ts`, MUST NOT reference `REVIEWER_LEVEL_RANGES`, and MUST NOT range-check the level against the writer-side reviewer range before attributing `options.defaultReviewer`. A bare digit at any level 1-5 MUST be attributed to `options.defaultReviewer` whenever the digit passes the existing `VALID_LEVELS` 1-5 guard. This preserves the DC.04 adapter/validation boundary unchanged; the `VALID_LEVELS` guard (an in-adapter constant, not a write-side range) continues to bound the level to 1-5, consistent with today's parse.
+
+### Config field — `impliedHuman` (`config.ts`, `config-validator.ts`)
+
+A new optional boolean joins `autoInsert` and `includeDate` in the `claims.confidence` block. This DD adds only the schema slot and the Zod validation; {DD017}.§8 resolves and consumes it. Type addition at `core/src/types/config.ts:239`:
+
+```typescript
+confidence?: {
+  autoInsert?: boolean;
+  includeDate?: boolean;
+  /**
+   * Whether a hand-typed bare confidence digit reads as a human (👤)
+   * annotation on the read path. When true (default), `confidence: 4`
+   * / `// @confidence 4` parses as human/4; when false, a bare digit
+   * does not parse (today's behavior). Write paths are unaffected
+   * regardless of this flag. Per {R017}.
+   * Default: true
+   */
+  impliedHuman?: boolean;
+};
+```
+
+Validator addition at `core/src/config/config-validator.ts:324-327`:
+
+```typescript
+confidence: z.object({
+  autoInsert: z.boolean().optional().default(true),
+  includeDate: z.boolean().optional().default(true),
+  impliedHuman: z.boolean().optional().default(true),
+}).optional(),
+```
+
+DC.55:4:derives=S004.§7.AC.01 `ClaimConfig.confidence.impliedHuman` MUST exist as an OPTIONAL boolean field in `core/src/types/config.ts` parallel to `autoInsert` and `includeDate`, and the `claims.confidence` Zod object in `core/src/config/config-validator.ts` MUST be extended with `impliedHuman: z.boolean().optional().default(true)`. The documented default MUST be `true` (bare-digit-reads-as-human active when unset). The existing `autoInsert` and `includeDate` entries MUST remain unchanged. This DD adds only the schema slot and validation; resolving the flag to a `defaultReviewer` value and threading it into read-path `parse` calls is {DD017}'s §8 ({S004.§7.AC.02}, {S004.§7.AC.03}).
+
 ## Wiring Map
 
 ### Import graph
@@ -972,6 +1114,14 @@ CLI: scepter confidence apply <reviewer> <level> --types Requirement
 
 **Acceptance gate for the entire DD**: `pnpm tsc` passes; all new test files pass; one end-to-end exercise of `scepter confidence mark <file> human 4` against a `.ts` file with a JSDoc header produces output that places ` * @confidence …` BEFORE the `*/` (the §3.AC.05 corrective behavior); the same exercise against a `.md` file (via the existing mark-command, even though full routing is {S004}'s job — at minimum the legacy-compat wrapper still produces working output for `.ts`) compiles.
 
+### Phase 7: Implied-human read-time policy ({R017})
+
+**Depends on:** Phases 2, 3, 5 (the c-family adapter, the frontmatter adapter, and the config slots must exist).
+**Files**: `core/src/claims/confidence/adapter.ts`, `core/src/claims/confidence/adapters/c-family.ts`, `core/src/claims/confidence/adapters/markdown-frontmatter.ts`, `core/src/types/config.ts`, `core/src/config/config-validator.ts`, and the two adapter test files.
+**Changes**: Add the OPTIONAL `options?: { defaultReviewer?: ReviewerIcon | null }` parameter to `ConfidenceAdapter.parse` (DC.50). Widen both adapters' emoji capture to `(🤖|👤)?` and resolve the reviewer via `?? options?.defaultReviewer ?? null` (DC.51, DC.52). Insert the YAML-number coercion ahead of the frontmatter string-scalar guard (DC.53). Add `impliedHuman?: boolean` to the config type and the Zod validator with `.default(true)` (DC.55). No `format`/`insert` change; no `validation.ts` import (DC.54).
+**Verify**: `pnpm tsc` passes (every existing two-arg `parse` call site still compiles). New adapter tests pass for: `// @confidence 4` and ` * @confidence 4` → `👤`/4 with `{defaultReviewer:'👤'}`; `confidence: 4` (YAML number) → `👤`/4 via coercion; `confidence: 4 2026-05-31` (YAML string) → `👤`/4 dated; bare digit at levels 1-5 each → `👤`; explicit `🤖2`/`👤4`/dated forms parse identically with and without the param; bare digit → `null` when the param is omitted; out-of-range/non-integer/object YAML values → `null` under both states; `claims.confidence.impliedHuman` defaults to `true`.
+**Spec**: {S003.§6.AC.01-08}, {S003.§1.AC.08}, {S003.§1.AC.09}, {S004.§7.AC.01}.
+
 ## Decisions
 
 ### Decision 1 — C-family adapter uses a hardcoded extension list, not config-driven
@@ -1018,7 +1168,8 @@ CLI: scepter confidence apply <reviewer> <level> --types Requirement
 | §7 Validation | 2 (DC.41-DC.42) | {S003.§5.AC.03} |
 | §8 Config additions | 3 (DC.43-DC.45) | {R013.§1.AC.06} |
 | §9 Migration and test mapping | 4 (DC.46-DC.49) | {S003.§3.AC.05}, {S003.§3.AC.06}, {S003.§4.AC.05}, {S003.§2.AC.03} |
-| **Total** | **49** | — |
+| §10 Implied-human read-time policy ({R017}) | 6 (DC.50-DC.55) | {S003.§1.AC.08}, {S003.§6.AC.01}, {S003.§6.AC.07}, {S003.§6.AC.08}, {S004.§7.AC.01} |
+| **Total** | **55** | — |
 
 ## Non-Goals / Out of Scope
 
@@ -1039,8 +1190,10 @@ This DD deliberately excludes:
 - {R013.§1} — Source requirement: pluggable annotation adapters.
 - {R013.§1.AC.06} — `claims.confidence.includeDate` flag (this DD's §8).
 - {R004.§7} — Original confidence requirement (preserved by C-family adapter via {S003.§3.AC.06}).
-- {S004} — Downstream consumer spec: command surface and creation hook.
-- {DD017} — Downstream consumer DD: command surface implementation (concretizes {S004}, consumes the adapter registry built here).
+- {S004} — Downstream consumer spec: command surface and creation hook. {S004.§7.AC.01} authorizes the `impliedHuman` config slot this DD adds (§10, DC.55).
+- {R017} — Implied-human read-time confidence defaulting. §10 concretizes the adapter-layer half: the emoji-optional grammar and `defaultReviewer` parameter ({S003.§6.AC.01}, {S003.§1.AC.08}), the YAML-number coercion ({S003.§6.AC.08}), the reaffirmed validation boundary ({S003.§6.AC.07}), and the config slot ({S004.§7.AC.01}). Origin task {T006}.
+- {S003.§6} — Implied-human read-time parse grammar this DD's §10 realizes.
+- {DD017} — Downstream consumer DD: command surface implementation (concretizes {S004}, consumes the adapter registry built here). {DD017}.§8 resolves `impliedHuman` and threads the `defaultReviewer` value into each read-path consumer's `parse` call.
 - `core/src/claims/confidence.ts` — Existing implementation; deleted by this DD.
 - `core/src/claims/__tests__/confidence.test.ts` — Existing tests; deleted by this DD with cases re-homed.
 - `core/src/notes/note-file-manager.ts:8, 222, 701-716` — Existing `gray-matter` usage convention the frontmatter adapter aligns with.

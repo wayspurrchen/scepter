@@ -6,10 +6,13 @@
  * @validates {S004.§2.AC.10}
  * @validates {S004.§4.AC.05}
  * @validates {S004.§4.AC.08}
+ * @validates {S004.§7.AC.06} per-reviewer breakdown rendering ({R017})
+ * @validates {DD017.§8.DC.42} renderScopeSection by-reviewer line + JSON carries byReviewer
  * @validates {TS001.§6.AC.05}
  * @validates {TS001.§6.AC.06}
  * @validates {TS001.§6.AC.09}
  * @validates {TS001.§8.AC.08}
+ * @validates {TS001.§12.AC.09}
  */
 
 import { describe, it, expect } from 'vitest';
@@ -27,6 +30,7 @@ function emptyScope() {
     annotated: 0,
     unannotated: 0,
     byLevel: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    byReviewer: { '🤖': 0, '👤': 0 },
     files: [],
     unannotatedFiles: [],
   };
@@ -38,6 +42,7 @@ function bothPopulated(): ConfidenceAuditResult {
     annotated: 2,
     unannotated: 2,
     byLevel: { 1: 0, 2: 1, 3: 0, 4: 1, 5: 0 },
+    byReviewer: { '🤖': 1, '👤': 1 },
     files: [
       {
         reviewer: '🤖',
@@ -60,6 +65,7 @@ function bothPopulated(): ConfidenceAuditResult {
       annotated: 1,
       unannotated: 1,
       byLevel: { 1: 0, 2: 1, 3: 0, 4: 0, 5: 0 },
+      byReviewer: { '🤖': 1, '👤': 0 },
       files: [
         {
           reviewer: '🤖',
@@ -76,6 +82,7 @@ function bothPopulated(): ConfidenceAuditResult {
       annotated: 1,
       unannotated: 1,
       byLevel: { 1: 0, 2: 0, 3: 0, 4: 1, 5: 0 },
+      byReviewer: { '🤖': 0, '👤': 1 },
       files: [
         {
           reviewer: '👤',
@@ -129,6 +136,25 @@ describe('S004.§2.AC.07: per-scope sections + combined-totals (DC.34)', () => {
     expect(parsed.total).toBe(4);
     expect(parsed.bySource).toBeDefined();
     expect(parsed.byNotes).toBeDefined();
+  });
+});
+
+describe('S004.§7.AC.06: per-reviewer breakdown rendering ({R017}, DD017.§8.DC.42)', () => {
+  it('renderScopeSection emits a "By reviewer:" block with human and AI counts per scope', () => {
+    const out = formatConfidenceAudit(bothPopulated(), { scope: 'both' });
+    // The Source scope has one 🤖 annotation; the Notes scope has one 👤.
+    expect(out).toContain('By reviewer:');
+    // Both reviewer labels are surfaced.
+    expect(out).toContain('Human');
+    expect(out).toContain('AI');
+  });
+
+  it('json output carries the additive byReviewer field at every scope', () => {
+    const out = formatConfidenceAudit(bothPopulated(), { format: 'json' });
+    const parsed = JSON.parse(out);
+    expect(parsed.byReviewer).toEqual({ '🤖': 1, '👤': 1 });
+    expect(parsed.bySource.byReviewer).toEqual({ '🤖': 1, '👤': 0 });
+    expect(parsed.byNotes.byReviewer).toEqual({ '🤖': 0, '👤': 1 });
   });
 });
 

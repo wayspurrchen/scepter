@@ -21,6 +21,7 @@ import type {
   ConfidencePayload,
   ConfidenceLevel,
   ReviewerIcon,
+  ConfidenceParseOptions,
 } from '../types.js';
 
 const VALID_LEVELS: readonly ConfidenceLevel[] = [1, 2, 3, 4, 5] as const;
@@ -29,10 +30,16 @@ const VALID_LEVELS: readonly ConfidenceLevel[] = [1, 2, 3, 4, 5] as const;
  * Anchored payload regex for YAML scalar values. Distinct from c-family's
  * CONFIDENCE_REGEX because the YAML scalar carries no `//` or `*` carrier.
  *
- * Matches: `<emoji><level>` optionally followed by ` <date>` (no internal
- * whitespace in the date capture, per S003.§4.AC.02 anchored grammar).
+ * Matches: `<emoji>?<level>` optionally followed by ` <date>` (no internal
+ * whitespace in the date capture, per S003.§4.AC.02 anchored grammar). The
+ * leading emoji group is OPTIONAL ({R017}): a bare digit matches with
+ * group 1 undefined, so the reviewer falls through to the resolved
+ * `options.defaultReviewer`. Capture order is unchanged: 1=emoji, 2=digit,
+ * 3=optional trailing date.
+ *
+ * @implements {DD016.§10.DC.52} emoji-optional grammar
  */
-const FRONTMATTER_PAYLOAD_REGEX = /^(🤖|👤)(\d)(?:\s+(\S+))?$/;
+const FRONTMATTER_PAYLOAD_REGEX = /^(🤖|👤)?(\d)(?:\s+(\S+))?$/;
 
 /**
  * @implements {S003.§4.AC.01} matches .md only (case-insensitive)
@@ -47,13 +54,33 @@ function matches(filePath: string): boolean {
  * when no recognized annotation is present. Suppresses gray-matter
  * errors per the parse-vs-insert asymmetry (S003 Edge case 2).
  *
- * @implements {S003.§4.AC.02,.AC.03}
+ * The leading emoji is OPTIONAL ({R017}): when present, `m[1]` is the
+ * reviewer regardless of policy; when absent, the reviewer falls through
+ * to `options.defaultReviewer`. A null resolved reviewer (emoji absent AND
+ * no default) returns null, today's outcome for an unrecognized scalar.
+ *
+ * Under the active policy, a hand-typed bare `confidence: 4` arrives as a
+ * YAML *number* from gray-matter, not a string; an in-range integer is
+ * coerced to its digit-string form before the string-scalar guard so the
+ * emoji-optional grammar can attribute it to `options.defaultReviewer`.
+ *
+ * @implements {S003.§4.AC.02}
+ * @implements {S003.§4.AC.03}
+ * @implements {S003.§6.AC.01} emoji-optional bare-digit defaulting
+ * @implements {S003.§6.AC.02} explicit emoji unchanged
+ * @implements {S003.§6.AC.08} YAML-integer coercion under active policy
  * @implements {S003.§1.AC.04} returns null on absent annotation
- * @implements {DD016.§6.DC.31,.DC.32}
+ * @implements {DD016.§6.DC.31}
+ * @implements {DD016.§6.DC.32}
+ * @implements {DD016.§10.DC.52} reviewer resolution under the policy
+ * @implements {DD016.§10.DC.53} YAML-number coercion ahead of the guard
+ * @implements {DD016.§10.DC.54} no validation.ts import; no range check
+ * @implements {R017.AC.01} bare digit reads as human under active policy
  */
 function parse(
   content: string,
   filePath: string,
+  options?: ConfidenceParseOptions,
 ): ConfidenceAnnotation | null {
   if (content === '') return null;
 
@@ -65,7 +92,23 @@ function parse(
     return null;
   }
 
-  const value = parsed.data?.confidence;
+  let value: unknown = parsed.data?.confidence;
+
+  // §10 coercion (active policy only): a hand-typed bare `confidence: 4`
+  // is a YAML number, not a string. Coerce an in-range integer to its
+  // digit string so the emoji-optional grammar (DC.52) can attribute it
+  // to options.defaultReviewer. Inactive policy leaves numbers untouched
+  // → today's `typeof value !== 'string'` → null.
+  if (
+    options?.defaultReviewer != null &&
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 5
+  ) {
+    value = String(value); // 4 → '4'
+  }
+
   if (typeof value !== 'string') return null;
 
   const m = value.match(FRONTMATTER_PAYLOAD_REGEX);
@@ -74,7 +117,12 @@ function parse(
   const level = parseInt(m[2], 10);
   if (!VALID_LEVELS.includes(level as ConfidenceLevel)) return null;
 
-  const reviewer = m[1] as ReviewerIcon;
+  const emoji = m[1] as ReviewerIcon | undefined;
+  const reviewer = emoji ?? options?.defaultReviewer ?? null;
+  if (reviewer === null) {
+    // Emoji absent AND no defaultReviewer → not an annotation.
+    return null;
+  }
   const date = m[3];
 
   return {
@@ -142,9 +190,18 @@ function format(
  * Per Edge case 2 asymmetry: parse swallows malformed YAML; insert
  * propagates the gray-matter error.
  *
- * @implements {S003.§4.AC.05,.AC.06,.AC.07,.AC.08}
- * @implements {S003.§1.AC.05,.AC.06,.AC.07}
- * @implements {DD016.§6.DC.35,.DC.36,.DC.37,.DC.38,.DC.39}
+ * @implements {S003.§4.AC.05}
+ * @implements {S003.§4.AC.06}
+ * @implements {S003.§4.AC.07}
+ * @implements {S003.§4.AC.08}
+ * @implements {S003.§1.AC.05}
+ * @implements {S003.§1.AC.06}
+ * @implements {S003.§1.AC.07}
+ * @implements {DD016.§6.DC.35}
+ * @implements {DD016.§6.DC.36}
+ * @implements {DD016.§6.DC.37}
+ * @implements {DD016.§6.DC.38}
+ * @implements {DD016.§6.DC.39}
  */
 function insert(content: string, payload: ConfidencePayload): string {
   const valueString = format(payload.reviewer, payload.level, payload.date);

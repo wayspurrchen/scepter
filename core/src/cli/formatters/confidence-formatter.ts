@@ -14,6 +14,7 @@
  * @implements {DD017.DC.36}
  * @implements {DD017.DC.37}
  * @implements {DD017.DC.38}
+ * @implements {DD017.§8.DC.42} per-reviewer breakdown in renderScopeSection
  */
 
 import chalk from 'chalk';
@@ -116,6 +117,14 @@ function renderScopeSection(label: string, scope: ScopedAuditResult): string[] {
         );
       }
     }
+    // Per-reviewer breakdown ({R017}): human vs AI annotated-file counts.
+    lines.push('  By reviewer:');
+    lines.push(
+      `    👤 ${padRight('Human', 14)} ${chalk.cyan(String(scope.byReviewer['👤']))}`,
+    );
+    lines.push(
+      `    🤖 ${padRight('AI', 14)} ${chalk.cyan(String(scope.byReviewer['🤖']))}`,
+    );
   }
   return lines;
 }

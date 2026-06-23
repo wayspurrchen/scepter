@@ -34,6 +34,9 @@ WHAT OPERATION ARE YOU PERFORMING?
 ├─ PRODUCING an artifact (code, design, requirements, specs, tests)?
 │   └─ **DISPATCH the sce-producer agent.** Do not do this work inline.
 │      Read claude/agents/sce-producer.md and launch with Agent tool.
+│      If the team protocol is in play (team.md): production is a producer+reviewer
+│      PAIR on a team — TeamCreate + spawn BOTH concurrently. A lone producer is a
+│      protocol violation. See team.md § Orchestrator Bootstrap.
 │
 ├─ REVIEWING or VALIDATING work?
 │   └─ **DISPATCH the sce-reviewer agent.** Do not review inline.

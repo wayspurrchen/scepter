@@ -256,6 +256,43 @@ A function name encoding a spec coordinate is **not a stylistic preference**. It
 
 Peer to reality-conformance and attribution-conformance. Reality-conformance grounds primitives against `src/`; attribution-conformance grounds user-intent claims against session sources; identifier-naming conformance grounds identifier semantics against the code's own job description. Run all four passes (these three plus claim-to-claim conformance) when reviewing source code derived from a DD or spec.
 
+## Behavioral-Reachability Conformance Pass
+
+**Scope-determining question:** "For each case the source claim enumerates, is the behavior actually *reached* under the input that case describes — and does a test *exercise* it — or is it merely *present* in the code?" Peer to reality-conformance: reality-conformance asks whether the primitive exists; this asks whether the realized behavior is reachable and exercised. Presence is necessary; reachability is what the claim actually asserts.
+
+### When to Use
+
+Whenever the artifact under review is code (or a test for code) that realizes a claim with conditional behavior: branches, guards, conflict/skip handling, error paths, cardinality/direction/state-dependent logic, or any "case (i) / (ii) / (iii)" structure in the source claim. Highest priority for bulk-mutation, migration, reconciliation, and remediation code, where the dangerous path fires only for one data shape and a small fixture never produces it.
+
+### Why this exists
+
+A check that confirms "the branch for case X is present" PASSES even when case X is **unreachable** — shadowed by an earlier condition, gated on a predicate that is always true/false for realistic data, or reachable only for a data shape no test produces. The branch exists; the behavior does not. Two real failure shapes:
+- A predicate that misreads its condition (wrong direction / side / sign) so the "common case" path is never taken — every input falls into the exception branch, and the exception branch then does the wrong thing.
+- A test whose name or docstring claims it verifies behavior X, but whose fixtures produce degenerate data that never reaches X and whose assertions never check X. Coverage reads green; the behavior is untested. This is strictly worse than a missing test, because it advertises false coverage.
+
+### Methodology
+
+For each conditional claim the artifact realizes:
+1. **Enumerate the cases the source claim names** (case i / ii / iii; happy path vs guarded path; each branch the claim requires).
+2. **For each case, construct the input that SHOULD reach it** and trace control flow by hand. Does execution actually arrive at that branch for that input? Look for shadowing predicates, always-true/always-false guards, and direction / cardinality / sign errors in the deciding condition.
+3. **Flag any case that is present but unreachable** (or reachable only for an input the claim does not intend) as a conformance FAILURE — the claim is not realized even though the code "has a branch for it."
+4. **For each test that names or claims a behavior** (`test('...: conflict is flagged', ...)`, docstring "verifies X is skipped"): confirm (a) the fixture/seed produces data that actually reaches the claimed path, and (b) an assertion exists that fails if X regresses. A coverage claim with no exercising assertion is coverage theater — a conformance failure equal to a missing test.
+
+### Output
+
+| Claim / Case | Branch present? | Reachable for intended input? | Test exercises it? | Verdict |
+|---|---|---|---|---|
+| `{NOTE.§N.DC.0X}` common-case path | yes | NO — every input mis-routed to the exception branch | no | UNREACHABLE — claim not realized |
+| `{NOTE.§N.DC.0Y}` guarded flag+skip | yes | yes | docstring claims it; fixture seeds no triggering data → never runs | COVERAGE THEATER |
+
+### Critical Rule
+
+Presence is not realization. A branch control flow never enters for the claim's intended input does not satisfy the claim; a test whose assertions never execute the claimed path does not cover it. Both are conformance FAILURES, not "present and accounted for." This is the cheapest catch for the bug class where green coverage and an existing-looking branch hide behavior that never runs — the failure that otherwise surfaces only in production or in a downstream consumer who trusted the artifact.
+
+### Relationship to Other Passes
+
+Peer to reality-conformance, attribution-conformance, and identifier-naming conformance. Reality-conformance: does the primitive exist? Behavioral-reachability: does the realized behavior actually run and get exercised? Run on any code claim with conditional structure, and on every test that asserts a behavior by name.
+
 ## Claim Verification
 
 Claims (e.g., `§1.AC.01`, `R004.§3.AC.02`) are SCEpter's mechanism for sub-document traceability. When validating implementations, you MUST verify that claims have been carried forward correctly. **Read `claims.md` from this skill directory for the full claim syntax and rules.**

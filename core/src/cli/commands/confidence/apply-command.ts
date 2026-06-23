@@ -9,7 +9,15 @@
  * the loop continues to the next file.
  *
  * @implements {R013.§3} bulk apply
- * @implements {S004.§4.AC.01-09}
+ * @implements {S004.§4.AC.01}
+ * @implements {S004.§4.AC.02}
+ * @implements {S004.§4.AC.03}
+ * @implements {S004.§4.AC.04}
+ * @implements {S004.§4.AC.05}
+ * @implements {S004.§4.AC.06}
+ * @implements {S004.§4.AC.07}
+ * @implements {S004.§4.AC.08}
+ * @implements {S004.§4.AC.09}
  * @implements {DD017.DC.20}
  * @implements {DD017.DC.21}
  * @implements {DD017.DC.22}
@@ -30,7 +38,7 @@ import {
   validateReviewerLevel,
   getAdapter,
 } from '../../../claims/confidence/index.js';
-import type { ConfidenceLevel } from '../../../claims/confidence/index.js';
+import type { ConfidenceLevel, ReviewerIcon } from '../../../claims/confidence/index.js';
 import {
   resolveFiles,
   FilterContradictionError,
@@ -89,6 +97,9 @@ function commaSplit(value: string | undefined): string[] | undefined {
  * @implements {DD017.DC.26}
  * @implements {DD017.DC.27}
  * @implements {DD017.DC.28}
+ * @implements {DD017.§8.DC.39} resolve impliedHuman ?? true
+ * @implements {DD017.§8.DC.39a} map to defaultReviewer ('👤' | null)
+ * @implements {DD017.§8.DC.44} thread defaultReviewer into --skip-annotated parse
  */
 export async function executeApply(
   pm: ProjectManager,
@@ -160,6 +171,12 @@ export async function executeApply(
   const includeDate = config.claims?.confidence?.includeDate ?? true;
   const date = includeDate ? new Date().toISOString().slice(0, 10) : undefined;
 
+  // {R017} read-time policy: resolve impliedHuman (default active) and map
+  // to the parse-policy defaultReviewer for the --skip-annotated check, so
+  // a hand-typed bare digit parses non-null and is not clobbered (DC.44).
+  const impliedHuman = config.claims?.confidence?.impliedHuman ?? true;
+  const defaultReviewer: ReviewerIcon | null = impliedHuman ? '👤' : null;
+
   const outcome: ApplyOutcome = {
     marked: 0,
     replaced: 0,
@@ -207,7 +224,9 @@ export async function executeApply(
 
     let parsed: ReturnType<typeof adapter.parse> | null = null;
     try {
-      parsed = adapter.parse(content, file.filePath);
+      // @implements {DD017.§8.DC.44} defaultReviewer threaded into the
+      //   --skip-annotated parse so a bare digit classifies skip-annotated
+      parsed = adapter.parse(content, file.filePath, { defaultReviewer });
     } catch {
       // Parse-throws are part of the adapter contract surface; treat
       // as failed for this file. (parse() shouldn't throw, but if a

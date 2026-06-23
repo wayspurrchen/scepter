@@ -1,12 +1,43 @@
 /**
  * Tests for the C-family confidence adapter (parse, format, insert).
  *
- * @validates {S003.§3.AC.01,.AC.02,.AC.03,.AC.04,.AC.05,.AC.06}
- * @validates {S003.§5.AC.02,.AC.04} side-effect freedom and date verbatim round-trip
- * @validates {DD016.§5.DC.19,.DC.20,.DC.21,.DC.22,.DC.23,.DC.24,.DC.25,.DC.26,.DC.27,.DC.28,.DC.29}
- * @validates {DD016.§9.DC.46,.DC.47}
- * @validates {R004.§7.AC.01,.AC.02} parse/format/insert legacy contract
+ * @validates {S003.§3.AC.01}
+ * @validates {S003.§3.AC.02}
+ * @validates {S003.§3.AC.03}
+ * @validates {S003.§3.AC.04}
+ * @validates {S003.§3.AC.05}
+ * @validates {S003.§3.AC.06}
+ * @validates {S003.§5.AC.02} side-effect freedom
+ * @validates {S003.§5.AC.04} date verbatim round-trip
+ * @validates {S003.§6.AC.01} implied-human parse grammar ({R017})
+ * @validates {S003.§6.AC.02} implied-human parse grammar ({R017})
+ * @validates {S003.§6.AC.03} implied-human parse grammar ({R017})
+ * @validates {S003.§6.AC.04} implied-human parse grammar ({R017})
+ * @validates {S003.§6.AC.05} implied-human parse grammar ({R017})
+ * @validates {S003.§6.AC.06} implied-human parse grammar ({R017})
+ * @validates {S003.§6.AC.07} implied-human parse grammar ({R017})
+ * @validates {DD016.§5.DC.19}
+ * @validates {DD016.§5.DC.20}
+ * @validates {DD016.§5.DC.21}
+ * @validates {DD016.§5.DC.22}
+ * @validates {DD016.§5.DC.23}
+ * @validates {DD016.§5.DC.24}
+ * @validates {DD016.§5.DC.25}
+ * @validates {DD016.§5.DC.26}
+ * @validates {DD016.§5.DC.27}
+ * @validates {DD016.§5.DC.28}
+ * @validates {DD016.§5.DC.29}
+ * @validates {DD016.§9.DC.46}
+ * @validates {DD016.§9.DC.47}
+ * @validates {DD016.§10.DC.51} emoji-optional grammar
+ * @validates {DD016.§10.DC.54} no validation coupling
+ * @validates {R004.§7.AC.01} parse/format/insert legacy contract
+ * @validates {R004.§7.AC.02} parse/format/insert legacy contract
  * @validates {R013.§1.AC.06} no-date format branch
+ * @validates {TS001.§12.AC.01}
+ * @validates {TS001.§12.AC.02}
+ * @validates {TS001.§12.AC.03}
+ * @validates {TS001.§12.AC.06} no-validation-coupling (bare 1/2) in C-family
  */
 
 import { describe, it, expect } from 'vitest';
@@ -406,5 +437,112 @@ describe('S003.§5: c-family cross-cutting invariants', () => {
         cFamilyAdapter.insert(c, { reviewer: '🤖', level: 2, date: '2026-05-05' }),
       ).not.toThrow();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Implied-human read-time policy ({R017}) — emoji-optional parse grammar.
+// S003.§6.AC.01-07 / DD016.§10.DC.51,.DC.54 / TS001 §12.
+// ---------------------------------------------------------------------------
+
+const HUMAN_DEFAULT = { defaultReviewer: '👤' as const };
+
+describe('S003.§6: c-family implied-human bare-digit parse', () => {
+  // S003.§6.AC.01 — bare digit reads as 👤 under active policy (line comment)
+  it('S003.§6.AC.01: bare `// @confidence 4` with defaultReviewer 👤 parses to human/4', () => {
+    const content = '// @confidence 4\nconst x = 1;';
+    const result = cFamilyAdapter.parse(content, 'test.ts', HUMAN_DEFAULT);
+    expect(result).not.toBeNull();
+    expect(result!.reviewer).toBe('👤');
+    expect(result!.level).toBe(4);
+    expect(result!.date).toBeUndefined();
+    expect(result!.line).toBe(1);
+  });
+
+  // S003.§6.AC.01 — JSDoc carrier form (` * @confidence 3`)
+  it('S003.§6.AC.01: bare ` * @confidence 3` JSDoc carrier with policy active parses to human/3', () => {
+    const content = ['/**', ' * Module doc', ' * @confidence 3', ' */', 'const x = 1;'].join('\n');
+    const result = cFamilyAdapter.parse(content, 'mod.ts', HUMAN_DEFAULT);
+    expect(result).not.toBeNull();
+    expect(result!.reviewer).toBe('👤');
+    expect(result!.level).toBe(3);
+    expect(result!.line).toBe(3);
+  });
+
+  // S003.§6.AC.05 — policy inactive (no options): a bare digit MUST NOT parse
+  it('S003.§6.AC.05: bare `// @confidence 4` with NO options returns null (today behavior)', () => {
+    const content = '// @confidence 4\nconst x = 1;';
+    expect(cFamilyAdapter.parse(content, 'test.ts')).toBeNull();
+  });
+
+  // S003.§6.AC.05 — explicit null default also yields no-match
+  it('S003.§6.AC.05: bare digit with defaultReviewer null returns null', () => {
+    const content = '// @confidence 4\nconst x = 1;';
+    expect(cFamilyAdapter.parse(content, 'test.ts', { defaultReviewer: null })).toBeNull();
+  });
+
+  // S003.§6.AC.03 — bare-digit defaulting applies at every level 1-5
+  it('S003.§6.AC.03: bare digit at every level 1-5 parses to human at that level', () => {
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      const content = `// @confidence ${level}\nconst x = 1;`;
+      const result = cFamilyAdapter.parse(content, 'test.ts', HUMAN_DEFAULT);
+      expect(result).not.toBeNull();
+      expect(result!.reviewer).toBe('👤');
+      expect(result!.level).toBe(level);
+    }
+  });
+
+  // S003.§6.AC.07 / DC.54 — no validation coupling: bare 1 and 2 (outside the
+  // write-side human range 3-5) still parse to human under the active policy.
+  it('S003.§6.AC.07: bare 1 and 2 (below the write-side human range) parse to human', () => {
+    for (const level of [1, 2] as const) {
+      const content = `// @confidence ${level}\nconst x = 1;`;
+      const result = cFamilyAdapter.parse(content, 'test.ts', HUMAN_DEFAULT);
+      expect(result).not.toBeNull();
+      expect(result!.reviewer).toBe('👤');
+      expect(result!.level).toBe(level);
+    }
+  });
+
+  // S003.§6.AC.04 — bare digit + date: date capture identical with/without emoji
+  it('S003.§6.AC.04: bare `// @confidence 4 2026-05-31` parses to human/4 dated', () => {
+    const content = '// @confidence 4 2026-05-31\nconst x = 1;';
+    const result = cFamilyAdapter.parse(content, 'test.ts', HUMAN_DEFAULT);
+    expect(result).not.toBeNull();
+    expect(result!.reviewer).toBe('👤');
+    expect(result!.level).toBe(4);
+    expect(result!.date).toBe('2026-05-31');
+  });
+
+  // S003.§6.AC.02 / .AC.06 — explicit emoji UNCHANGED, with and without options
+  it('S003.§6.AC.02: explicit 🤖2 and 👤4 parse identically with options active', () => {
+    const aiContent = '// @confidence 🤖2 2026-05-05\nconst x = 1;';
+    const humanContent = '// @confidence 👤4 2026-05-05\nconst x = 1;';
+    const ai = cFamilyAdapter.parse(aiContent, 'a.ts', HUMAN_DEFAULT);
+    const human = cFamilyAdapter.parse(humanContent, 'b.ts', HUMAN_DEFAULT);
+    expect(ai!.reviewer).toBe('🤖');
+    expect(ai!.level).toBe(2);
+    expect(human!.reviewer).toBe('👤');
+    expect(human!.level).toBe(4);
+  });
+
+  it('S003.§6.AC.06: explicit 🤖2 parses identically with and without options (regression)', () => {
+    const content = '// @confidence 🤖2 2026-05-05\nconst x = 1;';
+    const withOpts = cFamilyAdapter.parse(content, 'a.ts', HUMAN_DEFAULT);
+    const withoutOpts = cFamilyAdapter.parse(content, 'a.ts');
+    expect(withOpts).toEqual(withoutOpts);
+    expect(withoutOpts!.reviewer).toBe('🤖');
+  });
+
+  // S003.§6.AC.06 — the optional-emoji regex MUST NOT misparse the dated
+  // explicit forms (a guard against the emoji-group widening swallowing the
+  // emoji into the digit/date captures).
+  it('S003.§6.AC.06: explicit 👤4 parses identically with and without options', () => {
+    const content = '// @confidence 👤4\nconst x = 1;';
+    const withOpts = cFamilyAdapter.parse(content, 'a.ts', HUMAN_DEFAULT);
+    const withoutOpts = cFamilyAdapter.parse(content, 'a.ts');
+    expect(withOpts).toEqual(withoutOpts);
+    expect(withoutOpts!.reviewer).toBe('👤');
+    expect(withoutOpts!.level).toBe(4);
   });
 });

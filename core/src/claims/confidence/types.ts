@@ -47,3 +47,19 @@ export interface ConfidenceAnnotation extends ConfidencePayload {
   line: number;
   filePath: string;
 }
+
+/**
+ * Read-time parse policy options. Carries the resolved implied-human
+ * default reviewer per the {R017} read-time defaulting policy.
+ *
+ * When `defaultReviewer` is a reviewer value, an annotation whose level
+ * digit carries no leading emoji is attributed to that reviewer (the
+ * implied-human policy is active). When omitted or null, a bare digit
+ * does NOT parse — today's behavior. Write paths never consult this.
+ *
+ * @implements {S003.§1.AC.08}
+ * @implements {DD016.§10.DC.50}
+ */
+export interface ConfidenceParseOptions {
+  defaultReviewer?: ReviewerIcon | null;
+}

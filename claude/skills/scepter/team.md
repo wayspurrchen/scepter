@@ -17,6 +17,46 @@ There is exactly **one dialogue pair** and one **background tag-along**:
 | Linker | sce-linker | Tag-along (no pair, runs in background) |
 | Researcher | sce-researcher | On-demand (dispatched by producer or reviewer as needed) |
 
+## Orchestrator Bootstrap — RUN IT AS A TEAM (do this FIRST, non-negotiable)
+
+This is the foundational tenet of the protocol and its #1 failure mode. Before ANY production
+work, the orchestrator MUST stand up a real team — not a lone producer it plans to review later:
+
+1. **`TeamCreate`** — create the team (Team = TaskList).
+2. **In a SINGLE message, spawn BOTH agents** into the team: the producer (`sce-producer`) AND
+   the reviewer (`sce-reviewer`), each with `team_name` set and `run_in_background: true`, each
+   told the other's name and the lead's name. They explore and work the SAME phase together
+   from the start.
+3. **ONLY THEN begin Phase 1.**
+
+A lone producer is a protocol violation. The pair is the indivisible unit of work — there is
+no "producer now, reviewer later," and there is no orchestrator-mediated substitute for the
+two agents talking to each other directly.
+
+### Team membership grants the messaging tools — do NOT reason from the tool list
+
+Every agent spawned into a team receives `SendMessage` and the task tools (`TaskCreate`,
+`TaskList`, `TaskUpdate`) **by virtue of team membership.** The `tools:` frontmatter in an
+agent file — and the agent catalog in the orchestrator's own system prompt — lists the agent's
+**BASE / solo grant**; it does NOT list the coordination tools and is NOT the agent's team
+capability. **NEVER infer from a static tool list that an agent "can't DM" — on a team, it
+can.** The DM Exchange Protocol below depends entirely on this. If you ever doubt it, spawn
+into a team and test; do not assert an absence. (An incomplete map of capabilities, trusted
+over the protocol that assumes the capability, is exactly how this protocol gets silently
+downgraded to a sequential handoff.)
+
+### Anti-patterns — if you catch yourself about to do ANY of these, STOP and create the team
+
+- Spawning only a producer, with no concurrent reviewer.
+- "I'll review at the end" / dispatching the reviewer only after the producer finishes a phase.
+- "I'll mediate the messages myself" — making the orchestrator the message bus instead of
+  letting the pair DM directly.
+- Any conversion of the live producer↔reviewer pair into a sequential
+  produce → hand off → validate → loop. That sequential handoff is the precise thing this
+  protocol exists to replace (see Core Concept above). Catching yourself *justifying* the
+  downgrade ("more robust," "same fidelity guarantees," "the agents lack SendMessage") is the
+  tell that you are mid-violation — the justification is the symptom, not a reason.
+
 ## STRICT: Bash Command Discipline (ALL AGENTS)
 
 **Compound or complex Bash commands trigger a human approval prompt in Claude Code, which STALLS the entire team until a human intervenes.** This is catastrophic to throughput. Every agent MUST follow these rules without exception:

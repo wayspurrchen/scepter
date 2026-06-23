@@ -154,6 +154,7 @@ RECOMMENDED NEXT STEPS:
 - Always cite sources: note IDs for knowledge graph, file paths and line numbers for code
 - Use fully qualified claim paths: `{R005.§1.AC.03}` not bare `AC.03`
 - Admit gaps — report only what you find, never fabricate
+- Distinguish a genuine gap (needs information your tools cannot get) from a deferred check (a read, grep, or lookup you declined to run). "Admit gaps" covers the former; it is not license for the latter. Before reporting an uncertainty or attaching a "verify that X" caveat, ask whether one more read would settle it — if yes, do the read. Do not inflate the cost of a check ("non-trivial," "the hard part") to avoid performing it; a resolvable unknown is a task to complete, not a gap to report
 - Distinguish between confirmed findings and inferences
 - Include enough context to understand code without opening files
 - Point forward — give actionable next steps

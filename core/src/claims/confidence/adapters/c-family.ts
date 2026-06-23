@@ -19,6 +19,7 @@ import type {
   ConfidencePayload,
   ConfidenceLevel,
   ReviewerIcon,
+  ConfidenceParseOptions,
 } from '../types.js';
 
 const VALID_LEVELS: readonly ConfidenceLevel[] = [1, 2, 3, 4, 5] as const;
@@ -29,10 +30,15 @@ const C_FAMILY_EXTENSIONS: readonly string[] = [
 
 /**
  * Regex matching @confidence annotations in both line comments and
- * doc blocks. Verbatim from the legacy implementation. Carrier prefix
- * is `//` or `*`.
+ * doc blocks. Carrier prefix is `//` or `*`. The leading emoji group is
+ * OPTIONAL ({R017}): a bare `@confidence <digit>` matches with group 1
+ * undefined, so the reviewer falls through to the resolved
+ * `options.defaultReviewer` (implied-human policy). Capture order is
+ * unchanged: 1=emoji, 2=digit, 3=optional trailing date.
+ *
+ * @implements {DD016.§10.DC.51} emoji-optional grammar
  */
-const CONFIDENCE_REGEX = /(?:\/\/|\*)\s*@confidence\s+(🤖|👤)(\d)(?:\s+(.+))?/;
+const CONFIDENCE_REGEX = /(?:\/\/|\*)\s*@confidence\s+(🤖|👤)?(\d)(?:\s+(.+))?/;
 
 const SCAN_LIMIT = 20;
 
@@ -48,15 +54,27 @@ function matches(filePath: string): boolean {
  * Parse a C-family @confidence annotation from file content.
  * Scans only the first 20 lines for performance.
  *
+ * The leading emoji is OPTIONAL ({R017}): when present, `match[1]` is the
+ * reviewer regardless of policy; when absent, the reviewer falls through
+ * to `options.defaultReviewer`. A null resolved reviewer (emoji absent AND
+ * no default) is a non-match — the scan continues, exactly today's outcome.
+ *
  * @implements {S003.§3.AC.02} regex over first 20 lines
  * @implements {S003.§3.AC.06} legacy parse byte-identical
- * @implements {DD016.§5.DC.20,.DC.21}
+ * @implements {S003.§6.AC.01} emoji-optional bare-digit defaulting
+ * @implements {S003.§6.AC.02} explicit emoji unchanged
+ * @implements {DD016.§5.DC.20}
+ * @implements {DD016.§5.DC.21}
+ * @implements {DD016.§10.DC.51} reviewer resolution under the policy
+ * @implements {DD016.§10.DC.54} no validation.ts import; no range check
  * @implements {R004.§7.AC.01} parse confidence from file header
  * @implements {R004.§7.AC.02} recognize emoji+number format
+ * @implements {R017.AC.01} bare digit reads as human under active policy
  */
 function parse(
   content: string,
   filePath: string,
+  options?: ConfidenceParseOptions,
 ): ConfidenceAnnotation | null {
   const lines = content.split('\n');
   const scanLimit = Math.min(lines.length, SCAN_LIMIT);
@@ -64,7 +82,13 @@ function parse(
   for (let i = 0; i < scanLimit; i++) {
     const match = lines[i].match(CONFIDENCE_REGEX);
     if (match) {
-      const reviewer = match[1] as ReviewerIcon;
+      const emoji = match[1] as ReviewerIcon | undefined;
+      const reviewer = emoji ?? options?.defaultReviewer ?? null;
+      if (reviewer === null) {
+        // Emoji absent AND no defaultReviewer → not an annotation.
+        continue;
+      }
+
       const level = parseInt(match[2], 10);
 
       if (!VALID_LEVELS.includes(level as ConfidenceLevel)) {
@@ -144,9 +168,15 @@ function payloadString(payload: ConfidencePayload): string {
  *   (b) Line-comment-stack — append `// @confidence ...` after stack
  *   (c) Bare-file — `// @confidence ...` at line 0
  *
- * @implements {DD016.§5.DC.23,.DC.24,.DC.25,.DC.26,.DC.27}
- * @implements {S003.§3.AC.04,.AC.05}
- * @implements {S003.§1.AC.06,.AC.07}
+ * @implements {DD016.§5.DC.23}
+ * @implements {DD016.§5.DC.24}
+ * @implements {DD016.§5.DC.25}
+ * @implements {DD016.§5.DC.26}
+ * @implements {DD016.§5.DC.27}
+ * @implements {S003.§3.AC.04}
+ * @implements {S003.§3.AC.05}
+ * @implements {S003.§1.AC.06}
+ * @implements {S003.§1.AC.07}
  * @implements {R004.§7.AC.02}
  */
 function insert(content: string, payload: ConfidencePayload): string {
