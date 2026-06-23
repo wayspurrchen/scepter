@@ -1,0 +1,20 @@
+{
+  "name": "scepter",
+  "owner": {
+    "name": "Way Spurr-Chen",
+    "email": "way@livelyvideo.tv"
+  },
+  "description": "SCEpter authoring skills and agents for Claude Code. Pairs with the @wayspurrchen/scepter CLI; the plugin carries the workflow that the CLI alone does not ship.",
+  "plugins": [
+    {
+      "name": "scepter",
+      "source": "./claude",
+      "description": "SCEpter knowledge-graph workflow: the `scepter` skill (core concepts, reviewing, implementing, conformance) and the sce-researcher / sce-producer / sce-reviewer / sce-linker agents. Skills and agents are namespaced under `scepter:`.",
+      "author": {
+        "name": "Way Spurr-Chen"
+      },
+      "homepage": "https://github.com/wayspurrchen/scepter",
+      "license": "MIT"
+    }
+  ]
+}

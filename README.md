@@ -27,15 +27,27 @@ SCEpter is complementary to ticket trackers, not a replacement. SCEpter is built
 
 ## Quick Start
 
-### 1. Install SCEpter
+### 1. Install the `scepter` CLI
+
+Install the published package globally — this puts the `scepter` binary on your `PATH`:
+
+```bash
+npm install -g @wayspurrchen/scepter
+scepter --version
+```
+
+<details>
+<summary>From source instead (for contributing to scepter)</summary>
 
 ```bash
 git clone https://github.com/wayspurrchen/scepter.git
 cd scepter
 npm install
 npm run build
-npm link -g .
+npm link -g .   # points your global `scepter` at this checkout
 ```
+
+</details>
 
 ### 2. Initialize a project
 
@@ -49,17 +61,35 @@ This creates a `_scepter/` directory with a `scepter.config.json` and note folde
 
 ### 3. Set up Claude Code integration
 
-SCEpter ships with Claude Code agents and skills in the `claude/` directory. Symlink them into your global Claude Code config:
+The npm package ships only the CLI binary. The Claude Code skills and agents live in this repo's `claude/` directory and are distributed as a **plugin marketplace** — install them once, globally:
 
 ```bash
-# From the scepter repo directory
-ln -s "$(pwd)/claude/agents"/* ~/.claude/agents/
-ln -s "$(pwd)/claude/skills"/* ~/.claude/skills/
+# In Claude Code:
+/plugin marketplace add wayspurrchen/scepter
+/plugin install scepter@scepter
 ```
 
-This gives you:
-- **Agents:** `sce-researcher`, `sce-reviewer`, `sce-producer`, `sce-linker` — specialized subagents for research, review, artifact production, and cross-reference linking
-- **Skills:** `scepter` (core workflow: reviewing, implementing, conformance checking) and `sce-retrofit` (analyze an existing codebase to bootstrap a SCEpter knowledge graph)
+This gives you (all namespaced under `scepter:`):
+- **Skills:** `scepter:scepter` (core workflow — reviewing, implementing, conformance checking), `scepter:sce-retrofit` (analyze an existing codebase to bootstrap a knowledge graph), and `scepter:scepter-bootstrap` (install cold-start scaffolding into an existing project)
+- **Agents:** `scepter:sce-researcher`, `scepter:sce-reviewer`, `scepter:sce-producer`, `scepter:sce-linker` — specialized subagents for research, review, artifact production, and cross-reference linking
+
+The plugin has no pinned `version`, so it tracks the latest commit on `main` — run `/plugin update scepter` to refresh.
+
+<details>
+<summary>Manual alternative — symlink the skills and agents directly</summary>
+
+If you'd rather not use the plugin system (or want the files editable in place during development), clone the repo and symlink the `claude/` contents into your global Claude config:
+
+```bash
+git clone https://github.com/wayspurrchen/scepter.git ~/Projects/scepter
+mkdir -p ~/.claude/agents ~/.claude/skills
+ln -s ~/Projects/scepter/claude/agents/* ~/.claude/agents/
+ln -s ~/Projects/scepter/claude/skills/*  ~/.claude/skills/
+```
+
+Symlinked this way the skills and agents are **not** namespaced — they're addressed as `sce-researcher`, `/scepter`, etc. (no `scepter:` prefix), and they update whenever you `git pull`.
+
+</details>
 
 ### 4. Bootstrap SCEpter in your CLAUDE.md
 
@@ -72,7 +102,7 @@ This project uses SCEpter for knowledge management. At the start of each session
 invoke /scepter to load the SCEpter methodology, then review relevant notes
 before beginning work.
 
-Use `scepter ctx list` to see available notes and `scepter ctx gather <id>` to
+Use `scepter list` to see available notes and `scepter gather <id>` to
 pull in context. Create Task notes for non-trivial work. Add `// @implements {ID}`
 annotations to source code that realizes requirements or specifications.
 ```
@@ -82,8 +112,8 @@ annotations to source code that realizes requirements or specifications.
 The typical SCEpter workflow with an AI agent:
 
 1. **Agent loads SCEpter** — the `/scepter` skill teaches it the methodology and available commands
-2. **Agent gathers context** — `scepter ctx gather <note-id>` pulls in requirements, specs, and prior decisions by following the reference graph
-3. **Agent creates a task note** — `scepter ctx create Task "Implement feature X"` with references to upstream requirements
+2. **Agent gathers context** — `scepter gather <note-id>` pulls in requirements, specs, and prior decisions by following the reference graph
+3. **Agent creates a task note** — `scepter create Task "Implement feature X"` with references to upstream requirements
 4. **Agent implements** — writes code with `// @implements {R001}` annotations linking implementation to requirements
 5. **Agent updates knowledge** — creates or updates notes to capture decisions made during implementation
 
@@ -185,7 +215,7 @@ These claims can be referenced at any granularity: `{S003}` (whole note), `{S003
 The `gather` command is the primary way AI agents get context. Given a note ID, it follows references to a configurable depth and returns everything relevant:
 
 ```bash
-$ scepter ctx gather R001 --depth 2
+$ scepter gather R001 --depth 2
 
 # Context for R001: Core authentication system
 Origin: R001 [Requirement]
@@ -214,21 +244,21 @@ All commands support `--project-dir <path>` to target a specific project. Defaul
 | `scepter scaffold` | Create folder structure from config |
 | `scepter config` | Display current configuration |
 
-### Notes (`scepter ctx`)
+### Notes (`scepter`, no group)
 
 | Command | Description |
 |---|---|
-| `ctx create <type> <title>` | Create a new note |
-| `ctx show <ids...>` | Show notes by ID (supports globs like `R*`, `D00[1-5]`) |
-| `ctx list` | List and filter notes |
-| `ctx search <query>` | Full-text search across notes |
-| `ctx gather <noteId>` | Gather related context by following references |
-| `ctx archive <ids...>` | Archive notes (preserved in `_archive` folders) |
-| `ctx delete <ids...>` | Soft-delete notes (moved to `_deleted` folders) |
-| `ctx restore <ids...>` | Restore archived or deleted notes |
-| `ctx purge [ids...]` | Permanently delete from `_deleted` (irreversible) |
-| `ctx convert <ids...>` | Convert between file and folder note formats |
-| `ctx xref-sources [targets...]` | Cross-reference audit between source code and notes |
+| `create <type> <title>` | Create a new note |
+| `show <ids...>` | Show notes by ID (supports globs like `R*`, `D00[1-5]`) |
+| `list` | List and filter notes |
+| `search <query>` | Full-text search across notes |
+| `gather <noteId>` | Gather related context by following references |
+| `archive <ids...>` | Archive notes (preserved in `_archive` folders) |
+| `delete <ids...>` | Soft-delete notes (moved to `_deleted` folders) |
+| `restore <ids...>` | Restore archived or deleted notes |
+| `purge [ids...]` | Permanently delete from `_deleted` (irreversible) |
+| `convert <ids...>` | Convert between file and folder note formats |
+| `xref-sources [targets...]` | Cross-reference audit between source code and notes |
 
 ### Claims (`scepter claims`)
 

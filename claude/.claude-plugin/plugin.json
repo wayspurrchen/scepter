@@ -1,0 +1,11 @@
+{
+  "name": "scepter",
+  "description": "SCEpter knowledge-graph workflow for Claude Code: the spec/claim authoring skills and the sce-* agents. Pairs with the @wayspurrchen/scepter CLI, which ships the `scepter` binary separately via npm.",
+  "author": {
+    "name": "Way Spurr-Chen",
+    "email": "way@livelyvideo.tv"
+  },
+  "homepage": "https://github.com/wayspurrchen/scepter",
+  "repository": "https://github.com/wayspurrchen/scepter",
+  "license": "MIT"
+}
