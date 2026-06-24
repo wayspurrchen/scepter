@@ -70,7 +70,7 @@ The npm package ships only the CLI binary. The Claude Code skills and agents liv
 ```
 
 This gives you (all namespaced under `scepter:`):
-- **Skills:** `scepter:scepter` (core workflow — reviewing, implementing, conformance checking), `scepter:sce-retrofit` (analyze an existing codebase to bootstrap a knowledge graph), and `scepter:scepter-bootstrap` (install cold-start scaffolding into an existing project)
+- **Skill:** `scepter:scepter` — the core workflow (reviewing, implementing, conformance checking) plus adoption paths reached from its routing tree: **retrofit** (analyze an existing codebase, propose note types, ingest docs) and **bootstrap** (install the cold-start scaffolding into an existing project). Just say "retrofit" or "bootstrap" once the skill is loaded.
 - **Agents:** `scepter:sce-researcher`, `scepter:sce-reviewer`, `scepter:sce-producer`, `scepter:sce-linker` — specialized subagents for research, review, artifact production, and cross-reference linking
 
 The plugin has no pinned `version`, so it tracks the latest commit on `main` — run `/plugin update scepter` to refresh.

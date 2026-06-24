@@ -141,7 +141,7 @@ scepter/
       default/                  Engineering-stack schema (Architecture, Requirement, Specification, DetailedDesign, TestPlan, Task) — picked when `scepter init` runs with no template name
   claude/                       Claude Code integration
     agents/                     Specialized subagents (researcher, reviewer, producer, linker)
-    skills/                     Skills (scepter workflow, sce-retrofit)
+    skills/                     Skill (scepter workflow, incl. retrofit + bootstrap adoption companions)
   _scepter/                     SCEpter's own knowledge graph (dogfooding)
   ui/                           Web UI (separate)
   vscode/                       VS Code extension (separate)

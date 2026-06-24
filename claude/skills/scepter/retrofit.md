@@ -1,31 +1,15 @@
----
-name: sce-retrofit
-description: Analyze an existing codebase to establish a SCEpter knowledge management system. Uses epistemic topology analysis to discover the project's natural information structure, proposes note types and configuration, and on approval initializes SCEpter with ingested notes.
-allowed-tools: Read, Write, Edit, MultiEdit, Glob, Grep, Bash, Agent, WebFetch
----
-
 # SCEpter Retrofit
 
-Systematic analysis and initialization of SCEpter for existing projects. This skill discovers the project's natural information topology and translates it into a SCEpter configuration.
+**Read this companion when establishing SCEpter on an existing project** — bootstrapping a knowledge graph where none exists, evaluating a thin `_scepter/` setup for gaps, or importing a collection of markdown docs into SCEpter's structure. This is the analysis-and-initialization path; for wiring the cold-start surface (CLAUDE.md FIRST ACTION RULE, allowlist, plugin) into a project, read `bootstrap.md` instead.
 
-## Prerequisites
+You are reading this as a companion of the `scepter` skill (already loaded — its non-negotiable rules and CLI conventions apply). For the topology analysis in Phase 1, also load **@epi** (`vocabulary.md` + `topology.md` at minimum).
 
-Load these skills before or alongside this one:
-- **@scepter** — Core SCEpter concepts, CLI reference, non-negotiable rules
-- **@epi** — Epistemic vocabulary and topology analysis (load vocabulary.md + topology.md)
-
-## When to Use
-
-- Bootstrapping SCEpter on a project that has no `_scepter/` directory
-- Evaluating an existing `_scepter/` setup for gaps or improvements
-- Importing a collection of markdown documents into SCEpter's structure
-
-## Companion Files
+## Companion routing
 
 ```
 WHAT PHASE ARE YOU IN?
-├─ Analyzing the project?      → Read analysis.md from this skill directory
-├─ Proposing configuration?    → Read proposal.md from this skill directory
+├─ Analyzing the project?      → Read retrofit-analysis.md from this skill directory
+├─ Proposing configuration?    → Read retrofit-proposal.md from this skill directory
 └─ Just starting?              → This file has the overview
 ```
 
@@ -50,7 +34,7 @@ This phase uses the epi topology analysis discipline. You are perceiving, not pl
    ```bash
    # Check if SCEpter already exists
    ls _scepter/ 2>/dev/null
-   # If exists, check current config
+   # If it exists, check current config
    scepter config
    ```
 
@@ -117,13 +101,15 @@ This phase uses the epi topology analysis discipline. You are perceiving, not pl
 
 **Goal**: Translate the topology analysis into a concrete SCEpter configuration proposal.
 
-Read `proposal.md` from this skill directory for detailed guidance on this phase.
+Read `retrofit-proposal.md` from this skill directory for detailed guidance on this phase.
 
 Summary:
 1. Map identified bodies to note types (with folders, shortcodes, descriptions)
 2. Map identified workflows to work modes (if the project has distinct phases)
 3. Design the initial note population plan (prioritized list of notes to create)
 4. Produce the proposal document for user review
+
+**Consider claim-addressability when proposing types.** SCEpter's headline value is claim-level traceability — a note type whose instances carry acceptance criteria, constraints, or specifications (Requirement, Specification, Design) can have its claims (`{R001.§2.AC.03}`) traced into code `@implements` annotations and tests. When a body of information is full of testable assertions, propose a type that will hold claims, and flag in the proposal which types are claim-bearing vs. which are narrative. See `claims.md` for the claim system.
 
 ### Approval Gate
 
@@ -139,21 +125,24 @@ Present the proposal to the user. The proposal includes:
 
 **Goal**: Initialize SCEpter and create the initial knowledge graph.
 
-1. **Initialize SCEpter**
+1. **Initialize SCEpter** (if `_scepter/` doesn't exist)
    ```bash
-   # If _scepter doesn't exist
-   scepter init blank --project-dir .
+   scepter init blank --target .
+   # `scepter init --list` shows available templates (blank, default, example, minimal).
+   # Use `blank` when you intend to apply a custom, topology-derived config.
    ```
 
 2. **Apply Configuration**
 
-   Update `scepter.config.json` with the approved configuration using the Edit tool.
+   Update `scepter.config.json` with the approved configuration using the Edit tool. Then verify it loads:
+   ```bash
+   scepter config
+   ```
 
 3. **Create Initial Notes**
 
-   Using the scepter CLI (NEVER manual file creation):
+   Using the scepter CLI (NEVER manual file creation; NEVER guess IDs — read them from output):
    ```bash
-   # Create notes in priority order
    scepter create Decision "Use PostgreSQL for persistence" --tags database,infrastructure
    scepter create Question "How should we handle auth token refresh?" --tags auth,security
    ```
@@ -162,14 +151,34 @@ Present the proposal to the user. The proposal includes:
 
 4. **Ingest Existing Documents** (if applicable)
 
-   If there are existing markdown files to import:
-   - Use `scepter normalize` (when available) for frontmatter addition
-   - Use `scepter import` (when available) for ID assignment and file relocation
-   - Until these commands exist: manually move files, add frontmatter, and assign IDs using the scepter CLI's create command
+   Use `scepter ingest` to import existing markdown files as notes of a given type — it assigns IDs, adds frontmatter, and (with `--move`) relocates files into the type folder. Always preview first:
+
+   ```bash
+   # Preview what would be ingested — no changes made
+   scepter ingest Decision docs/adr/ --dry-run
+
+   # Ingest a directory of ADRs as Decision notes, moving them into the type folder
+   scepter ingest Decision docs/adr/ --move --tags architecture
+
+   # Ingest specific files as Requirement notes with an initial status
+   scepter ingest Requirement docs/specs/auth.md docs/specs/billing.md --status draft
+   ```
+
+   `--move` relocates files under the type folder in `_scepter/`; omit it to rename in place. Ingest one type at a time (the type is the first argument). For documents that cover multiple concerns, split them before ingesting so each note is atomic.
 
 5. **Establish Initial Connections**
 
-   After all initial notes exist, add `{ID}` cross-references to build the graph. Every note should reference at least one other note.
+   After all initial notes exist, add `{ID}` cross-references to build the graph. Every note should reference at least one other note. Then dispatch `sce-linker` (per non-negotiable rule 10) to sweep for missing bidirectional references and `@implements` annotations.
+
+6. **Validate the Initial Graph**
+
+   ```bash
+   scepter lint --all          # Project-wide reference audit — catch dangling/broken {ID} refs
+   scepter claims gaps         # Claims with partial projection coverage (for claim-bearing types)
+   scepter trace <ID>          # Spot-check that a key note's claims trace as expected
+   ```
+
+   A clean `lint --all` confirms the initial references resolve; gaps/trace confirm the claim layer is wired where you intended.
 
 ---
 

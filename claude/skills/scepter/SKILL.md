@@ -1,6 +1,6 @@
 ---
 name: scepter
-description: Core SCEpter concepts including the knowledge graph system, note types, and configuration-driven architecture. Foundational understanding required for all SCEpter work. This is the main entry point for SCEpter knowledge.
+description: Core SCEpter concepts including the knowledge graph system, note types, and configuration-driven architecture. Foundational understanding required for all SCEpter work. This is the main entry point for SCEpter knowledge — including adopting/retrofitting SCEpter onto an existing project (analyzing it, proposing note types, ingesting docs) and bootstrapping a project's cold-start surface (the FIRST ACTION RULE and allowlist). Invoke this skill for "retrofit", "bootstrap", or "set up scepter here".
 allowed-tools: Read, Write, Edit, MultiEdit, Glob, Grep, Bash, Task, NotebookEdit, TodoWrite, WebFetch
 ---
 
@@ -41,6 +41,14 @@ WHAT OPERATION ARE YOU PERFORMING?
 ├─ REVIEWING or VALIDATING work?
 │   └─ **DISPATCH the sce-reviewer agent.** Do not review inline.
 │      Read claude/agents/sce-reviewer.md and launch with Agent tool.
+│
+├─ ADOPTING SCEpter on a project — analyze it, propose note types, ingest docs?
+│   ("retrofit", "set up scepter here", "establish a knowledge graph")
+│   └─ Read retrofit.md  (→ retrofit-analysis.md for Phase 1, retrofit-proposal.md for Phase 2)
+│
+├─ INSTALLING the cold-start surface into a project — FIRST ACTION RULE in CLAUDE.md,
+│   allowlist, plugin/skill wiring ("bootstrap" a project to auto-load this skill)?
+│   └─ Read bootstrap.md
 │
 ├─ Multi-step feature work?  → Read process.md
 ├─ Working in an agent team?  → Read team.md
