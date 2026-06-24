@@ -421,6 +421,24 @@ export class NoteFileManager extends EventEmitter {
       lines.push(`status: ${note.metadata.status}`);
     }
 
+    // @implements {R018.§2.AC.01} Stamp each declared field into new-note frontmatter
+    // @implements {R018.§2.AC.02} Stamp the configured default when no caller value
+    // @implements {R018.§2.AC.03} Stamp an empty placeholder when no default and no caller value
+    // @implements {R018.§2.AC.04} Caller-supplied metadata value takes precedence over the default
+    // @implements {R018.§2.AC.05} Type without `fields` produces byte-identical output
+    // Stamp declared per-type frontmatter fields so each is always present to
+    // edit. A field the caller already supplied via metadata takes precedence
+    // over the declared default. Gated on `fields` being present: a type
+    // without `fields` produces byte-identical output.
+    const declaredFields = this.configManager.getConfig().noteTypes?.[note.type]?.fields;
+    if (declaredFields) {
+      for (const field of declaredFields) {
+        const supplied = note.metadata?.[field.name];
+        const value = supplied !== undefined && supplied !== null ? supplied : field.default ?? '';
+        lines.push(`${field.name}: ${value}`);
+      }
+    }
+
     lines.push('---');
     lines.push('');
 

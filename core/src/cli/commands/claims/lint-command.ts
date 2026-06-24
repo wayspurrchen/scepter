@@ -12,6 +12,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import matter from 'gray-matter';
 import { BaseCommand } from '../base-command.js';
 import { ensureIndex } from './ensure-index.js';
 import { buildClaimTree, validateClaimTree } from '../../../parsers/claim/index.js';
@@ -20,6 +21,7 @@ import { isLifecycleTag } from '../../../claims/index.js';
 import type { ClaimIndex } from '../../../claims/index.js';
 import { formatLintResults, formatClaimTree as formatClaimTreeDisplay } from '../../formatters/claim-formatter.js';
 import type { ProjectManager } from '../../../project/project-manager.js';
+import type { SCEpterConfig } from '../../../types/config.js';
 import { runProjectWideAudit, type AuditOptions } from '../../../claims/audit/run-audit.js';
 import { processSourceReference, REFERENCE_FAMILY_CODES, type IncidenceRecord, type IncidenceCode } from '../../../claims/audit/incidence-collector.js';
 import { CLAIM_ERROR_CODES } from '../../../parsers/claim/index.js';
@@ -178,6 +180,18 @@ export const lintCommand = new Command('lint')
             ? collectTombstonedTargetAudit(targetNoteId, indexData)
             : [];
 
+          // @implements {R018.§3.AC.01} Flag missing/empty required declared fields
+          // @implements {R018.§3.AC.02} Flag values outside a field's `allowed` set
+          // Validate declared per-type frontmatter fields. The note's type is
+          // resolved from the index; gated on the type declaring `fields`.
+          const noteType = indexData.noteTypes.get(targetNoteId);
+          const frontmatterFieldErrors = validateFrontmatterFields(
+            targetNoteId,
+            content,
+            noteType,
+            context.projectManager.configManager.getConfig(),
+          );
+
           // Merge errors, deduplicating by line + type
           // Section 6 Finding #5: `let allErrors` (was `const`) so the
           // post-merge filter steps below can reassign.
@@ -221,6 +235,15 @@ export const lintCommand = new Command('lint')
             }
           }
           for (const err of tombstonedAuditErrors) {
+            const key = `${err.line}:${err.type}:${err.claimId}`;
+            if (!seen.has(key)) {
+              allErrors.push(err);
+              seen.add(key);
+            }
+          }
+          for (const err of frontmatterFieldErrors) {
+            // claimId carries the field name, so include it in the dedup key
+            // to keep distinct per-field diagnostics on the same line.
             const key = `${err.line}:${err.type}:${err.claimId}`;
             if (!seen.has(key)) {
               allErrors.push(err);
@@ -373,6 +396,82 @@ export function collectInlineRefArchiveSynthesis(
     });
   }
   return out;
+}
+
+/**
+ * Validate declared per-type frontmatter fields for a note.
+ *
+ * For the note's type, each field declared in `noteTypes[type].fields` is
+ * checked against the note's parsed frontmatter:
+ * - `missing-required-field` — a `required` field is absent or empty.
+ * - `invalid-field-value` — the present value is outside the field's
+ *   configured `allowed` set.
+ *
+ * Backward-compat: a type with no `fields` declaration (or an unknown type)
+ * produces no errors. Mirrors the `allowedStatuses`/StatusValidator pattern,
+ * generalized to an arbitrary declared field set.
+ *
+ * @implements {R018.§3.AC.01} missing-required-field diagnostic
+ * @implements {R018.§3.AC.02} invalid-field-value diagnostic
+ * @implements {R018.§3.AC.03} Absent-but-optional field not validated against `allowed`
+ * @implements {R018.§3.AC.04} No field diagnostics for a type without `fields`
+ * @internal Exported for testing
+ */
+export function validateFrontmatterFields(
+  noteId: string,
+  content: string,
+  type: string | undefined,
+  config: SCEpterConfig,
+): ClaimTreeError[] {
+  const errors: ClaimTreeError[] = [];
+
+  if (!type) return errors;
+  const fields = config.noteTypes?.[type]?.fields;
+  if (!fields || fields.length === 0) return errors;
+
+  // Parse frontmatter with gray-matter. Malformed frontmatter is out of scope
+  // here (other lint paths surface structural issues); treat parse failure as
+  // "no frontmatter data" so we still report missing-required fields.
+  let data: Record<string, unknown> = {};
+  try {
+    data = (matter(content).data ?? {}) as Record<string, unknown>;
+  } catch {
+    data = {};
+  }
+
+  for (const field of fields) {
+    const raw = data[field.name];
+    const present = raw !== undefined && raw !== null && String(raw).trim() !== '';
+
+    if (!present) {
+      if (field.required) {
+        errors.push({
+          type: 'missing-required-field',
+          claimId: `${noteId}.${field.name}`,
+          line: 1,
+          message: `Note ${noteId} (${type}) is missing required field '${field.name}'.`,
+          noteId,
+        });
+      }
+      // Absent-but-optional fields are not validated against `allowed`.
+      continue;
+    }
+
+    if (field.allowed && field.allowed.length > 0) {
+      const value = String(raw);
+      if (!field.allowed.includes(value)) {
+        errors.push({
+          type: 'invalid-field-value',
+          claimId: `${noteId}.${field.name}`,
+          line: 1,
+          message: `Field '${field.name}' value '${value}' is not allowed for ${type}. Allowed: ${field.allowed.join(', ')}.`,
+          noteId,
+        });
+      }
+    }
+  }
+
+  return errors;
 }
 
 function collectTombstonedTargetAudit(

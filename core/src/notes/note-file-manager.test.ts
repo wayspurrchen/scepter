@@ -486,6 +486,115 @@ Use JWT with refresh tokens`);
       expect(template).toContain('tags: [auth]');
       expect(template).not.toContain('Context Hints');
     });
+
+    /**
+     * Stamping of declared per-type frontmatter fields. Mirrors the
+     * allowedStatuses status-stamping behavior, generalized to a declared
+     * field set.
+     *
+     * @validates {R018.§2.AC.01-05} Create-time stamping of declared frontmatter fields
+     */
+    describe('declared fields', () => {
+      it('a type without fields produces byte-identical output (backward-compat)', () => {
+        const note: Note = {
+          id: 'D001',
+          type: 'Decision',
+          title: 'Use JWT with refresh tokens',
+          content: 'Use JWT with refresh tokens',
+          tags: ['auth', 'security'],
+          created: new Date('2024-01-26'),
+        };
+
+        // `manager`'s config (from beforeEach) declares no fields on Decision.
+        const template = manager.getNoteTemplate(note);
+
+        expect(template).toBe(`---
+created: 2024-01-26
+tags: [auth, security]
+---
+
+# D001 - Use JWT with refresh tokens
+
+Use JWT with refresh tokens`);
+      });
+
+      it('stamps each declared field with its default value', () => {
+        const fieldsConfigManager = createMockConfigManager(tempDir, {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [
+              { name: 'version', default: '0.1.0', required: true },
+              { name: 'lifecycle', allowed: ['draft', 'active'], default: 'draft' },
+            ],
+          },
+        });
+        const fieldsManager = new NoteFileManager(tempDir, fieldsConfigManager);
+
+        const note: Note = {
+          id: 'S001',
+          type: 'Specification',
+          title: 'Connector Contract',
+          content: 'body',
+          tags: [],
+          created: new Date('2024-01-26'),
+        };
+
+        const template = fieldsManager.getNoteTemplate(note);
+        expect(template).toContain('version: 0.1.0');
+        expect(template).toContain('lifecycle: draft');
+      });
+
+      it('stamps an empty placeholder when a declared field has no default', () => {
+        const fieldsConfigManager = createMockConfigManager(tempDir, {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [{ name: 'owner' }],
+          },
+        });
+        const fieldsManager = new NoteFileManager(tempDir, fieldsConfigManager);
+
+        const note: Note = {
+          id: 'S001',
+          type: 'Specification',
+          title: 'Connector Contract',
+          content: 'body',
+          tags: [],
+          created: new Date('2024-01-26'),
+        };
+
+        const template = fieldsManager.getNoteTemplate(note);
+        // Field is always present to edit, even with no default.
+        expect(template).toContain('owner: ');
+        expect(template).toMatch(/^owner:\s*$/m);
+      });
+
+      it('prefers a caller-supplied metadata value over the declared default', () => {
+        const fieldsConfigManager = createMockConfigManager(tempDir, {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [{ name: 'version', default: '0.1.0' }],
+          },
+        });
+        const fieldsManager = new NoteFileManager(tempDir, fieldsConfigManager);
+
+        const note: Note = {
+          id: 'S001',
+          type: 'Specification',
+          title: 'Connector Contract',
+          content: 'body',
+          tags: [],
+          created: new Date('2024-01-26'),
+          metadata: { version: '2.0.0' },
+        };
+
+        const template = fieldsManager.getNoteTemplate(note);
+        expect(template).toContain('version: 2.0.0');
+        expect(template).not.toContain('version: 0.1.0');
+      });
+    });
   });
 
   describe('file watching', () => {

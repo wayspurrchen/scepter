@@ -198,6 +198,35 @@ export async function createNote(
       }
     }
 
+    // @implements {R018.§2.AC.01} Stamp declared fields into template frontmatter
+    // @implements {R018.§2.AC.03} Empty placeholder when a field has no default
+    // @implements {R018.§2.AC.05} Type without `fields` leaves the template untouched
+    // Inject declared per-type frontmatter fields into the _templates/<type>.md
+    // frontmatter, mirroring the status injection above. Each declared field
+    // the template doesn't already define is appended with its default (or
+    // empty placeholder) so it is always present to edit. Gated on `fields`
+    // being present: a type without `fields` is untouched.
+    const declaredFields = projectManager.configManager.getConfig().noteTypes?.[type]?.fields;
+    if (declaredFields && declaredFields.length > 0 && content) {
+      const frontmatterMatch = content.match(/^(---\n[\s\S]*?)\n---/);
+      if (frontmatterMatch) {
+        const frontmatter = frontmatterMatch[1];
+        const additions: string[] = [];
+        for (const field of declaredFields) {
+          // Skip fields the template already declares (line-anchored key match).
+          const keyPresent = new RegExp(`^${field.name}:`, 'm').test(frontmatter);
+          if (keyPresent) continue;
+          additions.push(`${field.name}: ${field.default ?? ''}`);
+        }
+        if (additions.length > 0) {
+          content = content.replace(
+            /^(---\n[\s\S]*?)\n---/,
+            `$1\n${additions.join('\n')}\n---`,
+          );
+        }
+      }
+    }
+
     // Create the note
     const note = await noteManager.createNote({
       type,

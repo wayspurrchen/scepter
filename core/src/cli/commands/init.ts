@@ -1,6 +1,5 @@
 /**
  * @implements {C002} Init Command - Boilerplate Initialization
- * @implements {F002} Agent Instructions Auto-Copy on Init
  * @depends-on {D002} CLI-First Architecture Pivot
  */
 import { Command } from 'commander';
@@ -135,7 +134,6 @@ async function listBoilerplates(boilerplatesDir: string): Promise<void> {
 
 /**
  * Copy a boilerplate template to the target directory
- * @implements {F002} Agent Instructions Auto-Copy on Init
  * @depends-on {D002} CLI-First Architecture Pivot
  */
 async function copyBoilerplate(
@@ -176,8 +174,8 @@ async function copyBoilerplate(
   try {
     await copyDirectory(sourcePath, absoluteTarget, force);
     
-    // Copy _prompts directory from boilerplates directory
-    // Feature {F002}: Ensures AI agents have immediate access to SCEpter instructions
+    // Copy _prompts directory from boilerplates directory.
+    // Ensures AI agents have immediate access to SCEpter instructions.
     const promptsSource = path.join(boilerplatesDir, '_prompts');
     const promptsTarget = path.join(absoluteTarget, '_scepter', '_prompts');
 

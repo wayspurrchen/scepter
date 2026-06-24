@@ -49,7 +49,9 @@ import type { NoteWithContent } from '../../../../claims/claim-index';
 import {
   collectInlineRefArchiveSynthesis,
   validateDerivationLinks,
+  validateFrontmatterFields,
 } from '../lint-command';
+import type { SCEpterConfig } from '../../../../types/config';
 import { buildTraceabilityMatrix } from '../../../../claims/traceability';
 import {
   formatTraceabilityMatrix,
@@ -575,5 +577,95 @@ describe('ISSUE 22: paired UX-distinction — lint surfaces [ARCHIVED-REF]; trac
     // But it carries NO `[ARCHIVED]` inline decoration. This is the
     // load-bearing negative assertion.
     expect(rendered).not.toContain('[ARCHIVED]');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Declared per-type frontmatter field validation. Mirrors the allowedStatuses
+// enforce/suggest validation, generalized to a declared field set:
+// missing-required-field and invalid-field-value.
+//
+// @validates {R018.§3.AC.01-04} Lint-time validation of declared frontmatter fields
+// ---------------------------------------------------------------------------
+
+describe('validateFrontmatterFields', () => {
+  const fmt = (frontmatter: string) => `---\n${frontmatter}\n---\n\n# S001 - Spec\n\nbody`;
+
+  const configWith = (fields: SCEpterConfig['noteTypes'][string]['fields']): SCEpterConfig => ({
+    noteTypes: {
+      Specification: { folder: 'specs', shortcode: 'S', fields },
+    },
+  });
+
+  it('a type with no fields declaration produces no errors (backward-compat)', () => {
+    const config: SCEpterConfig = {
+      noteTypes: { Specification: { folder: 'specs', shortcode: 'S' } },
+    };
+    const errs = validateFrontmatterFields('S001', fmt('tags: []'), 'Specification', config);
+    expect(errs).toHaveLength(0);
+  });
+
+  it('an unknown / undefined type produces no errors', () => {
+    const config = configWith([{ name: 'version', required: true }]);
+    expect(validateFrontmatterFields('S001', fmt('tags: []'), undefined, config)).toHaveLength(0);
+    expect(validateFrontmatterFields('S001', fmt('tags: []'), 'Nonexistent', config)).toHaveLength(0);
+  });
+
+  it('flags a missing required field', () => {
+    const config = configWith([{ name: 'version', required: true }]);
+    const errs = validateFrontmatterFields('S001', fmt('tags: []'), 'Specification', config);
+    expect(errs).toHaveLength(1);
+    expect(errs[0].type).toBe('missing-required-field');
+    expect(errs[0].message).toContain('version');
+    expect(errs[0].noteId).toBe('S001');
+  });
+
+  it('flags an empty required field as missing', () => {
+    const config = configWith([{ name: 'version', required: true }]);
+    const errs = validateFrontmatterFields('S001', fmt('version: \ntags: []'), 'Specification', config);
+    expect(errs.some((e) => e.type === 'missing-required-field')).toBe(true);
+  });
+
+  it('does not flag a present required field', () => {
+    const config = configWith([{ name: 'version', required: true }]);
+    const errs = validateFrontmatterFields('S001', fmt('version: 1.0.0\ntags: []'), 'Specification', config);
+    expect(errs).toHaveLength(0);
+  });
+
+  it('does not flag a missing optional field', () => {
+    const config = configWith([{ name: 'owner' }]);
+    const errs = validateFrontmatterFields('S001', fmt('tags: []'), 'Specification', config);
+    expect(errs).toHaveLength(0);
+  });
+
+  it('flags a value outside the allowed set', () => {
+    const config = configWith([{ name: 'lifecycle', allowed: ['draft', 'active'] }]);
+    const errs = validateFrontmatterFields('S001', fmt('lifecycle: retired\ntags: []'), 'Specification', config);
+    expect(errs).toHaveLength(1);
+    expect(errs[0].type).toBe('invalid-field-value');
+    expect(errs[0].message).toContain('retired');
+    expect(errs[0].message).toContain('draft, active');
+  });
+
+  it('does not flag an in-set value', () => {
+    const config = configWith([{ name: 'lifecycle', allowed: ['draft', 'active'] }]);
+    const errs = validateFrontmatterFields('S001', fmt('lifecycle: active\ntags: []'), 'Specification', config);
+    expect(errs).toHaveLength(0);
+  });
+
+  it('does not flag an absent optional allowed field (only present values are checked)', () => {
+    const config = configWith([{ name: 'lifecycle', allowed: ['draft', 'active'] }]);
+    const errs = validateFrontmatterFields('S001', fmt('tags: []'), 'Specification', config);
+    expect(errs).toHaveLength(0);
+  });
+
+  it('emits both missing-required and invalid-value across multiple fields', () => {
+    const config = configWith([
+      { name: 'version', required: true },
+      { name: 'lifecycle', allowed: ['draft', 'active'] },
+    ]);
+    const errs = validateFrontmatterFields('S001', fmt('lifecycle: retired\ntags: []'), 'Specification', config);
+    expect(errs.some((e) => e.type === 'missing-required-field' && e.claimId === 'S001.version')).toBe(true);
+    expect(errs.some((e) => e.type === 'invalid-field-value' && e.claimId === 'S001.lifecycle')).toBe(true);
   });
 });

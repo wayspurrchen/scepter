@@ -401,4 +401,150 @@ describe('ConfigValidator', () => {
       expect(errors).toHaveLength(0);
     });
   });
+
+  /**
+   * Per-type declarable frontmatter fields. Mirrors the allowedStatuses
+   * validation tests: structural acceptance, default-in-allowed cross-check,
+   * reserved-name rejection, and duplicate detection.
+   *
+   * @validates {R018.§1.AC.01-06} Config schema and validation of declared frontmatter fields
+   */
+  describe('per-type fields', () => {
+    const baseConfig: SCEpterConfig = {
+      noteTypes: {
+        Specification: { folder: 'specs', shortcode: 'S' },
+      },
+    };
+
+    it('a config without fields validates exactly as today (backward-compat)', () => {
+      const errors = validator.validate(baseConfig);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts a minimal field with only a name', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: { folder: 'specs', shortcode: 'S', fields: [{ name: 'owner' }] },
+        },
+      };
+      expect(validator.validate(config)).toHaveLength(0);
+    });
+
+    it('accepts a field with default and required', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [{ name: 'version', default: '0.1.0', required: true }],
+          },
+        },
+      };
+      expect(validator.validate(config)).toHaveLength(0);
+    });
+
+    it('accepts a field with an allowed set and an in-set default', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [{ name: 'lifecycle', allowed: ['draft', 'active', 'deprecated'], default: 'draft' }],
+          },
+        },
+      };
+      expect(validator.validate(config)).toHaveLength(0);
+    });
+
+    it('rejects a default that is not in the allowed set', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [{ name: 'lifecycle', allowed: ['draft', 'active'], default: 'retired' }],
+          },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.message.includes('not in the allowed values'))).toBe(true);
+      expect(errors.some((e) => e.field === 'noteTypes.Specification.fields.lifecycle.default')).toBe(true);
+    });
+
+    it('rejects an empty allowed array (must have at least one value)', () => {
+      const config = {
+        noteTypes: {
+          Specification: { folder: 'specs', shortcode: 'S', fields: [{ name: 'lifecycle', allowed: [] }] },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects a field name that is not a valid identifier', () => {
+      const config = {
+        noteTypes: {
+          Specification: { folder: 'specs', shortcode: 'S', fields: [{ name: 'has-dash' }] },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.message.includes('valid identifier'))).toBe(true);
+    });
+
+    it.each(['created', 'modified', 'tags'])('rejects reserved field name %s', (name) => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: { folder: 'specs', shortcode: 'S', fields: [{ name }] },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.message.includes('reserved'))).toBe(true);
+    });
+
+    it('rejects reserved field name status and redirects to allowedStatuses', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: { folder: 'specs', shortcode: 'S', fields: [{ name: 'status' }] },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.message.includes('allowedStatuses'))).toBe(true);
+    });
+
+    it('rejects duplicate field names within a type', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [{ name: 'owner' }, { name: 'owner', default: 'x' }],
+          },
+        },
+      };
+      const errors = validator.validate(config);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.message.includes('Duplicate field name'))).toBe(true);
+    });
+
+    it('accepts the first-use Specification version field config', () => {
+      const config: SCEpterConfig = {
+        noteTypes: {
+          Specification: {
+            folder: 'specs',
+            shortcode: 'S',
+            fields: [
+              { name: 'version', default: '0.1.0', required: true },
+              { name: 'lifecycle', allowed: ['draft', 'active', 'deprecated'], default: 'draft' },
+              { name: 'owner' },
+            ],
+          },
+        },
+      };
+      expect(validator.validate(config)).toHaveLength(0);
+    });
+  });
 });

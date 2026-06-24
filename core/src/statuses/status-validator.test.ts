@@ -2,7 +2,6 @@
  * Status Validator Tests
  *
  * @implements {T011.2.2} Tests for status validator
- * @implements {F003} Predefined Status Values Per Note Type
  */
 
 import { describe, it, expect } from 'vitest';

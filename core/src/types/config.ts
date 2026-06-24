@@ -6,8 +6,6 @@ export interface StatusMapping {
 /**
  * Configuration for allowed statuses on a note type.
  * Supports referencing reusable status sets and/or literal values.
- *
- * @implements {F003} Predefined Status Values Per Note Type
  */
 export interface AllowedStatusesConfig {
   /**
@@ -36,6 +34,43 @@ export interface AllowedStatusesConfig {
   defaultValue?: string;
 }
 
+/**
+ * Declaration of an additional frontmatter field stamped on `scepter create`
+ * and validated on `scepter lint` for a note type.
+ *
+ * Mirrors the per-type governance pattern established by `allowedStatuses`,
+ * generalized from the hard-coded `status` field to an arbitrary set of
+ * declared frontmatter fields.
+ *
+ * Reserved names (`created`, `modified`, `tags`, `status`) MUST NOT appear
+ * here — they are governed by built-in template machinery (and `status` by
+ * `allowedStatuses`). The config validator rejects them.
+ *
+ * @implements {R018.§1.AC.01} Per-type declared frontmatter field vocabulary
+ */
+export interface NoteTypeFieldConfig {
+  /** Frontmatter key. Must be a valid identifier and not a reserved name. */
+  name: string;
+
+  /**
+   * Value stamped at create time when the caller does not supply one.
+   * When omitted, the field is stamped with an empty placeholder so it is
+   * always present to edit.
+   */
+  default?: string;
+
+  /**
+   * Closed set of permitted values. When set, `scepter lint` flags any value
+   * outside the set. When `default` is also set, it MUST be a member.
+   */
+  allowed?: string[];
+
+  /**
+   * When true, `scepter lint` flags the note if the field is missing or empty.
+   */
+  required?: boolean;
+}
+
 export interface NoteTypeConfig {
   folder?: string;
   shortcode: string;
@@ -59,10 +94,19 @@ export interface NoteTypeConfig {
    *   "defaultValue": "pending"
    * }
    * ```
-   *
-   * @implements {F003} Predefined Status Values Per Note Type
    */
   allowedStatuses?: string[] | AllowedStatusesConfig;
+
+  /**
+   * Additional frontmatter fields declared for this note type. Each is
+   * stamped on `scepter create` (with its `default`, or an empty placeholder)
+   * and validated on `scepter lint` (missing-required and out-of-`allowed`).
+   *
+   * A type with no `fields` key behaves exactly as before this feature.
+   *
+   * @implements {R018.§1.AC.01} Optional declared-fields list on a note type
+   */
+  fields?: NoteTypeFieldConfig[];
 
   // NEW: Folder-based note support fields
   // @implements {E002} - Exploration for folder-based notes configuration
@@ -207,8 +251,6 @@ export interface SCEpterConfig {
    * ```
    *
    * Note types can then reference these sets in their `allowedStatuses.sets` field.
-   *
-   * @implements {F003} Predefined Status Values Per Note Type
    */
   statusSets?: Record<string, string[]>;
 

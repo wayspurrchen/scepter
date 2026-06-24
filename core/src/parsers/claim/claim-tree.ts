@@ -148,7 +148,14 @@ export interface ClaimTreeError {
     | 'derivation-target-superseded'
     // `derives=` resolved ambiguously (section-less multi-match); no legacy
     // equivalent.
-    | 'derivation-target-ambiguous';
+    | 'derivation-target-ambiguous'
+    // ---- per-type declared frontmatter field diagnostics ----
+    // A declared `required` field is missing or empty in the note frontmatter.
+    // @implements {R018.§3.AC.01} missing-required-field error code
+    | 'missing-required-field'
+    // A declared field's value is outside its configured `allowed` set.
+    // @implements {R018.§3.AC.02} invalid-field-value error code
+    | 'invalid-field-value';
   claimId: string;
   line: number;
   message: string;
@@ -214,6 +221,8 @@ export const CLAIM_ERROR_CODES: ReadonlySet<ClaimErrorCode> = new Set<ClaimError
   'derivation-target-removed',
   'derivation-target-superseded',
   'derivation-target-ambiguous',
+  'missing-required-field',
+  'invalid-field-value',
 ]);
 
 // ---------------------------------------------------------------------------

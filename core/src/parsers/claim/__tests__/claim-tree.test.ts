@@ -1493,7 +1493,7 @@ describe('Claim Tree', () => {
       // union grows or shrinks, update this number AND the Set body. The
       // count is the tripwire: if it changes without the Set being touched,
       // CI catches the drift.
-      expect(CLAIM_ERROR_CODES.size).toBe(33);
+      expect(CLAIM_ERROR_CODES.size).toBe(35);
     });
 
     it('contains the new DD022 reference codes', () => {
@@ -1506,6 +1506,11 @@ describe('Claim Tree', () => {
       // the parser's structural-error vocabulary; the audit's reference-
       // family extension is separate.
       expect(CLAIM_ERROR_CODES.has('reference-to-soft-deleted' as ClaimErrorCode)).toBe(false);
+    });
+
+    it('contains the declared-field codes', () => {
+      expect(CLAIM_ERROR_CODES.has('missing-required-field')).toBe(true);
+      expect(CLAIM_ERROR_CODES.has('invalid-field-value')).toBe(true);
     });
   });
 });

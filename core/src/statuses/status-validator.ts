@@ -35,7 +35,6 @@
  * ```
  *
  * @implements {T011} Phase 2 - Status Validation Service
- * @implements {F003} Predefined Status Values Per Note Type
  */
 
 import type { SCEpterConfig, AllowedStatusesConfig } from '../types/config';
@@ -103,7 +102,6 @@ export interface StatusValidationResult {
  * ```
  *
  * @implements {T011.2.1} StatusValidator class
- * @implements {F003} Predefined Status Values Per Note Type
  */
 export class StatusValidator {
   private config: SCEpterConfig;

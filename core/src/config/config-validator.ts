@@ -1,10 +1,10 @@
 /**
  * @implements {T003} - Validation for folder-based notes configuration fields
- * @implements {F003} - Validation for predefined status values feature
  */
 import { z, ZodError } from 'zod';
 import type {
   NoteTypeConfig,
+  NoteTypeFieldConfig,
   NotesConfig,
   ContextConfig,
   TaskConfig,
@@ -67,8 +67,6 @@ export const StatusMappingsRecordSchema = z.record(
 /**
  * Schema for object-form allowed statuses configuration.
  * Validates structure but not cross-references to statusSets (done later).
- *
- * @implements {F003} Predefined Status Values Per Note Type
  */
 export const AllowedStatusesConfigSchema = z.object({
   sets: z.array(z.string().min(1, 'Set name cannot be empty')).optional(),
@@ -87,8 +85,6 @@ export const AllowedStatusesConfigSchema = z.object({
 
 /**
  * Schema for allowed statuses - either shorthand array or full object config.
- *
- * @implements {F003} Predefined Status Values Per Note Type
  */
 export const AllowedStatusesSchema = z.union([
   z.array(z.string().min(1, 'Status value cannot be empty')).min(1, 'At least one status value is required'),
@@ -98,13 +94,50 @@ export const AllowedStatusesSchema = z.union([
 /**
  * Schema for statusSets at the config root level.
  * Keys must be valid identifiers, values must be non-empty string arrays.
- *
- * @implements {F003} Predefined Status Values Per Note Type
  */
 export const StatusSetsSchema = z.record(
   z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Status set key must be a valid identifier'),
   z.array(z.string().min(1, 'Status value cannot be empty')).min(1, 'Status set must have at least one value'),
 );
+
+/**
+ * Frontmatter field names that note types MUST NOT redeclare via `fields`.
+ * These are owned by the built-in template machinery; `status` in particular
+ * is governed by `allowedStatuses`, so a `fields` entry named `status` is
+ * redirected to that mechanism.
+ *
+ * @implements {R018.§1.AC.04} Reserved built-in field names rejected
+ */
+export const RESERVED_FIELD_NAMES: ReadonlySet<string> = new Set([
+  'created',
+  'modified',
+  'tags',
+  'status',
+]);
+
+/**
+ * Schema for a single declared frontmatter field on a note type.
+ * Validates structure (identifier name, non-empty allowed array) but not
+ * cross-field constraints (default-in-allowed, reserved names, duplicates),
+ * which run as a Phase-2 cross-check (see validateNoteTypeFields), mirroring
+ * how allowedStatuses defers its defaultValue-in-allowed check.
+ *
+ * @implements {R018.§1.AC.02} Field name must be a valid identifier
+ * @implements {R018.§1.AC.03} Present `allowed` set must be non-empty
+ */
+export const NoteTypeFieldConfigSchema = z.object({
+  name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must be a valid identifier'),
+  default: z.string().optional(),
+  allowed: z.array(z.string().min(1, 'Allowed value cannot be empty')).min(1, 'At least one allowed value is required').optional(),
+  required: z.boolean().optional(),
+});
+
+/**
+ * Schema for the `fields` array on a note type.
+ *
+ * @implements {R018.§1.AC.01} Note type accepts an optional ordered `fields` list
+ */
+export const NoteTypeFieldsSchema = z.array(NoteTypeFieldConfigSchema);
 
 // Note Type Schema
 export const NoteTypeConfigSchema = z.object({
@@ -122,8 +155,10 @@ export const NoteTypeConfigSchema = z.object({
   emoji: z.string().optional(),
   color: z.string().optional(),
   statusMappings: StatusMappingsRecordSchema.optional(),
-  // Allowed statuses configuration - @implements {F003}
+  // Allowed statuses configuration
   allowedStatuses: AllowedStatusesSchema.optional(),
+  // Declared per-type frontmatter fields - @implements {R018.§1.AC.01}
+  fields: NoteTypeFieldsSchema.optional(),
   // Folder-based note support fields
   supportsFolderFormat: z.boolean().optional(),
   folderTemplate: z.string().optional(),
@@ -312,7 +347,7 @@ const SCEpterConfigBaseSchema = z.object({
   discoveryExclude: z.array(z.string().min(1, 'Exclude pattern cannot be empty')).optional(),
   // Timestamp precision for note metadata
   timestampPrecision: z.enum(['date', 'datetime']).optional().default('date'),
-  // Status sets for reusable status value collections - @implements {F003}
+  // Status sets for reusable status value collections
   statusSets: StatusSetsSchema.optional(),
   // Claim-level addressability configuration
   // @implements {R004.§7.AC.03} Confidence config validation
@@ -337,8 +372,6 @@ const SCEpterConfigBaseSchema = z.object({
 /**
  * Helper to resolve all allowed status values for a note type,
  * expanding referenced status sets.
- *
- * @implements {F003} Predefined Status Values Per Note Type
  */
 function resolveAllowedStatusValues(
   allowedStatuses: string[] | AllowedStatusesConfig,
@@ -374,8 +407,6 @@ function resolveAllowedStatusValues(
  * Validates cross-references between allowedStatuses and statusSets.
  * - Ensures all referenced sets in allowedStatuses.sets exist in statusSets
  * - Ensures defaultValue is in the resolved allowed values
- *
- * @implements {F003} Predefined Status Values Per Note Type
  */
 function validateStatusSetsReferences(config: z.infer<typeof SCEpterConfigBaseSchema>): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -411,6 +442,64 @@ function validateStatusSetsReferences(config: z.infer<typeof SCEpterConfigBaseSc
         errors.push({
           field: `noteTypes.${noteTypeName}.allowedStatuses.defaultValue`,
           message: `Default value '${objConfig.defaultValue}' is not in the allowed status values: [${resolvedValues.join(', ')}]`,
+          severity: 'error',
+        });
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validates declared per-type frontmatter `fields` cross-field constraints
+ * that the Zod structural schema cannot express:
+ * - duplicate field names within a single note type;
+ * - reserved names (`created`, `modified`, `tags`, `status`) — `status` users
+ *   are redirected to `allowedStatuses`;
+ * - `default` not present in `allowed` when both are set (mirrors the
+ *   allowedStatuses defaultValue-in-allowed check).
+ *
+ * @implements {R018.§1.AC.04} Reserved-name rejection (status redirected to allowedStatuses)
+ * @implements {R018.§1.AC.05} Duplicate field name rejection within a type
+ * @implements {R018.§1.AC.06} `default` must be a member of `allowed` when both set
+ */
+function validateNoteTypeFields(config: z.infer<typeof SCEpterConfigBaseSchema>): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  for (const [noteTypeName, noteTypeConfig] of Object.entries(config.noteTypes)) {
+    const fields = (noteTypeConfig as NoteTypeConfig).fields;
+    if (!fields) continue;
+
+    const seenNames = new Set<string>();
+
+    for (const field of fields) {
+      const fieldPath = `noteTypes.${noteTypeName}.fields.${field.name}`;
+
+      // Reserved name check
+      if (RESERVED_FIELD_NAMES.has(field.name)) {
+        const message =
+          field.name === 'status'
+            ? `Field name 'status' is reserved — declare status values via 'allowedStatuses', not 'fields'`
+            : `Field name '${field.name}' is reserved and cannot be redeclared in 'fields'`;
+        errors.push({ field: fieldPath, message, severity: 'error' });
+      }
+
+      // Duplicate name check
+      if (seenNames.has(field.name)) {
+        errors.push({
+          field: fieldPath,
+          message: `Duplicate field name '${field.name}' in note type '${noteTypeName}'`,
+          severity: 'error',
+        });
+      }
+      seenNames.add(field.name);
+
+      // default-in-allowed check (mirrors allowedStatuses defaultValue check)
+      if (field.default !== undefined && field.allowed && !field.allowed.includes(field.default)) {
+        errors.push({
+          field: `${fieldPath}.default`,
+          message: `Default value '${field.default}' is not in the allowed values: [${field.allowed.join(', ')}]`,
           severity: 'error',
         });
       }
@@ -495,6 +584,7 @@ export class ConfigValidator {
     // At this point we know config is valid per the base schema
     const typedConfig = config as z.infer<typeof SCEpterConfigBaseSchema>;
     errors.push(...validateStatusSetsReferences(typedConfig));
+    errors.push(...validateNoteTypeFields(typedConfig));
     errors.push(...validateProjectAliases(typedConfig));
 
     return errors;
