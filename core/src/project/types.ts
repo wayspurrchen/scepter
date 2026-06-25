@@ -1,7 +1,7 @@
 // Type management related interfaces
 
 /**
- * @implements {T011} Phase 3 - Added allowedStatuses info
+ * @implements {R019.§4.AC.03} TypeInfo carries the per-type status config for the listing surface
  */
 export interface TypeInfo {
   type: string;
@@ -14,7 +14,7 @@ export interface TypeInfo {
   color?: string;
   /**
    * Allowed statuses configuration for this type
-   * @implements {T011.3.3} Status info in type listing
+   * @implements {R019.§4.AC.03} Resolved status config (mode, values, default) for the listing surface
    */
   allowedStatuses?: {
     mode: 'suggest' | 'enforce' | 'none';

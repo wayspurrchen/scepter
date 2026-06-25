@@ -1,7 +1,11 @@
 /**
  * Status Validator Tests
  *
- * @implements {T011.2.2} Tests for status validator
+ * @validates {R019.§2.AC.01} Set expansion and literal-value combination
+ * @validates {R019.§2.AC.02} Ungoverned types resolve to null / mode 'none'
+ * @validates {R019.§2.AC.03} Enforce-mode invalidation
+ * @validates {R019.§2.AC.04} Suggest-mode warning
+ * @validates {R019.§1.AC.02} Shorthand default and suggest mode
  */
 
 import { describe, it, expect } from 'vitest';

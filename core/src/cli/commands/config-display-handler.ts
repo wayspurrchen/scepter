@@ -1,5 +1,6 @@
 /**
- * @implements {T011} Phase 3 - CLI Integration for status sets display
+ * @implements {R019.§4.AC.01} `scepter config` displays per-type allowed statuses, mode, and default
+ * @implements {R019.§4.AC.02} `scepter config` displays the project's reusable status sets
  */
 import type { ProjectManager } from '../../project/project-manager';
 import type { SCEpterConfig, AllowedStatusesConfig } from '../../types/config';
@@ -9,7 +10,7 @@ export interface ConfigDisplayOptions {
   noteTypes?: boolean;
   paths?: boolean;
   source?: boolean;
-  statusSets?: boolean; // @implements {T011.3.2} Display status sets
+  statusSets?: boolean; // @implements {R019.§4.AC.02} Opt into status-sets display
   json?: boolean;
   yaml?: boolean;
 }
@@ -51,7 +52,7 @@ export class ConfigDisplayHandler {
       this.displaySourceCodeIntegration(config);
     }
 
-    // @implements {T011.3.2} Display status sets section
+    // @implements {R019.§4.AC.02} Display status sets section
     if (showAll || options.statusSets) {
       this.displayStatusSets(config);
     }
@@ -77,7 +78,7 @@ export class ConfigDisplayHandler {
         console.log(`  ${chalk.dim(' '.repeat(maxNameLength))} ${chalk.dim('│')}     ${chalk.dim('│')} ${chalk.dim(typeConfig.description)}`);
       }
 
-      // @implements {T011.3.2} Display allowed statuses per note type
+      // @implements {R019.§4.AC.01} Display allowed statuses per note type
       if (typeConfig.allowedStatuses) {
         const statusInfo = this.formatAllowedStatuses(typeConfig.allowedStatuses, config.statusSets);
         console.log(`  ${chalk.dim(' '.repeat(maxNameLength))} ${chalk.dim('│')}     ${chalk.dim('│')} ${statusInfo}`);
@@ -88,7 +89,7 @@ export class ConfigDisplayHandler {
 
   /**
    * Format allowed statuses configuration for display
-   * @implements {T011.3.2} Status display formatting
+   * @implements {R019.§4.AC.01} Format a type's allowed values with mode and default
    */
   private formatAllowedStatuses(
     allowedStatuses: string[] | AllowedStatusesConfig,
@@ -212,7 +213,7 @@ export class ConfigDisplayHandler {
 
   /**
    * Display status sets section
-   * @implements {T011.3.2} Status sets display
+   * @implements {R019.§4.AC.02} Render each status set and its values
    */
   private displayStatusSets(config: SCEpterConfig): void {
     console.log(chalk.cyan(chalk.bold('Status Sets:')));

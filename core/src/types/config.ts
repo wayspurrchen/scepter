@@ -6,6 +6,8 @@ export interface StatusMapping {
 /**
  * Configuration for allowed statuses on a note type.
  * Supports referencing reusable status sets and/or literal values.
+ *
+ * @implements {R019.§1.AC.01} Object form of the allowedStatuses declaration (sets/values/mode/defaultValue)
  */
 export interface AllowedStatusesConfig {
   /**
@@ -94,6 +96,8 @@ export interface NoteTypeConfig {
    *   "defaultValue": "pending"
    * }
    * ```
+   *
+   * @implements {R019.§1.AC.01} Per-type allowedStatuses: shorthand array or full object
    */
   allowedStatuses?: string[] | AllowedStatusesConfig;
 
@@ -251,6 +255,8 @@ export interface SCEpterConfig {
    * ```
    *
    * Note types can then reference these sets in their `allowedStatuses.sets` field.
+   *
+   * @implements {R019.§1.AC.05} Top-level map of named reusable status sets
    */
   statusSets?: Record<string, string[]>;
 

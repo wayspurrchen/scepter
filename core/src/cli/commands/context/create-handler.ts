@@ -1,6 +1,6 @@
 /**
  * @implements {T003} - Folder-based notes creation handler
- * @implements {T011} Phase 3 - Status validation integration
+ * @implements {R019.§3.AC.02} CLI create-time status validation integration
  */
 import fs from 'fs-extra';
 import * as os from 'os';
@@ -55,7 +55,10 @@ export async function createNote(
   // Use resolved type name for all operations
   type = resolvedType;
 
-  // @implements {T011.3.1} Status validation before note creation
+  // @implements {R019.§3.AC.01} Apply the type's default when the caller names no status
+  // @implements {R019.§3.AC.02} Validate the resolved status before creating the note
+  // @implements {R019.§3.AC.03} Enforce mode blocks creation with an allowed-values error
+  // @implements {R019.§3.AC.04} Suggest mode warns and continues
   const statusValidator = projectManager.statusValidator;
   let finalStatus = options.status;
 

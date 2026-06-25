@@ -1,5 +1,5 @@
 /**
- * @implements {T011} Phase 3 - Added status info display
+ * @implements {R019.§4.AC.03} Type-listing surface exposes per-type status config
  */
 import { ProjectManager } from '../../../project/project-manager.js';
 import { formatTable } from '../../formatters/table-formatter.js';
@@ -10,7 +10,7 @@ import chalk from 'chalk';
 export interface ListOptions {
   json?: boolean;
   stats?: boolean;
-  statuses?: boolean; // @implements {T011.3.3} Show status info per type
+  statuses?: boolean; // @implements {R019.§4.AC.03} Show status info per type
 }
 
 export interface ListResult {
@@ -90,7 +90,7 @@ export async function listTypes(options: ListOptions, projectPath: string): Prom
 
     let output = formatTable(fakeNotes, { columns });
 
-    // @implements {T011.3.3} Add status info section if requested or any types have status config
+    // @implements {R019.§4.AC.03} Add status info section if requested or any types have status config
     if (options.statuses || types.some(t => t.allowedStatuses)) {
       const statusOutput = formatStatusInfo(types, options.statuses);
       if (statusOutput) {
@@ -111,7 +111,7 @@ export async function listTypes(options: ListOptions, projectPath: string): Prom
 
 /**
  * Format status info for display
- * @implements {T011.3.3} Status info in type listing
+ * @implements {R019.§4.AC.03} Render per-type allowed values with mode and default
  */
 function formatStatusInfo(types: TypeInfo[], showAll: boolean = false): string {
   const typesWithStatuses = types.filter(t => t.allowedStatuses);

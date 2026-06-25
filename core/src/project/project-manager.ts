@@ -71,7 +71,10 @@ export interface ProjectStatistics {
 }
 
 /**
- * @implements {T011} Phase 3 - CLI Integration
+ * Project orchestrator: owns the config, note, reference, and claim subsystems
+ * and the per-type StatusValidator (initialized in initialize()).
+ *
+ * @see {R019} Hosts and initializes the per-type status-validation subsystem
  */
 export class ProjectManager extends EventEmitter {
   public readonly configManager: ConfigManager;
@@ -216,7 +219,7 @@ export class ProjectManager extends EventEmitter {
       config = loaded;
     }
 
-    // @implements {T011} Initialize status validator after config is loaded
+    // @implements {R019.§3.AC.02} Initialize the status validator the create path uses, after config load
     this.statusValidator = new StatusValidator(config);
 
     // Initialize note type resolver after config is loaded
@@ -388,7 +391,7 @@ export class ProjectManager extends EventEmitter {
         ? (await this.templateStorage.getTemplate(typeName)) !== null
         : false;
 
-      // @implements {T011.3.3} Populate allowedStatuses info for type listing
+      // @implements {R019.§4.AC.03} Populate resolved allowedStatuses info for the type listing
       let allowedStatusesInfo: TypeInfo['allowedStatuses'];
       if (this.statusValidator && this.statusValidator.hasAllowedStatuses(typeName)) {
         const mode = this.statusValidator.getMode(typeName);

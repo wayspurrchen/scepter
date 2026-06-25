@@ -127,7 +127,7 @@ When a note is linted, each field declared for the note's type is checked agains
 
 ## References
 
-- Generalizes the per-type `status` governance mechanism (`allowedStatuses` / `StatusValidator`), which has no requirement note of its own. The field-set lifecycle (declare → stamp at create → validate at lint) and the cross-field default-in-allowed check are modeled on it directly.
+- {R019} — Per-Type Predefined Status Values. R018 generalizes R019's per-type `status` governance mechanism (`allowedStatuses` / `StatusValidator`) from the hard-coded `status` field to an arbitrary set of declared frontmatter fields. The field-set lifecycle (declare → stamp at create → validate at lint) and the cross-field default-in-allowed check are modeled on it directly.
 - {R008} — Folder Note Claim Aggregation. Lint operates over the aggregated note unit; field validation reads the main file's frontmatter, which is the authoritative frontmatter for a folder note.
 - Config-surface sibling: {R010} — Verification Actor Default and Strictness Configuration, another per-project config-governance requirement validated at config-load time.
 

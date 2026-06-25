@@ -67,6 +67,10 @@ export const StatusMappingsRecordSchema = z.record(
 /**
  * Schema for object-form allowed statuses configuration.
  * Validates structure but not cross-references to statusSets (done later).
+ *
+ * @implements {R019.§1.AC.02} mode defaults to 'suggest'
+ * @implements {R019.§1.AC.03} mode is 'suggest' or 'enforce'; at least one of sets/values required
+ * @implements {R019.§1.AC.04} defaultValue required when mode is 'enforce'
  */
 export const AllowedStatusesConfigSchema = z.object({
   sets: z.array(z.string().min(1, 'Set name cannot be empty')).optional(),
@@ -85,6 +89,8 @@ export const AllowedStatusesConfigSchema = z.object({
 
 /**
  * Schema for allowed statuses - either shorthand array or full object config.
+ *
+ * @implements {R019.§1.AC.01} allowedStatuses is a non-empty array or the object form
  */
 export const AllowedStatusesSchema = z.union([
   z.array(z.string().min(1, 'Status value cannot be empty')).min(1, 'At least one status value is required'),
@@ -94,6 +100,8 @@ export const AllowedStatusesSchema = z.union([
 /**
  * Schema for statusSets at the config root level.
  * Keys must be valid identifiers, values must be non-empty string arrays.
+ *
+ * @implements {R019.§1.AC.05} Named status sets map identifier-shaped names to non-empty value lists
  */
 export const StatusSetsSchema = z.record(
   z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Status set key must be a valid identifier'),
@@ -372,6 +380,8 @@ const SCEpterConfigBaseSchema = z.object({
 /**
  * Helper to resolve all allowed status values for a note type,
  * expanding referenced status sets.
+ *
+ * @implements {R019.§2.AC.01} Expand referenced sets and combine with literal values
  */
 function resolveAllowedStatusValues(
   allowedStatuses: string[] | AllowedStatusesConfig,
@@ -407,6 +417,9 @@ function resolveAllowedStatusValues(
  * Validates cross-references between allowedStatuses and statusSets.
  * - Ensures all referenced sets in allowedStatuses.sets exist in statusSets
  * - Ensures defaultValue is in the resolved allowed values
+ *
+ * @implements {R019.§2.AC.05} Reject reference to a status set absent from statusSets
+ * @implements {R019.§2.AC.06} Reject defaultValue not in the resolved allowed values
  */
 function validateStatusSetsReferences(config: z.infer<typeof SCEpterConfigBaseSchema>): ValidationError[] {
   const errors: ValidationError[] = [];

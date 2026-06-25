@@ -34,7 +34,9 @@
  * }
  * ```
  *
- * @implements {T011} Phase 2 - Status Validation Service
+ * @implements {R019.§2.AC.01} Resolve effective allowed values (expand sets + combine literals)
+ * @implements {R019.§2.AC.03} Enforce-mode invalidation with allowed-values message
+ * @implements {R019.§2.AC.04} Suggest-mode warning on out-of-set status
  */
 
 import type { SCEpterConfig, AllowedStatusesConfig } from '../types/config';
@@ -42,7 +44,8 @@ import type { SCEpterConfig, AllowedStatusesConfig } from '../types/config';
 /**
  * Result of validating a status value
  *
- * @implements {T011.2.1} StatusValidationResult interface
+ * @implements {R019.§2.AC.03} Carries enforce-mode invalid result with allowed-values message
+ * @implements {R019.§2.AC.04} Carries suggest-mode valid-with-warning result
  */
 export interface StatusValidationResult {
   /**
@@ -101,7 +104,7 @@ export interface StatusValidationResult {
  * const allowed = validator.resolveAllowedStatuses('Task');
  * ```
  *
- * @implements {T011.2.1} StatusValidator class
+ * @implements {R019.§2.AC.01} Status validation engine resolving and checking per-type allowed values
  */
 export class StatusValidator {
   private config: SCEpterConfig;
@@ -124,7 +127,8 @@ export class StatusValidator {
    * validator.resolveAllowedStatuses('Task');
    * // Returns: ["pending", "in-progress", "completed", "on-hold"]
    *
-   * @implements {T011.2.1} resolveAllowedStatuses method
+   * @implements {R019.§2.AC.01} Expand referenced sets and combine with literal values
+   * @implements {R019.§2.AC.02} Returns null (no governed values) when type declares no allowedStatuses
    */
   resolveAllowedStatuses(noteType: string): string[] | null {
     const noteTypeConfig = this.config.noteTypes?.[noteType];
@@ -186,7 +190,9 @@ export class StatusValidator {
    * //   allowedValues: ['draft', 'proposed', 'approved']
    * // }
    *
-   * @implements {T011.2.1} validateStatus method
+   * @implements {R019.§2.AC.02} Reports mode 'none' and accepts any status when type is ungoverned
+   * @implements {R019.§2.AC.03} Reports invalid under enforce with allowed-values message
+   * @implements {R019.§2.AC.04} Reports valid-with-warning under suggest
    */
   validateStatus(status: string | undefined, noteType: string): StatusValidationResult {
     const allowedValues = this.resolveAllowedStatuses(noteType);
@@ -268,7 +274,7 @@ export class StatusValidator {
    * // Object: { sets: ["workflow"], defaultValue: "draft" }
    * validator.getDefaultStatus('Decision'); // Returns: "draft"
    *
-   * @implements {T011.2.1} getDefaultStatus method
+   * @implements {R019.§1.AC.02} Shorthand default is the array's first element; object default is its defaultValue
    */
   getDefaultStatus(noteType: string): string | null {
     const noteTypeConfig = this.config.noteTypes?.[noteType];
@@ -297,7 +303,7 @@ export class StatusValidator {
    * @param noteType The note type to check
    * @returns true if allowedStatuses is configured, false otherwise
    *
-   * @implements {T011.2.1} hasAllowedStatuses method
+   * @implements {R019.§2.AC.02} Distinguishes governed types from ungoverned (no allowedStatuses) types
    */
   hasAllowedStatuses(noteType: string): boolean {
     const noteTypeConfig = this.config.noteTypes?.[noteType];
@@ -314,7 +320,8 @@ export class StatusValidator {
    * @param noteType The note type to get the mode for
    * @returns 'suggest', 'enforce', or 'none'
    *
-   * @implements {T011.2.1} getMode method
+   * @implements {R019.§1.AC.02} Shorthand array form resolves to 'suggest' mode
+   * @implements {R019.§2.AC.02} Ungoverned type resolves to 'none'
    */
   getMode(noteType: string): 'suggest' | 'enforce' | 'none' {
     const noteTypeConfig = this.config.noteTypes?.[noteType];

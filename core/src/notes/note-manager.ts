@@ -1,6 +1,6 @@
 /**
  * @implements {T003} - Support for isFolder parameter in note creation
- * @implements {T011} Phase 4 - Status validation in NoteManager
+ * @implements {R019.§3.AC.02} Create-time status validation in NoteManager
  */
 import { EventEmitter } from 'events';
 import * as path from 'path';
@@ -105,7 +105,7 @@ export class NoteManager extends EventEmitter {
   private isInitialized: boolean = false;
   private unifiedDiscovery: UnifiedDiscovery;
   /**
-   * @implements {T011} Status validator for note status enforcement/suggestion
+   * @implements {R019.§3.AC.02} Status validator the create path uses to enforce/suggest
    * Created lazily when first needed to ensure config is loaded
    */
   private statusValidator?: StatusValidator;
@@ -133,7 +133,7 @@ export class NoteManager extends EventEmitter {
 
   /**
    * Get or create the StatusValidator instance
-   * @implements {T011} Lazy initialization ensures config is loaded
+   * @implements {R019.§3.AC.02} Lazy validator init ensures config is loaded before create-time validation
    */
   private getStatusValidator(): StatusValidator | undefined {
     if (!this.statusValidator) {
@@ -467,7 +467,10 @@ export class NoteManager extends EventEmitter {
       throw new Error(`Note ${id} already exists`);
     }
 
-    // @implements {T011.4.1} Status validation and default application
+    // @implements {R019.§3.AC.01} Apply the type's default status when none is supplied
+    // @implements {R019.§3.AC.02} Validate the resulting status before the note file is written
+    // @implements {R019.§3.AC.03} Enforce mode aborts creation with an allowed-values error
+    // @implements {R019.§3.AC.04} Suggest mode emits a warning and proceeds
     let finalStatus = params.status;
     const statusValidator = this.getStatusValidator();
     if (statusValidator) {
@@ -523,7 +526,7 @@ export class NoteManager extends EventEmitter {
       modified: new Date(), // Set modified same as created initially
       contextHints: params.contextHints,
       ...(params.isFolder && { isFolder: true }), // Requested as folder (may be overridden by type config)
-      // @implements {T011.4.1} Use finalStatus which includes default application
+      // @implements {R019.§3.AC.05} Stamp the resolved status (caller-supplied or default) into frontmatter
       ...(finalStatus && { metadata: { status: finalStatus } }),
     };
 
