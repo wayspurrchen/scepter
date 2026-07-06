@@ -61,9 +61,20 @@ const unresolvedDecoration = vscode.window.createTextEditorDecorationType({
   cursor: 'default',
 });
 
-// Section reference — very subtle, just a thin dotted underline
+// Section reference — a section citation resolves to the section's full
+// content (every claim and prose block under the heading), so it is styled as
+// a resolved, clickable reference just like a claim ref: teal color, dotted
+// underline, pointer, overview-ruler mark. Previously it had no `color:` at
+// all — only a 40%-alpha underline — so the reference text rendered in the
+// editor's default foreground and read as gray/unresolved "no content."
+// @see {R012.§2} section-reference hover/rendering surface
+// @see {T013} section-decoration resolved-style fix
 const sectionDecoration = vscode.window.createTextEditorDecorationType({
-  textDecoration: 'underline dotted rgba(78, 201, 176, 0.4)',
+  textDecoration: 'underline dotted',
+  color: '#4EC9B0',
+  cursor: 'pointer',
+  overviewRulerColor: '#4EC9B044',
+  overviewRulerLane: vscode.OverviewRulerLane.Right,
 });
 
 // Cross-project resolved reference — purple hue, dotted underline.

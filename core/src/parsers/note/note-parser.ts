@@ -188,7 +188,14 @@ function parseLineForMentions(
   // Find all potential note mention starts
   // Use negative lookahead to ensure we don't match if there are more digits after
   // Groups: 1=noteID, 2=claimPath, 3=claimMetadata, 4=modifiers, 5=tags
-  const startRegex = /\{([A-Z]{1,5}\d{3,5})(?!\d)((?:\.§?\d+)*(?:\.[A-Z]+\.\d{2,3}[a-z]?)?)?(?::([A-Za-z0-9,]+))?([$+><*]+)?(?:#([^:}\n]+))?/g;
+  // The claim segment carries an optional `§?` before the prefix so a
+  // section-less citation written with the § marker (e.g. `{DD018.§DC.06}`)
+  // captures its claim path. Without it, the § only matched on numeric
+  // sections (`.§3`), so `.§DC.06` fell through to a bare note-level mention
+  // and the claim-level `@implements` was invisible to trace/gaps coverage.
+  // @see {R004.§2.AC.03} § is optional emphasis — source-mention parity with note-content parser
+  // @see {T012} section-less §-claim source-annotation coverage fix
+  const startRegex = /\{([A-Z]{1,5}\d{3,5})(?!\d)((?:\.§?\d+)*(?:\.§?[A-Z]+\.\d{2,3}[a-z]?)?)?(?::([A-Za-z0-9,]+))?([$+><*]+)?(?:#([^:}\n]+))?/g;
 
   // Track processed regions to avoid parsing mentions inside other mentions
   const processedRegions: Array<{ start: number; end: number }> = [];

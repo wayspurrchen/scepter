@@ -564,6 +564,7 @@ claims/trace-handler.ts
 | R004.§2.AC.01 | `parseClaimReferences()` with braceless mode + shortcode validation | `claim-parser.ts`, `note-parser.ts` | 6 |
 | R004.§2.AC.02 | Existing `parseNoteMentions()` continues unchanged for braced refs | `note-parser.ts` | 6 |
 | R004.§2.AC.03 | `normalizeSectionSymbol()` strips `§` for canonical comparison | `claim-parser.ts` | 1 |
+| R004.§2.AC.03 (source-annotation projection) | `parseNoteMentions()` mention-scan regex honors `§?` before the claim prefix on section-less citations (e.g. `{DD018.§DC.06}`) — gap fixed by {T012}, 2026-07-06; row added retroactively, this realization site was absent from the original Phase 1 design | `note-parser.ts` | 1 (fix: {T012}) |
 | R004.§2.AC.04 | `parseMetadataSuffix()` extracts colon-separated metadata | `claim-parser.ts` | 1 |
 | R004.§2.AC.05 | `ClaimConfig.bracelessMatching` field in `SCEpterConfig` | `config.ts` | 2 |
 | R004.§3.AC.01 | `ClaimNode` with `type: 'section'` from heading parser | `claim-tree.ts` | 1 |

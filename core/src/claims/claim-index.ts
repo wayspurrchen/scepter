@@ -668,6 +668,23 @@ export class ClaimIndex {
       }
     }
 
+    // Group entries by note ONCE so `findContainingClaim` scans only the
+    // citing note's own claims instead of re-walking every entry in the
+    // index per reference. On large corpora (thousands of notes, tens of
+    // thousands of references) the prior O(references × all-entries) scan
+    // was a dominant cost; this makes it O(references × claims-in-note).
+    // All entries are fully populated by now (Phase 1), so the grouping is
+    // stable for the whole Phase 2 pass.
+    const entriesByNote = new Map<string, ClaimIndexEntry[]>();
+    for (const entry of this.data.entries.values()) {
+      const list = entriesByNote.get(entry.noteId);
+      if (list) {
+        list.push(entry);
+      } else {
+        entriesByNote.set(entry.noteId, [entry]);
+      }
+    }
+
     // Phase 2: Scan content for cross-references
     for (const note of notes) {
       const parseOptions: ClaimParseOptions = {
@@ -675,6 +692,8 @@ export class ClaimIndex {
         bracelessEnabled: true,
         currentDocumentId: note.id,
       };
+
+      const noteEntries = entriesByNote.get(note.id);
 
       const refs = parseClaimReferences(note.content, parseOptions);
 
@@ -746,7 +765,7 @@ export class ClaimIndex {
           }
 
           // Find the claim in the current note that contains this reference line
-          const fromClaim = this.findContainingClaim(note.id, ref.line);
+          const fromClaim = this.findContainingClaim(noteEntries, ref.line);
 
           this.data.crossRefs.push({
             fromClaim: fromClaim ?? `${note.id}:line-${ref.line}`,
@@ -806,7 +825,7 @@ export class ClaimIndex {
             // Also create an unresolved cross-reference so the trace command
             // can surface broken refs instead of silently dropping them.
             // Attach the full resolver outcome per OQ.02 closure.
-            const fromClaim = this.findContainingClaim(note.id, ref.line);
+            const fromClaim = this.findContainingClaim(noteEntries, ref.line);
             this.data.crossRefs.push({
               fromClaim: fromClaim ?? `${note.id}:line-${ref.line}`,
               toClaim: rawRef,
@@ -947,14 +966,26 @@ export class ClaimIndex {
   // -------------------------------------------------------------------------
 
   /**
-   * Find the claim entry in a note that contains a given line number.
-   * Returns the fully qualified ID, or null if the line is outside any claim.
+   * Find the claim entry (among a single note's claims) that contains a
+   * given line number. Returns the fully qualified ID, or null if the line
+   * is outside any claim.
+   *
+   * `noteEntries` is the pre-grouped list of the current note's claim
+   * entries (see the `entriesByNote` map built once per Phase 2). Passing
+   * the note's own claims rather than scanning the entire index turns the
+   * per-reference cost from O(all entries) into O(claims-in-note) — the
+   * difference between a linear rescan of every claim in the project on
+   * each of thousands of references and a scan of the few dozen claims in
+   * the citing note.
    */
-  private findContainingClaim(noteId: string, line: number): string | null {
+  private findContainingClaim(
+    noteEntries: readonly ClaimIndexEntry[] | undefined,
+    line: number,
+  ): string | null {
+    if (!noteEntries) return null;
     let bestMatch: ClaimIndexEntry | null = null;
 
-    for (const entry of this.data.entries.values()) {
-      if (entry.noteId !== noteId) continue;
+    for (const entry of noteEntries) {
       if (line >= entry.line && line <= entry.endLine) {
         // Prefer the most specific (smallest range) containing claim
         if (!bestMatch || (entry.endLine - entry.line) < (bestMatch.endLine - bestMatch.line)) {

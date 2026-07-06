@@ -30,6 +30,7 @@ If the claim does NOT fit one of these, it is NOT a claim. Common failure modes:
 - **"MUST be possible during DSL editing, plan composition, or interactive UI editing"** — workflow context, not a system observable
 - **"This requirement MUST NOT pre-resolve Q042"** — meta-claim about the document, not the system
 - **"Documentation MUST cite §1.4 of E029"** — documentation rule, not a system requirement
+- **"Note X's posture supersedes note Y's" / "Y's open question is settled by later canon" / "Z's machinery is reclassified to cluster W"** — a cross-artifact reconciliation or supersession *record*, not a system assertion. When a spec merges prior design generations, the where-each-piece-now-lives accounting belongs in coherence/prose sections and in lifecycle tags (`:superseded=`), not in numbered claims — claim syntax on placement history is unfalsifiable bookkeeping wearing a contract's clothes. Keep as claims only the residue that binds implementations (e.g. "every implementation of X MUST also compute Y independently")
 
 Each says something real, but none is a claim. Move them to overview, scope, or design-principle prose, or decompose into testable assertions where applicable.
 

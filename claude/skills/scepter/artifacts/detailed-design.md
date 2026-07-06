@@ -43,6 +43,10 @@ A detailed design document has five core sections and up to three conditional UI
 
 **5. Traceability Matrix** — Every spec requirement maps to its design realization. Every design decision maps back to a spec requirement. Two-directional: forward (spec → design → file) and backward (file → design → spec). Missing coverage in either direction is the primary signal that the design is incomplete or over-scoped.
 
+### Section Orientation Summaries (required)
+
+Every claim-bearing section (a § of DCs, a module design, a contract definition) opens with a short plain-language orientation BEFORE the claims: 2-6 sentences — or a compact interface/type sketch where the section defines a module surface — stating what the thing IS, what it does, and what the claims below govern. The reader must be able to understand the section's subject without reconstructing it from the claim list. Claims are the contract; the orientation is the mental model. When a section defines a programmable surface, show the interface definition directly: a 10-line `interface` block orients faster than any prose. This mirrors the Overview discipline in the requirements/specification/architecture guides; detailed designs need it MORE, not less, because DC claims are the densest projection a human reviewer has to ratify.
+
 ### Conditional UI Sections
 
 **Visual State Catalog** — For each stateful UI component, enumerate all visual states (empty, loading, populated, error, etc.) with entry conditions, visual description, exit conditions, and spec reference. Include when the design introduces or modifies components with user-visible state changes.
@@ -725,6 +729,10 @@ Adding design decisions that have no corresponding spec requirement. If the desi
 ### Skipping Verification Points [Structural]
 
 An integration sequence without verification points is just a task list. Every step MUST have a testable verification criterion. "It compiles" is a valid verification. "It renders identically to before" is a valid verification. "The component displays the correct number of rows" is a valid verification. But each step needs one.
+
+### Claims Without Orientation [Structural]
+
+A section that opens directly with `§N.DC.01 …` and expects the reader to infer the module's shape from the claim list. Human reviewers ratify DDs; a DD whose sections cannot be skimmed does not get properly reviewed. Every claim section gets its orientation summary (see Section Orientation Summaries above), and where the section defines a module surface, the interface sketch.
 
 ### Treating the Design as Disposable [Process]
 

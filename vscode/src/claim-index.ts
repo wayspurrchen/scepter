@@ -751,6 +751,9 @@ export class ClaimIndexCache {
   /**
    * Read a section's content from line to endLine (inclusive). Falls back to
    * a fixed window when endLine is missing or matches line (one-line stub).
+   *
+   * @see {R012.§2.AC.12} section-hover body excerpt
+   * @see {T013} full-section rendering (endLine authoritative, no maxLines clamp on real sections)
    */
   async readSectionContent(entry: SectionEntry, maxLines = 200): Promise<string | null> {
     try {
@@ -763,8 +766,15 @@ export class ClaimIndexCache {
       }
       const lines = content.split('\n');
       const startIdx = Math.max(0, entry.line - 1);
-      const stubEnd = entry.endLine && entry.endLine > entry.line ? entry.endLine : startIdx + maxLines;
-      const endIdx = Math.min(lines.length, Math.min(stubEnd, startIdx + maxLines));
+      // A real section renders its entire [line, endLine] slice — the whole
+      // section, all nested claims and prose. `maxLines` is only a fallback
+      // window for one-line stubs (endLine absent or equal to line), matching
+      // this method's documented "line to endLine inclusive" contract; it must
+      // NOT clamp a genuine section, or long sections silently lose their tail.
+      const hasRealEnd = entry.endLine !== undefined && entry.endLine > entry.line;
+      const endIdx = hasRealEnd
+        ? Math.min(lines.length, entry.endLine)
+        : Math.min(lines.length, startIdx + maxLines);
       return lines.slice(startIdx, endIdx).join('\n');
     } catch {
       return null;

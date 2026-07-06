@@ -1377,6 +1377,37 @@ describe('Note Parser - Claim-Level Addressability', () => {
         claimPath: '.§3.AC.01a',
       });
     });
+
+    // Section-less citation with the § marker directly before the claim
+    // prefix (`{DD018.§DC.06}`). This is the common `@implements` shape for a
+    // note whose claims carry no numeric section. Before the `§?` was added to
+    // the claim-segment portion of the mention regex, the § only matched on a
+    // numeric section (`.§3`), so this form lost its claim path entirely and
+    // degraded to a bare note-level mention — making claim-level source
+    // coverage invisible to `scepter trace`/`gaps`.
+    it('should capture section-less claim path with § marker {DD018.§DC.06}', () => {
+      // @validates {R004.§2.AC.03} § is optional emphasis — section-less source-mention parity
+      const content = ' * @implements {DD018.§DC.06} CrossTypeQueryEngine class';
+      const mentions = parseNoteMentions(content);
+
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0]).toMatchObject({
+        id: 'DD018',
+        claimPath: '.§DC.06',
+      });
+    });
+
+    it('should capture section-less §-marked claim path with sub-letter {DD018.§DC.06a}', () => {
+      // @validates {R004.§2.AC.03} § optionality holds with a claim sub-letter
+      const content = 'Addresses {DD018.§DC.06a} specifically.';
+      const mentions = parseNoteMentions(content);
+
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0]).toMatchObject({
+        id: 'DD018',
+        claimPath: '.§DC.06a',
+      });
+    });
   });
 
   describe('claim path with metadata', () => {

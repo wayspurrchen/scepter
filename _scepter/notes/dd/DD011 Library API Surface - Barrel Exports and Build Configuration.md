@@ -1069,3 +1069,13 @@ These claims are about the VS Code extension migration and are deferred to a sep
 | Tests | Not in this DD | Verification plan uses ad-hoc scripts; formal test is out of scope for Phase 1-2 |
 | CLI | No change | CLI entry point unaffected |
 | Docs | Not in this DD | API documentation is a Phase 3+ concern |
+
+---
+
+## Related Notes
+
+- {T010} (2026-06-23) — Stripped the heavy chat/llm runtime deps and set up npm publishing. Deleted
+  `core/src/chat/` and most of `core/src/llm/`, removed `@anthropic-ai/claude-code`, `@anthropic-ai/sdk`,
+  `openai`, and `handlebars` from `dependencies`. The barrel-exclusion claims here ({DD011.§DC.05},
+  {DD011.§DC.06}, {DD011.§DC.11}) remain *satisfied* but their text/rationale referencing `chat/` and
+  "external service dependencies" is now stale — see the inline `stale-for` markers on those claims.

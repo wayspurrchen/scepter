@@ -82,6 +82,35 @@ export class PeerProjectResolver {
    * the same alias share a single load. */
   private peerCache = new Map<string, Promise<ResolveResult>>();
 
+  /**
+   * Per-alias cache of the peer's *built claim index* promise. The peer
+   * ProjectManager (in `peerCache`) is loaded once, but its claim index
+   * must also be built (parse every peer note, resolve every reference)
+   * before `getClaim` can answer — an O(refs × claims) pass that on a
+   * large peer (thousands of notes) costs seconds. Without this cache
+   * every `lookupClaim` rebuilt the whole peer index from scratch, so a
+   * note with N cross-project refs paid N full rebuilds per refresh and
+   * every hover paid another — pinning the single-threaded extension
+   * host for seconds-to-minutes at a time.
+   *
+   * Keyed by alias name and invalidated alongside `peerCache` in
+   * `invalidate()` / `invalidateChanged()`, so an alias whose target
+   * path changes rebuilds on next lookup. Within a stable session the
+   * peer index is built exactly once per alias.
+   *
+   * DD015 designed `lookupClaim` to query an already-built peer index
+   * (`claimIndex.getClaim(fqid)`) backed by this "peer-index cache owned
+   * by core" — the prior implementation cached only the peer
+   * `ProjectManager` and rebuilt its claim index on every lookup, which
+   * is the conformance gap this field closes.
+   *
+   * @implements {R011.§4.AC.07} peer-index cache owned by core
+   * @see {R011.§2.AC.06} mirrors the per-invocation peer-*loading* cache
+   *   (realized separately by `peerCache`/`resolve()`); this field is the
+   *   peer-*index* cache, so §2.AC.06 is a cross-reference, not a claim it realizes.
+   */
+  private peerIndexCache = new Map<string, Promise<void>>();
+
   constructor(
     private readonly configManager: ConfigManager,
     private readonly factory: PeerProjectFactory,
@@ -190,18 +219,9 @@ export class PeerProjectResolver {
         message: `Cannot construct fully qualified claim ID from address '${address.raw}' (missing note ID and/or claim prefix).`,
       };
     }
-    // Build the peer's claim index from peer notes.
-    const peerNotes = await result.projectManager.noteManager.getAllNotes();
-    const peerNotesWithContent = await Promise.all(peerNotes.map(async (n) => {
-      const content = await result.projectManager.noteFileManager.getAggregatedContents(n.id);
-      return {
-        id: n.id,
-        type: n.type ?? '',
-        filePath: n.filePath ?? '',
-        content: content ?? '',
-      };
-    }));
-    result.projectManager.claimIndex.build(peerNotesWithContent);
+    // Build the peer's claim index once per alias, then reuse it. Rebuilding
+    // on every lookup is what pinned the extension host — see peerIndexCache.
+    await this.ensurePeerIndexBuilt(address.aliasPrefix, result.projectManager);
     const entry = result.projectManager.claimIndex.getClaim(fqid);
     if (!entry) {
       return {
@@ -212,6 +232,38 @@ export class PeerProjectResolver {
       };
     }
     return { ok: true, peer: result, entry };
+  }
+
+  /**
+   * Build the peer's claim index exactly once per alias and memoize the
+   * in-flight/completed build promise. Concurrent lookups for the same
+   * alias share a single build; subsequent lookups reuse the already-built
+   * `projectManager.claimIndex`.
+   *
+   * If the build throws, the cache entry is dropped so a later lookup can
+   * retry rather than being poisoned by a rejected promise.
+   */
+  private ensurePeerIndexBuilt(aliasName: string, projectManager: ProjectManager): Promise<void> {
+    const cached = this.peerIndexCache.get(aliasName);
+    if (cached) return cached;
+    const promise = (async () => {
+      const peerNotes = await projectManager.noteManager.getAllNotes();
+      const peerNotesWithContent = await Promise.all(peerNotes.map(async (n) => {
+        const content = await projectManager.noteFileManager.getAggregatedContents(n.id);
+        return {
+          id: n.id,
+          type: n.type ?? '',
+          filePath: n.filePath ?? '',
+          content: content ?? '',
+        };
+      }));
+      projectManager.claimIndex.build(peerNotesWithContent);
+    })().catch((err) => {
+      this.peerIndexCache.delete(aliasName);
+      throw err;
+    });
+    this.peerIndexCache.set(aliasName, promise);
+    return promise;
   }
 
   /**
@@ -233,6 +285,7 @@ export class PeerProjectResolver {
    */
   invalidate(aliasName: string): void {
     this.peerCache.delete(aliasName);
+    this.peerIndexCache.delete(aliasName);
   }
 
   /**
@@ -256,6 +309,7 @@ export class PeerProjectResolver {
       if (!next.has(name)) {
         if (this.peerCache.has(name)) {
           this.peerCache.delete(name);
+          this.peerIndexCache.delete(name);
           invalidated.push(name);
         }
       }
@@ -271,6 +325,7 @@ export class PeerProjectResolver {
       if (prevPath !== nextPath || statusChanged) {
         if (this.peerCache.has(name)) {
           this.peerCache.delete(name);
+          this.peerIndexCache.delete(name);
           invalidated.push(name);
         }
       }
